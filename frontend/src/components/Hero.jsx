@@ -16,9 +16,8 @@ export default function Hero() {
   return (
     <section id="home" className="hero-section">
       <Swiper
-        modules={[Navigation, Pagination, Autoplay]}
+        modules={[Navigation, Autoplay]}
         navigation
-        pagination={{ clickable: true }}
         autoplay={{ delay: 5000 }}
         className="hero-swiper"
       >

@@ -54,6 +54,7 @@
 
 .navbar__menu a:hover {
   color: #8BC53F;
+  cursor: pointer;
 }
 
 /* Botón CTA */

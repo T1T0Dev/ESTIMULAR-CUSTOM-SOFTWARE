@@ -82,3 +82,25 @@
   background-color: #8BC53F; /* greenBrand */
   transform: scale(1.05);
 }
+
+.swiper-pagination-bullet {
+  width: 18px;
+  height: 18px;
+  background: #E5007D;
+  opacity: 0.6;
+  border: 2px solid #8BC53F;
+  box-shadow: 0 2px 8px rgba(233,30,99,0.15);
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.swiper-pagination-bullet-active {
+  background: var(--color-secondary);
+  opacity: 1;
+  transform: scale(1.2);
+  border-color: var(--color-primary);
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+  display: none !important;
+}

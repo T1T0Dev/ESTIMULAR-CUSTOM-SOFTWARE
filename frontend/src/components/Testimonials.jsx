@@ -5,11 +5,23 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import '../styles/Testimonials.css';
 
+
+import persona1 from '../assets/persona_prueba1.png';
 const data = [
   { 
     quote: '“Hemos visto un progreso increíble en nuestro hijo desde que comenzó la terapia.”', 
     name: 'Familia Pérez',
-    image: '/images/testimonial-mom.jpg' // <-- poné aquí tu imagen real
+    image: persona1
+  },
+  {
+    quote: '“El equipo es increíblemente atento y profesional.”',
+    name: 'Familia Rodríguez',
+    image: persona1
+  },
+  {
+    quote: '“Recomendaría este centro a cualquier familia que busque apoyo.”',
+    name: 'Familia Fernández',
+    image: persona1
   },
 ];
 
