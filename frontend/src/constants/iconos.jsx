@@ -1,3 +1,5 @@
+
+
 export function getIcon(type) {
   switch (type) {
     case "diagnostico":

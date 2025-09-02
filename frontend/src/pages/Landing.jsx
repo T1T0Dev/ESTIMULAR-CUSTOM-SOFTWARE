@@ -1,25 +1,25 @@
 import Hero from '../components/Hero';
-import AboutEstimular from '../components/SobreEstimular';
+import SobreEstimular from '../components/SobreEstimular';
 import Servicios from '../components/Servicios';
-import Ubication from '../components/Ubicacion';
-import Testimonials from '../components/Testimonios';
-import Gallery from '../components/Galeria';
+import Ubicacion from '../components/Ubicacion';
+import Testimonios from '../components/Testimonios';
+import Galeria from '../components/Galeria';
 import Footer from '../components/Footer';  
 import Navbar from '../components/Navbar';
-import WhatsappButton from '../components/BotonWhatsapp';
+import BotonWhatsapp from '../components/BotonWhatsapp';
 
 export default function Landing() {
   return (
     <div>
         <Navbar/>
         <Hero />
-        <AboutEstimular />
+        <SobreEstimular />
         <Servicios />
-        <Testimonials />
-        <Ubication />
-        <Gallery />
+        <Testimonios />
+        <Ubicacion />
+        <Galeria />
         <Footer />
-        <WhatsappButton />
+        <BotonWhatsapp/>
     </div>
   );
 }

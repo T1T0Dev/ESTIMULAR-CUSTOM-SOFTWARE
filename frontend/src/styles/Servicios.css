@@ -19,6 +19,7 @@
   gap: 4rem; /* espacio amplio como en la imagen */
   max-width: 1200px;
   margin: 0 auto;
+  transition: all 0.4s cubic-bezier(.4,0,.2,1);
 }
 
 .service-item {
@@ -31,7 +32,30 @@
   border-radius: 12px; /* esquinas redondeadas */
   padding: 1rem; /* un poquito de espacio interno */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* sombra suave */
-  transition: transform 0.3s ease, box-shadow 0.3s ease; /* efecto hover */
+  transition: transform 0.4s cubic-bezier(.4,0,.2,1), box-shadow 0.4s, flex 0.4s, opacity 0.4s;
+  cursor: pointer;
+  flex: 1;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.service-item:hover {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 8px 24px rgba(63,174,42,0.12);
+}
+
+.service-item--active {
+  flex: 2.5;
+  z-index: 2;
+  transform: scale(1.08);
+  box-shadow: 0 8px 32px rgba(63,174,42,0.18);
+}
+
+.service-item--hidden {
+  flex: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
 }
 
 .service-desc{
@@ -72,29 +96,3 @@
   box-shadow: 0 2px 8px rgba(229,57,53,0.18);
 }
 
-
-.service-item {
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  background: #fff;
-  border-radius: 16px;
-  padding: 1.5rem 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.service-item:hover {
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 0 8px 24px rgba(63,174,42,0.12);
-}
-
-@media (max-width: 900px) {
-  .services-list {
-    flex-direction: column;
-    gap: 2.5rem;
-    align-items: center;
-  }
-}

@@ -42,9 +42,11 @@
 }
 
 .ubicacion-desc {
-  color: var(--color-secondary);
+  font-weight: bold;
+  color: black;
   font-size: 1.15rem;
   margin-bottom: 1.2rem;
+  
 }
 
 @media (max-width: 800px) {

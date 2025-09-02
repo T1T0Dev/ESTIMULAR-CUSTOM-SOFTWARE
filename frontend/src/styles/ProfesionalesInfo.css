@@ -1,0 +1,112 @@
+/* Estilos para ProfesionalesInfo */
+.service-profesionales {
+  margin-top: 2rem;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(233,30,99,0.10);
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  width: 100%;
+  max-width: 600px;
+  position: relative;
+  animation: modalOpen 0.4s cubic-bezier(.4,0,.2,1);
+}
+
+.service-profesionales--full {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(233,30,99,0.10);
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: modalOpen 0.4s cubic-bezier(.4,0,.2,1);
+}
+
+@keyframes modalOpen {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.service-profesionales__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.7rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  z-index: 2;
+}
+.service-profesionales__close:hover {
+  background: var(--color-secondary);
+}
+
+.service-profesionales__title {
+  color: #8BC53F; 
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+
+.service-profesionales__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.service-profesionales__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 12px;
+  padding: 1rem 1.2rem;
+  box-shadow: 0 2px 8px rgba(233,30,99,0.08);
+  min-width: 220px;
+  max-width: 240px;
+}
+
+.service-profesionales__foto {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--color-primary);
+  background: #fff;
+  margin-bottom: 0.7rem;
+}
+
+.service-profesionales__info h3 {
+  margin: 0 0 0.3rem 0;
+  color: #E91E63;
+  font-size: 1.1rem;
+  text-align: center;
+}
+.service-profesionales__info p {
+  margin: 0.2rem 0;
+  color: var(--color-text);
+  font-size: 0.98rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .service-profesionales--full {
+    max-width: 100vw;
+    padding: 1rem 0.5rem;
+  }
+  .service-profesionales__list {
+    flex-direction: column;
+    align-items: center;
+  }
+}

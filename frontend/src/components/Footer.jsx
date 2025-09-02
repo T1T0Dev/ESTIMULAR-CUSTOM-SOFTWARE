@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import instagramIcon from "../assets/logo_instagram.jpg";
 import facebookIcon from "../assets/logo_facebook.jpg";
+
 import "../styles/Footer.css";
 
 export default function Footer() {
