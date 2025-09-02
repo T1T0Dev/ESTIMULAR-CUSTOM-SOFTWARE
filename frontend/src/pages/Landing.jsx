@@ -1,6 +1,6 @@
 import Hero from '../components/Hero';
 import AboutEstimular from '../components/SobreEstimular';
-import Services from '../components/Servicios';
+import Servicios from '../components/Servicios';
 import Ubication from '../components/Ubicacion';
 import Testimonials from '../components/Testimonios';
 import Gallery from '../components/Galeria';
@@ -14,7 +14,7 @@ export default function Landing() {
         <Navbar/>
         <Hero />
         <AboutEstimular />
-        <Services />
+        <Servicios />
         <Testimonials />
         <Ubication />
         <Gallery />

@@ -1,29 +1,28 @@
 import React from "react";
 import logoEstimular from "../assets/logo_estimular.png";
-import "../styles/AboutEstimular.css";
+import "../styles/SobreEstimular.css";
 
 
-export default function AboutEstimular() {
+export default function SobreEstimular() {
   return (
-    <div className="about-estimular-section">
-      <div className="logo-container">
-        <img src={logoEstimular} alt="Logo de Estimular" className="logo" />
+    <div className="seccion-sobre-estimular">
+      <div className="contenedor-logo">
+        <img src={logoEstimular} alt="Logo de Estimular" className="logo-estimular" />
       </div>
-      <div className="about-estimular">
-        <h2 className="about-title">Centro Terapéutico Estimular</h2>
+      <div className="contenido-sobre-estimular">
+        <h2 className="titulo-sobre-estimular">Centro Terapéutico Estimular</h2>
         <p>
-          Estimular nace con la finalidad de dar respuesta a personas con discapacidad, ayudándolas a mejorar su calidad de vida y desarrollo personal, tanto físico como mental.
+          Estimular nace con la finalidad de dar respuesta a niños y adolescentes con desafíos en el desarrollo o en el neurodesarrollo, ayudándolos a mejorar su calidad de vida y desarrollo personal, tanto físico como mental.
         </p>
-        <ul className="about-list">
+        <ul className="lista-sobre-estimular">
           <li>Psicólogos</li>
           <li>Psicopedagogos</li>
           <li>Terapeutas Ocupacionales</li>
           <li>Fonoaudiólogos</li>
-          <li>Psicomotricistas</li>
         </ul>
-        <p className="about-note">
-          Nuestro equipo interdisciplinario brinda atención personalizada y estrategias de abordaje para cada paciente. <br />
-          Se atienden todas las obras sociales.
+        <p className="nota-sobre-estimular">
+          Nuestro equipo brinda atención personalizada y estrategias de abordaje para cada paciente y su familia. <br />
+          <span style={{ color: "#E91E63" }}>Se atienden diversas obras sociales.</span>
         </p>
       </div>
     </div>

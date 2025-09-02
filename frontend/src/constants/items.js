@@ -4,18 +4,23 @@ export const items = [
     title: "Evaluaciones Diagnósticas",
     iconClass: "service-icon blue",
     iconType: "diagnostico",
-    desc: "Pruebas completas para identificar necesidades específicas",
+    desc: [
+      "Psicodiagnóstico",
+      "Evaluación neurolinguistica",
+      "Perfil sensorial",
+      "Evaluación psicopedagógica",
+    ],
   },
   {
-    title: "Terapia Individual",
+    title: "Terapias",
     iconClass: "service-icon orange",
     iconType: "terapia",
-    desc: "Tratamiento personalizado para cada niño o adolescente",
+    desc: ["Psicologia","Fonoaudiologia","Terapia Ocupacional","Psicopedagogia"],
   },
   {
-    title: "Apoyo Familiar",
+    title: "Talleres Grupales",
     iconClass: "service-icon red",
     iconType: "familia",
-    desc: "Orientación y soporte para toda la familia",
+    desc: ["Habilidades sociales","Manejo de emociones","Resolución de conflictos"],
   },
 ];

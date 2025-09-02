@@ -5,7 +5,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import 'swiper/css/autoplay';
-import '../styles/Gallery.css';
+import '../styles/Galeria.css';
 
 export default function Gallery() {
   const images = [
@@ -31,10 +31,10 @@ export default function Gallery() {
           1024: { slidesPerView: 3 }
         }}
       >
-        {images.map((src, i) => (
-          <SwiperSlide key={i}>
+        {images.map((src, idx) => (
+          <SwiperSlide key={idx}>
             <div className="gallery-item">
-              <img src={src} alt={`Slide ${i+1}`} />
+              <img src={src} alt={`Slide ${idx+1}`} />
             </div>
           </SwiperSlide>
         ))}

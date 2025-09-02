@@ -1,5 +1,5 @@
 import React from "react";
-import '../styles/Ubication.css';
+import '../styles/Ubicacion.css';
 import empresaImg from '../assets/estimular_ubicacion.jpeg';
 
 export default function Ubicacion() {

@@ -1,4 +1,5 @@
-.about-estimular-section {
+
+.seccion-sobre-estimular {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8,14 +9,14 @@
   max-width: 900px;
 }
 
-.logo-container {
+.contenedor-logo {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.logo {
+.logo-estimular {
   width: 220px;
   height: 220px;
   object-fit: contain;
@@ -25,17 +26,37 @@
   background: #fff;
 }
 
-.about-estimular {
+.contenido-sobre-estimular {
   flex: 2;
   padding-left: 5rem;
 }
 
-.about-estimular p {
+.contenido-sobre-estimular p {
   color: #000;
   font-size: 1.25rem;
   font-weight: 500;
   line-height: 1.7;
   margin: 0;
+}
+
+.titulo-sobre-estimular {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 1.2rem;
+}
+
+.lista-sobre-estimular {
+  margin: 1.2rem 0;
+  padding-left: 1.2rem;
+  font-size: 1.1rem;
+  color: #3FAE2A;
+}
+
+.nota-sobre-estimular {
+  font-size: 1rem;
+  color: #555;
+  margin-top: 1.2rem;
 }
 
 .about-title {

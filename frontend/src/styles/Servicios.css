@@ -17,7 +17,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 4rem; /* espacio amplio como en la imagen */
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -34,6 +34,15 @@
   transition: transform 0.3s ease, box-shadow 0.3s ease; /* efecto hover */
 }
 
+.service-desc{
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  
+}
 .service-icon {
   margin-bottom: 1rem;
   display: flex;

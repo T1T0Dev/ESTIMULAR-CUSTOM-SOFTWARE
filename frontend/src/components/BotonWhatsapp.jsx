@@ -2,7 +2,7 @@ import React from 'react'
 
 
 
-import '../styles/WhatsappButton.css';
+import '../styles/BotonWhatsapp.css';
 import whatsappIcon from '../assets/whatsapp_button.jpeg';
 
 // Luego los datos sensibles traerlos desde un archivo de configuración

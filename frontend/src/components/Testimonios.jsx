@@ -3,7 +3,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
-import '../styles/Testimonials.css';
+import '../styles/Testimonios.css';
 
 
 import persona1 from '../assets/persona_prueba1.png';
@@ -25,7 +25,7 @@ const data = [
   },
 ];
 
-export default function Testimonials() {
+export default function Testimonios() {
   return (
     <section id='testimonials' className="testimonials-section">
       <Swiper

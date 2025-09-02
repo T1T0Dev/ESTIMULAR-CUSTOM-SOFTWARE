@@ -41,7 +41,7 @@ export default function Hero() {
       <div className="hero-overlay improved">
         <div className="hero-content">
           <h2 className="hero-brand">Estimular</h2>
-          <h1 className="hero-title">Centro Terapéutico Infantil y Juvenil</h1>
+          <h1 className="hero-title">Centro Terapéutico Infanto Juvenil</h1>
           <p className="hero-subtitle">
             Brindamos apoyo especializado para el desarrollo y bienestar de niños y adolescentes
           </p>
