@@ -2,7 +2,7 @@
   position: relative;
   width: 100%;
   height: 100vh;
-  background-color: #fff;
+  background-color: var(--color-bg);
   overflow: hidden;
 }
 
@@ -38,7 +38,7 @@
 .hero-brand {
   font-size: 2rem;
   font-weight: 700;
-  color: #E5007D; /* pinkBrand */
+  color: var(--color-rosa1); /* pinkBrand */
   margin-bottom: 0.5rem;
 }
 

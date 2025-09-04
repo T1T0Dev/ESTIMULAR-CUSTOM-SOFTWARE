@@ -1,15 +1,23 @@
 :root {
-  --color-primary: #e91e63; /* Fucsia, igual al texto ESTIMULAR */
-  --color-secondary: #4caf50; /* Verde (tronco/hojas) */
+
+  --color-rosa1: #E5007D;
+  --color-rosa2: #e91e63; 
+
+  --color-verde1: #4caf50; /* Verde (tronco/hojas) */
+
   --color-accent-blue: #2196f3;
   --color-accent-yellow: #ffeb3b;
   --color-accent-orange: #ff9800;
   --color-accent-purple: #9c27b0;
+
+
+  
 
   --color-bg: #ffffff;
   --color-text: #333333;
 
   --color-muted: #f5f5f5;
   --color-border: #dddddd;
+
 }
 

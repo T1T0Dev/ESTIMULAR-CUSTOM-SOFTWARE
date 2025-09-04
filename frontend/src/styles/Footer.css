@@ -1,8 +1,8 @@
 .footer {
-  background: var(--color-primary);
+  background: var(--color-rosa1);
   padding: 3rem 1rem 1rem 1rem;
-  color: #fff;
-  border-top: 2px solid var(--color-secondary);
+  color: var(--color-bg);
+  border-top: 2px solid var(--color-verde1);
 }
 
 .footer-content {
@@ -18,7 +18,7 @@
 .footer-left {
   flex: 1;
   min-width: 260px;
-  color: #fff;
+  color: var(--color-bg);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -26,8 +26,8 @@
 }
 
 .footer-contact-btn {
-  background: #fff;
-  color: var(--color-primary);
+  background: var(--color-bg);
+  color: var(--color-verde1);
   font-weight: 600;
   border: none;
   border-radius: 24px;
@@ -41,7 +41,7 @@
 }
 .footer-contact-btn:hover {
   background: var(--color-secondary);
-  color: #fff;
+  color: var(--color-bg);
 }
 
 .footer-desc {
@@ -63,7 +63,7 @@
   font-size: 1.15rem;
   font-weight: 600;
   margin-bottom: 0.7rem;
-  color: #fff;
+  color: var(--color-bg);
 }
 .footer-social-icons {
   display: flex;
@@ -98,7 +98,7 @@
 .footer-right {
   flex: 1;
   min-width: 320px;
-  background: #fff;
+  background: var(--color-bg);
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   padding: 2rem 1.5rem;
@@ -136,7 +136,7 @@
 }
 .footer-form-btn {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-bg);
   border: none;
   border-radius: 6px;
   font-size: 1.1rem;
@@ -155,7 +155,7 @@
   text-align: center;
 }
 .footer-bottom p {
-  color: #fff;
+  color: var(--color-bg);
   font-size: 1rem;
   margin: 0;
 }

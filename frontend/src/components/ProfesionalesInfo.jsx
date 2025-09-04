@@ -20,9 +20,6 @@ export default function ProfesionalesInfo({ onClose }) {
             </div>
             <div className="service-profesionales__info">
               <h3>{prof.nombre}</h3>
-              <p className="profesional-cargo">
-                <span className="profesional-icon">💼</span> {prof.cargo}
-              </p>
               <p className="profesional-profesion">
                 <span className="profesional-icon">🎓</span> {prof.profesion}
               </p>
