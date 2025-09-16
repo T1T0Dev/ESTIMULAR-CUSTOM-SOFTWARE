@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const contactRoutes = require('./src/routes/contactRoutes');
+const turnoRoutes = require('./src/routes/turnoRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,6 +12,7 @@ app.use(express.json());
 
 // Rutas
 app.use('/api', contactRoutes);
+app.use('/api', turnoRoutes);
 
 app.listen(PORT, () => {
 	console.log(`Servidor backend escuchando en puerto ${PORT}`);

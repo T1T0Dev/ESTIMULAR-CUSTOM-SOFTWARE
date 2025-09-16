@@ -1,0 +1,60 @@
+/* Turnos.css */
+
+/* Estilo general del contenedor del calendario */
+.turnos-grid-container {
+  height: 90vh; /* Ocupa casi toda la altura de la pantalla */
+  padding: 0; /* Padding eliminado para una vista más compacta */
+  background-color: #fcfdff; /* Un fondo muy claro */
+}
+
+/* Estilo para los eventos (turnos) */
+.rbc-event {
+  background-color: var(--color-accent-blue); /* Azul de acento */
+  border-color: var(--color-azul2);
+  color: var(--color-fondo);
+  border-radius: 6px;
+  padding: 2px 6px; /* Padding reducido */
+  font-size: 0.85em; /* Fuente más pequeña */
+}
+
+/* Evento seleccionado */
+.rbc-event.rbc-selected {
+  background-color: var(--color-rosa1); /* Rosa para selección */
+}
+
+/* Estilo para el evento de un profesional logueado */
+.highlighted-event {
+  border-left: 4px solid var(--color-amarillo1);
+  font-weight: bold;
+}
+
+/* Encabezado del día y de los recursos (consultorios) */
+.rbc-header {
+  background-color: var(--color-fondo);
+  color: var(--color-rosa2);
+  border-color: #ddd;
+  padding: 6px 5px; /* Padding vertical reducido */
+  font-weight: 600;
+  font-size: 0.9em; /* Fuente más pequeña */
+}
+
+/* Hora actual */
+.rbc-time-slot.rbc-now {
+  font-weight: bold;
+}
+
+.rbc-current-time-indicator {
+  background-color: var(--color-rojo1);
+  height: 2px;
+}
+
+/* Estilo para el horario de almuerzo */
+.rbc-time-slot.lunch-break {
+    background-color: #f1f1f1; /* Un gris claro para indicar el receso */
+    border-top: 1px dashed #ccc;
+    border-bottom: 1px dashed #ccc;
+}
+
+.rbc-day-slot .rbc-time-slot:not(.lunch-break) {
+    border-top: none;
+}
