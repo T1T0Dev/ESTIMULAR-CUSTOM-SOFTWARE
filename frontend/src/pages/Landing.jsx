@@ -1,11 +1,12 @@
+import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import SobreEstimular from '../components/SobreEstimular';
 import Servicios from '../components/Servicios';
-import Ubicacion from '../components/Ubicacion';
 import Testimonios from '../components/Testimonios';
+import Ubicacion from '../components/Ubicacion';
 import Galeria from '../components/Galeria';
+import ContactoArea from '../components/ContactoArea';
 import Footer from '../components/Footer';  
-import Navbar from '../components/Navbar';
 import BotonWhatsapp from '../components/BotonWhatsapp';
 
 export default function Landing() {
@@ -18,6 +19,7 @@ export default function Landing() {
         <Testimonios />
         <Ubicacion />
         <Galeria />
+        <ContactoArea />
         <Footer />
         <BotonWhatsapp/>
     </div>
