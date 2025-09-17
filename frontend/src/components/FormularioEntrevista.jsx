@@ -5,69 +5,81 @@ export default function FormularioEntrevista() {
     <section className="entrevista__formulario">
       <h1 className="entrevista__titulo">Primera Entrevista</h1>
       <p className="entrevista__subtitulo">
-        Por favor complete el siguiente formulario<br />
+        Por favor complete el siguiente formulario
+        <br />
         con la información del niño/a y del responsable.
       </p>
       <form className="entrevista__form">
+        <label className="label-entrevista" htmlFor="nombre_nino">
+          Nombre completo del niño/a
+        </label>
         <input
+          id="nombre_nino"
           className="entrevista__input"
           type="text"
           name="nombre_nino"
-          placeholder="Nombre completo del niño/a"
+          placeholder="Ej: Juan Pérez"
           required
         />
-        {/* <div className="entrevista__input-fecha">
-          <input
-            className="entrevista__input"
-            type="date"
-            name="fecha_nacimiento"
-            placeholder="Fecha de nacimiento del niño/a en dia/mes/año"
-            required
-          />
-        </div> */
+
+        <label className="label-entrevista">Fecha de nacimiento</label>
         <div className="entrevista__input-fecha">
           <input
             className="entrevista__input"
             type="text"
-            name="fecha_nacimiento"
-            placeholder="dia"
+            name="dia"
+            placeholder="Día"
             required
           />
-                    <input
+          <input
             className="entrevista__input"
             type="text"
-            name="fecha_nacimiento"
-            placeholder="mes"
+            name="mes"
+            placeholder="Mes"
             required
           />
-                    <input
+          <input
             className="entrevista__input"
             type="text"
-            name="fecha_nacimiento"
-            placeholder="ano"
+            name="ano"
+            placeholder="Año"
             required
           />
         </div>
-        }
+
+        <label className="label-entrevista" htmlFor="nombre_responsable">
+          Nombre completo del responsable
+        </label>
         <input
+          id="nombre_responsable"
           className="entrevista__input"
           type="text"
           name="nombre_responsable"
-          placeholder="Nombre del responsable"
+          placeholder="Ej: María López"
           required
         />
+
+        <label className="label-entrevista" htmlFor="telefono">
+          Teléfono
+        </label>
         <input
+          id="telefono"
           className="entrevista__input"
           type="tel"
           name="telefono"
-          placeholder="Teléfono"
+          placeholder="Ej: 381-1234567"
           required
         />
+
+        <label className="label-entrevista" htmlFor="motivo">
+          Motivo de consulta
+        </label>
         <input
+          id="motivo"
           className="entrevista__input"
           type="text"
           name="motivo"
-          placeholder="Motivo de consulta"
+          placeholder="Explique brevemente"
           required
         />
 
@@ -79,24 +91,11 @@ export default function FormularioEntrevista() {
             name="aceptar_terminos"
             required
           />
-        <label className="entrevista__label-terminos"
-        onClick={(e) => {
-          const checkbox = document.getElementById('aceptar_terminos');
-          checkbox.checked = !checkbox.checked;
-        }}
-        
-        
-        
-        
-        
-        
-        >
-          Acepto los términos y condiciones
-        </label>
-
+          <label className="entrevista__label-terminos" htmlFor="aceptar_terminos">
+            Acepto los términos y condiciones
+          </label>
         </div>
-      
-      
+
         <button type="submit" className="entrevista__boton">
           Enviar
         </button>

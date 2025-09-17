@@ -3,7 +3,7 @@ import FormularioEntrevista from '../components/FormularioEntrevista';
 
 export default function Entrevista() {
   return (
-    <div className="entrevista__layout">
+    <div style={{display:'flex', minHeight:'100vh',width:'100%'}}>
       <Sidebar />
       <FormularioEntrevista />
     </div>

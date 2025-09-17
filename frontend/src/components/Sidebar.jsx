@@ -1,5 +1,7 @@
 import React from "react";
 import logoEstimular from "../assets/logo_estimular.png";
+import InformacionContacto from '../components/InformacionContacto'
+
 import "../styles/Sidebar.css";
 
 export default function Sidebar() {
@@ -11,13 +13,16 @@ export default function Sidebar() {
           alt="Logo Estimular"
           className="barra-lateral__logo"
         />
-        <div className="barra-lateral__info">
+      </aside>
+       <div className="barra-lateral__info">
           <h1 className="barra-lateral__marca">ESTIMULAR</h1>
           <h2 className="barra-lateral__frase">
-            "Cada niño es un mundo por descubrir"
+            Hace mas de 5 años brindando el mejor servicio para vos y para tu familia.
           </h2>
         </div>
-      </aside>
+      <div>
+        <InformacionContacto/>
+      </div>
     </div>
   );
 }
