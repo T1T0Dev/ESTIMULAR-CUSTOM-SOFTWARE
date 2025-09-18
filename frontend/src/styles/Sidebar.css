@@ -12,6 +12,18 @@
   justify-content: space-between;
   padding: 2rem 1rem;
 }
+<<<<<<< HEAD
+=======
+
+.barra-lateral__info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+>>>>>>> cca22c0dc88af46340194f8a1bc4eb32a7853512
 
 .barra-lateral__aside {
   width: 100%;
