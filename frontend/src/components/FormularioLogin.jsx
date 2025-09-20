@@ -3,8 +3,23 @@ import '../styles/FormularioLogin.css'
 
 const FormularioLogin = () => {
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState('')
+  const [dni, setDni] = useState('')
   const [password, setPassword] = useState('')
+
+  // Validación para solo números y mínimo 7 dígitos
+  const handleDniChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '') // Solo números
+    if (value.length <= 15) setDni(value) // Limita a 15 dígitos si quieres
+  }
+
+  // Prevención básica de inyección en contraseña
+  const isPasswordSafe = (pwd) => {
+    // Bloquea patrones comunes de inyección SQL
+    const forbidden = [
+      /('|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i
+    ]
+    return !forbidden.some((regex) => regex.test(pwd))
+  }
 
   const togglePassword = (e) => {
     e.preventDefault()
@@ -13,12 +28,20 @@ const FormularioLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (dni.length < 7) {
+      alert('El DNI debe tener al menos 7 números.')
+      return
+    }
+    if (!isPasswordSafe(password)) {
+      alert('La contraseña contiene caracteres no permitidos.')
+      return
+    }
     try {
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dni: email,
+          dni: dni,
           contrasena: password
         })
       })
@@ -44,9 +67,15 @@ const FormularioLogin = () => {
             type="text"
             placeholder="DNI"
             className="formulario-login-input"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
+            value={dni}
+            onChange={handleDniChange}
+            minLength={7}
+            maxLength={15}
+            pattern="\d{7,15}"
+            inputMode="numeric"
             required
+            title="Ingrese solo números (mínimo 7 dígitos)"
+            autoComplete="off"
           />
           <div className="PadreBotonMostrarContraseña">
             <input
@@ -57,6 +86,7 @@ const FormularioLogin = () => {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="off"
             />
             <button className='BotonMostrarContraseña'
               onClick={togglePassword}
@@ -64,7 +94,7 @@ const FormularioLogin = () => {
               type="button"
               aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             >
-              {showPassword ? "🙈" : "👁️"}
+              {showPassword ? "👁️" : "🕵️"}
             </button>
           </div>
           <div className="formulario-login-olvidaste">
