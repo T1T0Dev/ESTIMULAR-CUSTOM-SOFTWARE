@@ -77,32 +77,3 @@
   margin-top: auto;
 }
 
-
-@media (min-height: 720px) {
-  .center-block {
-    justify-content: center;
-    height: 48%;
-  }
-}
-
-@media (max-width: 900px) {
-  .barra-lateral {
-    height:100vh;
-    min-height: 100%;
-    width: 100%;
-    padding: 2rem 1rem 1rem 1rem;
-    justify-content: flex-start;
-  }
-
-  .barra-lateral__logo {
-    width: 200px;
-    height: 200px;
-    margin-bottom: 2rem;
-  }
-  .barra-lateral__marca {
-    display: none;
-  }
-  .slogan, .barra-lateral__frase {
-    display: none;
-  }
-}

@@ -14,6 +14,11 @@
 
 .pagina-entrevista main {
   flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
+
+
+
+

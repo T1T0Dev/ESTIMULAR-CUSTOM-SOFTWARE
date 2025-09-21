@@ -34,7 +34,7 @@ export default function Sidebar({
           aria-label="Cerrar sesión"
           onClick={() => {
             localStorage.clear();
-            navigate("/");   // <- redirige a la página de inicio
+            navigate("/");  
           }}
         >
           Logout
