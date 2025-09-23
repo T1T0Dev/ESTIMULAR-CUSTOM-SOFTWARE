@@ -29,7 +29,6 @@ export default function FormularioConsulta() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus(null);
     try {
       const res = await axios.post("http://localhost:5000/api/contact/enviar-mail", form);
 

@@ -40,9 +40,7 @@ export default function Sidebar({
           Regresar al inicio
         </button>
       </div>
-      <footer className="barra-lateral__footer">
-        <InformacionContacto />
-      </footer>
+      
     </div>
   );
 }

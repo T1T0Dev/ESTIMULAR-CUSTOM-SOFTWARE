@@ -1,6 +1,60 @@
 import "../styles/FormularioEntrevista.css";
+import {useState} from "react";
+import axios from "axios";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
+const MySwal = withReactContent(Swal);
 
 export default function FormularioEntrevista() {
+  const [formularioEntrevista, setFormularioEntrevista] = useState({
+    nombre_nino: "",
+    //Concatenar strings
+    fecha_nacimiento: "",
+    dni_nino: "",
+    obra_social: "",
+    nombre_responsable: "",
+    telefono: "",
+    aceptar_terminos: false,
+  });
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormularioEntrevista((prevState) => ({
+      ...prevState,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+
+    e.preventDefault();
+
+    const respuesta = await axios.post("http://localhost:5000/api/entrevista", formularioEntrevista)
+
+    respuesta.data.success ? MySwal.fire({
+      icon: 'success',
+      title: 'Formulario enviado',
+      text: 'Gracias por completar el formulario, nos pondremos en contacto a la brevedad.',
+    }) : MySwal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Hubo un problema al enviar el formulario. Por favor, intenta nuevamente más tarde.',
+    });
+
+    setFormularioEntrevista({
+      nombre_nino: "",
+      fecha_nacimiento: "",
+      dni_nino: "",
+      obra_social: "",
+      nombre_responsable: "",
+      telefono: "",
+      aceptar_terminos: false,
+    });
+    // Reiniciar el formulario
+    e.target.reset();
+  }
+
   return (
     <section className="entrevista__formulario">
       <h1 className="entrevista__titulo">Primera Entrevista</h1>
@@ -10,6 +64,7 @@ export default function FormularioEntrevista() {
         con la información del niño/a y del responsable.
       </p>
       <form
+        onSubmit={handleSubmit}
         className="entrevista__form"
         aria-label="Formulario de primera entrevista"
       >
@@ -25,6 +80,8 @@ export default function FormularioEntrevista() {
             name="nombre_nino"
             placeholder="Ej: Juan Pérez"
             required
+            onChange={handleChange}
+
           />
 
           <label className="label-entrevista" htmlFor="fecha_dia">
@@ -38,6 +95,7 @@ export default function FormularioEntrevista() {
               name="dia"
               placeholder="Día"
               required
+              onChange={handleChange}
             />
             <input
               id="fecha_mes"
@@ -46,6 +104,7 @@ export default function FormularioEntrevista() {
               name="mes"
               placeholder="Mes"
               required
+              onChange={handleChange}
             />
             <input
               id="fecha_ano"
@@ -54,6 +113,7 @@ export default function FormularioEntrevista() {
               name="ano"
               placeholder="Año"
               required
+              onChange={handleChange}
             />
           </div>
           <label className="label-entrevista" htmlFor="dni_nino">
@@ -66,6 +126,7 @@ export default function FormularioEntrevista() {
             name="dni_nino"
             placeholder="Ej: 12345678"
             required
+            onChange={handleChange}
           />
           <label className="label-entrevista" htmlFor="obra_social">
             Obra social
@@ -77,6 +138,7 @@ export default function FormularioEntrevista() {
             name="obra_social"
             placeholder="Ej: OSDE"
             required
+            onChange={handleChange}
           />
           <label className="label-vacio-entrevista">
             En caso de no tener deje el campo vacio.{" "}
@@ -94,6 +156,7 @@ export default function FormularioEntrevista() {
             type="text"
             name="nombre_responsable"
             placeholder="Ej: María López"
+            onChange={handleChange}
             required
           />
 
@@ -106,20 +169,7 @@ export default function FormularioEntrevista() {
             type="tel"
             name="telefono"
             placeholder="Ej: 381-1234567"
-            required
-          />
-        </fieldset>
-
-        <fieldset>
-          <legend>Fecha de consulta</legend>
-          <label className="label-entrevista" htmlFor="fecha_consulta">
-            Fecha
-          </label>
-          <input
-            id="fecha_consulta"
-            className="entrevista__input"
-            type="date"
-            name="fecha_consulta"
+            onChange={handleChange}
             required
           />
         </fieldset>
@@ -137,18 +187,20 @@ export default function FormularioEntrevista() {
               id="aceptar_terminos"
               type="checkbox"
               name="aceptar_terminos"
+              onChange={handleChange}
               required
             />
             <label
               className="entrevista__label-terminos"
               htmlFor="aceptar_terminos"
+              title="Debe aceptar los términos y condiciones para continuar"
             >
               Acepto los términos y condiciones
             </label>
           </div>
         </fieldset>
 
-        <button type="submit" className="entrevista__boton">
+        <button  type="submit" className="entrevista__boton">
           Enviar
         </button>
       </form>
