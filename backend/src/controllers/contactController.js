@@ -1,39 +1,38 @@
 // backend/controllers/contactController.js
 
 const nodemailer = require('nodemailer');
-
 require('dotenv').config();
 
 // Configuración de transporte Nodemailer
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: process.env.SMTP_PORT || 587,
+  service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER || 'TU_USUARIO_ETHEREAL',
-    pass: process.env.SMTP_PASS || 'TU_PASSWORD_ETHEREAL',
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
-exports.sendContactEmail = async (req, res) => {
-  const { nombre, apellido, email, servicio, comentario } = req.body;
+module.exports.enviarEmail = async (req, res) => {
 
-  if (!nombre || !apellido || !email || !servicio) {
-    return res.status(400).json({ success: false, message: 'Todos los campos son obligatorios.' });
-  }
+  const { nombre, apellido, email, servicio, mensaje } = req.body;
 
-  try {
-
+  try{
     const mailOptions = {
-      from: `Estimular Web <${process.env.SMTP_USER}>`,
-      to: process.env.CONTACT_EMAIL || 'destino@ejemplo.com',
-      subject: 'Nueva consulta desde el Footer',
-      text: `Nombre: ${nombre} ${apellido}\nEmail: ${email}\nServicio: ${servicio}\nComentario: ${comentario}`,
+      from: email,
+      to: process.env.EMAIL_USER,
+      subject: `Nueva consulta de ${nombre} ${apellido} - Servicio: ${servicio}`,
+      text: mensaje,
     };
-    
+
     await transporter.sendMail(mailOptions);
-    res.json({ success: true, message: 'Consulta enviada correctamente.' });
+    res.status(200).json({ success: true, message: 'Correo enviado correctamente.' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Error al enviar el correo.' });
   }
 };
+
+
+
+
+

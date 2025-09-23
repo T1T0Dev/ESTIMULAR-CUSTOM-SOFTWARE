@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Rutas
-app.use('/api', contactRoutes);
+app.use('/api/contact', contactRoutes);
 
 app.listen(PORT, () => {
 	console.log(`Servidor backend escuchando en puerto ${PORT}`);

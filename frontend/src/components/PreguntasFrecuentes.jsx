@@ -27,10 +27,12 @@ export default function PreguntasFrecuentes() {
             </summary>
             <p className="footer-respuesta">
               Podes solicitar a traves de un formulario con datos basicos del
-              pacientes y responsable.
-              <div className="footer-enlace-entrevista">
+              pacientes y responsable
+              <br/>
+              <span className="footer-enlace-entrevista">
                 <Link to="/formulario-entrevista">EN ESTE ENLACE</Link>
-              </div>
+              </span>
+              <br/>
               El equipo se pondrá en contacto para coordinar la primera
               entrevista.
             </p>

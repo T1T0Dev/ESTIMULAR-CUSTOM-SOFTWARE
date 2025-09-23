@@ -37,7 +37,7 @@ export default function Sidebar({
             navigate("/");  
           }}
         >
-          Logout
+          Regresar al inicio
         </button>
       </div>
       <footer className="barra-lateral__footer">
