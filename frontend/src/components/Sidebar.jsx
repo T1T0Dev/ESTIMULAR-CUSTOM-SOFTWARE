@@ -1,16 +1,20 @@
 import logoEstimular from "../assets/logo_estimular.png";
-import InformacionContacto from '../components/InformacionContacto';
-import "../styles/Sidebar.css"
-import { useNavigate } from 'react-router-dom';
+
+import "../styles/Sidebar.css";
+import { useNavigate } from "react-router-dom";
 
 export default function Sidebar({
   altLogo = "Logo Estimular",
-  slogan = "Si quieres ir rápido camina solo, si quieres llegar lejos ve acompañado"
+  slogan = "Si quieres ir rápido camina solo, si quieres llegar lejos ve acompañado",
 }) {
   const navigate = useNavigate();
 
   return (
-    <div className="barra-lateral" role="complementary" aria-label="Barra lateral Estimular">
+    <div
+      className="barra-lateral"
+      role="complementary"
+      aria-label="Barra lateral Estimular"
+    >
       {logoEstimular ? (
         <img
           src={logoEstimular}
@@ -34,13 +38,12 @@ export default function Sidebar({
           aria-label="Cerrar sesión"
           onClick={() => {
             localStorage.clear();
-            navigate("/");  
+            navigate("/");
           }}
         >
           Regresar al inicio
         </button>
       </div>
-      
     </div>
   );
 }

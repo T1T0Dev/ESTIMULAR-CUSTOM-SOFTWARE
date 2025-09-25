@@ -11,19 +11,19 @@
   padding: 2rem 1rem;
 }
 
-
 .barra-lateral__logo {
-  width:20rem;
-  height: 20rem;
+  width: 8rem;
+  height: 8rem;
   object-fit: contain;
   border-radius: 50%;
   background: var(--color-fondo);
   box-shadow: 0 4px 16px var(--color-fondo);
+  margin-bottom: 1.2rem;
 }
 
-.barra-lateral__logo--placeholder{
-  width:20rem;
-  height: 20rem;
+.barra-lateral__logo--placeholder {
+  width: 8rem;
+  height: 8rem;
   border-radius: 50%;
   background: var(--color-fondo);
   display: flex;
@@ -33,6 +33,7 @@
   text-align: center;
   padding: 1rem;
   box-shadow: 0 4px 16px var(--color-fondo);
+  margin-bottom: 1.2rem;
 }
 
 .barra-lateral__separador {
@@ -42,38 +43,53 @@
   margin: 1.5rem 0;
 }
 
-.barra-lateral__slogan{
-  font-size: 2rem;
+.barra-lateral__slogan {
+  font-size: 1.2rem;
   font-style: italic;
   text-align: center;
   line-height: 1.4;
   letter-spacing: 0.2px;
-  text-shadow: 0 0 8px rgba(0,0,0,0.2);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  margin-bottom: 1.2rem;
 }
 
 .btn-logout {
-  margin-top: 3rem;
-  background: rgba(255,255,255,0.14);
+  margin-top: 1.2rem;
+  background: rgba(255, 255, 255, 0.14);
   color: var(--color-fondo);
-  border: 1px solid rgba(255,255,255,0.12);
-  padding: 12px 40px;
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 32px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.2px;
-  transition: transform .16s ease, background .12s ease, box-shadow .12s ease;
+  transition: transform 0.16s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .btn-logout:hover,
 .btn-logout:focus {
   transform: translateY(-3px);
-  background: rgba(255,255,255,0.18);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   outline: none;
 }
 
-.barra-lateral__footer{
+.barra-lateral__footer {
   margin-top: auto;
+
 }
 
+@media (max-width: 768px) {
+
+  .barra-lateral {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    padding: 1rem;
+    box-shadow: 0 4px 16px var(--color-fondo);
+  }
+
+  
+}
