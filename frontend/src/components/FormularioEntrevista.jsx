@@ -57,7 +57,7 @@ export default function FormularioEntrevista() {
 
     try {
       const respuesta = await axios.post(
-        "http://localhost:5000/api/entrevista",
+        "http://localhost:5000/api/entrevista/crear-candidato",
         datosFinales
       );
 
@@ -96,19 +96,30 @@ export default function FormularioEntrevista() {
       >
         <fieldset>
           <legend>Datos del niño/a</legend>
-          <label className="label-entrevista" htmlFor="nombre_nino">
-            Nombre completo del niño/a
+             <label className="label-entrevista" htmlFor="nombre_nino">
+            Nombre
           </label>
           <input
             id="nombre_nino"
             className="entrevista__input"
             type="text"
             name="nombre_nino"
-            placeholder="Ej: Juan Pérez"
+            placeholder="Ej: Juan"
             required
             onChange={handleChange}
           />
-
+          <label className="label-entrevista" htmlFor="apellido_nino">
+            Apellido
+          </label>
+          <input
+            id="apellido_nino"
+            className="entrevista__input"
+            type="text"
+            name="apellido_nino"
+          placeholder="Ej:  Pérez"
+          required
+          onChange={handleChange}
+        />
           <label className="label-entrevista">Fecha de nacimiento</label>
           <div className="entrevista__input-fecha">
             <input
@@ -149,23 +160,36 @@ export default function FormularioEntrevista() {
           <label className="label-vacio-entrevista">
             En caso de no tener deje el campo vacío.
           </label>
+
+         
         </fieldset>
 
         <fieldset>
           <legend>Datos del responsable</legend>
           <label className="label-entrevista" htmlFor="nombre_responsable">
-            Nombre completo del responsable
+            Nombre 
           </label>
           <input
             id="nombre_responsable"
             className="entrevista__input"
             type="text"
             name="nombre_responsable"
-            placeholder="Ej: María López"
+            placeholder="Ej: María"
             onChange={handleChange}
             required
           />
-
+          <label className="label-entrevista" htmlFor="apellido_responsable">
+            Apellido
+          </label>
+          <input
+            id="apellido_responsable"
+            className="entrevista__input"
+            type="text"
+            name="apellido_responsable"
+            placeholder="Ej: García"
+            onChange={handleChange}
+            required
+          />
           <label className="label-entrevista" htmlFor="telefono">
             Teléfono
           </label>
@@ -179,14 +203,56 @@ export default function FormularioEntrevista() {
             onBlur={handleBlur}
             required
           />
+          <label className="label-entrevista" htmlFor="email">
+            Correo electrónico
+            </label>
+          <input
+            id="email"
+            className="entrevista__input"
+            type="email"
+            name="email"
+            placeholder="Ej: juanperez@gmail.com"
+            onChange={handleChange}
+            onBlur={handleBlur}
+            required
+          />
+          <label className="label-entrevista" htmlFor="parentesco">
+            Parentesco con el niño/a
+          </label>
+          <select
+            id="parentesco"
+            className="entrevista__input"
+            name="parentesco"
+            onChange={handleChange}
+            required
+          >
+            <option value="">Seleccione una opción</option>
+            <option value="madre">Madre</option>
+            <option value="padre">Padre</option>
+            <option value="tutor">Tutor</option>
+            <option value="otro">Otro</option>
+          </select>
+
         </fieldset>
 
         <fieldset>
-          <legend>Consentimiento</legend>
+          <legend>Motivo de consulta </legend>
+           <label className="label-entrevista" htmlFor="motivo_consulta">
+            Motivo de consulta
+          </label>
+          <textarea
+            id="motivo_consulta"
+            type="text"
+            name="motivo_consulta"
+            placeholder="Describa brevemente los motivos por los cuales solicita la entrevista"
+            className="entrevista__input"
+            onChange={handleChange}
+          />  
           <label className="label-informacion-entrevista">
             Todos los datos proporcionados son confidenciales y se utilizarán
             únicamente para fines terapéuticos.
           </label>
+        </fieldset>
           <div className="entrevista__terminos-container">
             <input
               className="entrevista__aceptar-terminos"
@@ -204,8 +270,6 @@ export default function FormularioEntrevista() {
               Acepto los términos y condiciones
             </label>
           </div>
-        </fieldset>
-
         <button type="submit" className="entrevista__boton">
           Enviar
         </button>
