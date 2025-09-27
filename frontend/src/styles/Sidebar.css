@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem;
+  padding: 1rem;
 }
 
 .barra-lateral__logo {
@@ -18,7 +18,6 @@
   border-radius: 50%;
   background: var(--color-fondo);
   box-shadow: 0 4px 16px var(--color-fondo);
-  margin-bottom: 1.2rem;
 }
 
 .barra-lateral__logo--placeholder {
@@ -40,28 +39,27 @@
   width: 60%;
   height: 1px;
   box-shadow: var(--color-fondo) 0px 0px 8px;
-  margin: 1.5rem 0;
+  margin: 1rem;
 }
 
 .barra-lateral__slogan {
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   font-style: italic;
   text-align: center;
   line-height: 1.4;
   letter-spacing: 0.2px;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
-  margin-bottom: 1.2rem;
+  text-shadow: 0 0 8px rgb(255, 0, 166);
 }
 
 .btn-logout {
-  margin-top: 1.2rem;
+  margin-top: 2rem;
   background: rgba(255, 255, 255, 0.14);
   color: var(--color-fondo);
   border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 10px 32px;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: 0.2px;
   transition: transform 0.16s ease, background 0.12s ease, box-shadow 0.12s ease;
@@ -86,10 +84,29 @@
     flex: 0 0 auto;
     width: 100%;
     max-width: 100%;
-    height: auto;
-    padding: 1rem;
     box-shadow: 0 4px 16px var(--color-fondo);
   }
+
+  .barra-lateral__logo {
+    width: 8rem;
+    height: 8rem;
+  }
+
+  .barra-lateral__logo--placeholder {
+    width: 6rem;
+    height: 6rem;
+    font-size: 1rem;
+  }
+
+  .barra-lateral__slogan {
+    font-size: 1rem;
+  }
+
+  .btn-logout {
+    padding: 8px 24px;
+    font-size: 0.9rem;
+  }
+ 
 
   
 }

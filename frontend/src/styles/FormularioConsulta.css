@@ -40,8 +40,12 @@
   background: var(--color-rosa2);
 }
 
-@media (max-width: 600px) {
+
+@media (max-width: 1200px) {
   .content-form-row {
     flex-direction: column;
+    
   }
+
 }
+

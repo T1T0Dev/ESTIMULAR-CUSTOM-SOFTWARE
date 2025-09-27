@@ -124,10 +124,7 @@ export default function FormularioConsulta() {
           required
           placeholder="Hola estoy interesado/a en..."
         />
-        <p
-          style={{ color: "red", textAlign: "right" }}
-          className=" maximo-caracteres-label"
-        >
+        <p className="max-caracteres">
           {" "}
           Max 250 caracteres{" "}
         </p>

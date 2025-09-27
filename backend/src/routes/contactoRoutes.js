@@ -1,7 +1,7 @@
 // backend/routes/contactRoutes.js
 const express = require('express');
 
-const { enviarEmail } = require('../controllers/contactController');
+const { enviarEmail } = require('../controllers/contactoController');
 
 const router = express.Router();
 
