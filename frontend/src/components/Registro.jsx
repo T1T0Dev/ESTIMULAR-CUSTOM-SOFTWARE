@@ -60,11 +60,12 @@ function Registro({ onSuccess }) {
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form className="registro"
+        onSubmit={handleSubmit}>
             {error && <div style={{ color: "red", marginBottom: 10 }}>{error}</div>}
             <div>
-                <label>Nombre:</label>
-                <input
+                <label className="registro">Nombre:</label>
+                <input className="registro" 
                     type="text"
                     name="Nombre"
                     value={form.Nombre}
@@ -73,8 +74,8 @@ function Registro({ onSuccess }) {
                 />
             </div>
             <div>
-                <label>Apellido:</label>
-                <input
+                <label className="registro">Apellido:</label>
+                <input className="registro" 
                     type="text"
                     name="Apellido"
                     value={form.Apellido}
@@ -83,8 +84,8 @@ function Registro({ onSuccess }) {
                 />
             </div>
             <div>
-                <label>Contraseña:</label>
-                <input
+                <label className="registro">Contraseña:</label>
+                <input className="registro" 
                     type="password"
                     name="contra"
                     value={form.contra}
@@ -93,16 +94,16 @@ function Registro({ onSuccess }) {
                 />
             </div>
             <div>
-                <label>Rol:</label>
-                <select
+                <label className="registro">Rol:</label>
+                <select className="registro" 
                     name="rol"
                     value={form.rol}
                     onChange={handleChange}
                     required
                 >
-                    <option value="">Seleccione un rol</option>
+                    <option className="registro"  value="">Seleccione un rol</option>
                     {roles.map((rol) => (
-                        <option key={rol.value} value={rol.value}>
+                        <option className="registro"  key={rol.value} value={rol.value}>
                             {rol.label}
                         </option>
                     ))}
@@ -110,16 +111,16 @@ function Registro({ onSuccess }) {
             </div>
             {form.rol === "profesional" && (
                 <div>
-                    <label>Profesión:</label>
-                    <select
+                    <label className="registro">Profesión:</label>
+                    <select className="registro" 
                         name="profesion"
                         value={form.profesion}
                         onChange={handleChange}
                         required
                     >
-                        <option value="">Seleccione una profesión</option>
+                        <option className="registro"  value="">Seleccione una profesión</option>
                         {profesiones.map((prof) => (
-                            <option key={prof} value={prof}>
+                            <option className="registro"  key={prof} value={prof}>
                                 {prof}
                             </option>
                         ))}
@@ -127,7 +128,7 @@ function Registro({ onSuccess }) {
                 </div>
             )}
             <div>
-                <label>Teléfono:</label>
+                <label className="registro">Teléfono:</label>
                 <input
                     type="tel"
                     name="telefono"
@@ -137,7 +138,7 @@ function Registro({ onSuccess }) {
                 />
             </div>
             <div>
-                <label>Dirección de mail:</label>
+                <label className="registro">Dirección de mail:</label>
                 <input
                     type="email"
                     name="email"
@@ -146,7 +147,7 @@ function Registro({ onSuccess }) {
                     required
                 />
             </div>
-            <button type="submit">Registrarse</button>
+            <button className="registro"  type="submit">Registrarse</button>
         </form>
     );
 }

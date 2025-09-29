@@ -1,4 +1,4 @@
-form {
+ form.registro {
     max-width: 400px;
     margin: 40px auto;
     padding: 32px 24px;
@@ -11,19 +11,19 @@ form {
     border: 1.5px solid #971b46;
 }
 
-form div {
+form.registro div {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-label {
+.registro  label.registro {
     font-weight: 600;
     color: #ebe6e8; /* Rosado fuerte */
     margin-bottom: 2px;
 }
 
-input, select {
+input.registro, select.registro {
     padding: 10px 12px;
     border: 1.5px solid #f8bbd0; /* Borde rosado claro */
     border-radius: 8px;
@@ -33,13 +33,13 @@ input, select {
     color: #ad1457;
 }
 
-input:focus, select:focus {
+input.registro:focus, select.registro:focus {
     border-color: #f06292; /* Rosado más intenso al enfocar */
     outline: none;
     background: #fce4ec; /* Fondo rosado claro al enfocar */
 }
 
-button[type="submit"] {
+button.registro[type="submit"] {
     margin-top: 10px;
     padding: 12px 0;
     background: linear-gradient(90deg, #f05b8d 0%, #f591b4 100%);
@@ -54,7 +54,7 @@ button[type="submit"] {
     letter-spacing: 0.5px;
 }
 
-button[type="submit"]:hover {
+button.registro[type="submit"]:hover {
     background: linear-gradient(90deg, #ec407a 0%, #f06292 100%);
     transform: translateY(-2px) scale(1.02);
 }

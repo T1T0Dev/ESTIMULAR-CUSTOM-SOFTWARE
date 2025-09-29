@@ -1,5 +1,5 @@
 /* Fondo del modal */
-.modal-overlay {
+.modal-overlay.registro {
     position: fixed;
     top: 0;
     left: 0;
@@ -13,7 +13,7 @@
 }
 
 /* Caja del modal */
-.modal-box {
+.modal-box.registro {
     background: #fff0f7; /* fondo rosado muy suave */
     padding: 2.5rem 3.5rem;
     border-radius: 16px;
@@ -26,7 +26,7 @@
 }
 
 /* Título */
-.modal-box h2 {
+.modal-box.registro h2 {
     color: #d72660; /* fucsia/rosado fuerte */
     font-size: 2rem;
     margin-bottom: 1rem;
@@ -35,14 +35,14 @@
 }
 
 /* Mensaje */
-.modal-box p {
+.modal-box.registro p{
     color: #ad1457; /* rosado oscuro */
     font-size: 1.1rem;
     margin-bottom: 2rem;
 }
 
 /* Botón */
-.modal-box button {
+.modal-box.registro button{
     background: linear-gradient(90deg, #f06292 60%, #e255ac 100%);
     color: #fff;
     border: none;
@@ -55,7 +55,7 @@
     transition: background 0.2s, transform 0.15s;
 }
 
-.modal-box button:hover {
+.modal-box.registro button:hover{
     background: linear-gradient(90deg, #ec407a 60%, #ab47bc 100%);
     transform: translateY(-2px) scale(1.03);
 }
