@@ -1,0 +1,73 @@
+/* Fondo del modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(245, 56, 108, 0.18); /* rosado translúcido */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* Caja del modal */
+.modal-box {
+    background: #fff0f7; /* fondo rosado muy suave */
+    padding: 2.5rem 3.5rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(245, 56, 108, 0.12);
+    text-align: center;
+    max-width: 90vw;
+    min-width: 320px;
+    animation: modalFadeIn 0.4s cubic-bezier(.4,2,.6,1) both;
+    border: 2px solid #f8bbd0;
+}
+
+/* Título */
+.modal-box h2 {
+    color: #d72660; /* fucsia/rosado fuerte */
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* Mensaje */
+.modal-box p {
+    color: #ad1457; /* rosado oscuro */
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+/* Botón */
+.modal-box button {
+    background: linear-gradient(90deg, #f06292 60%, #e255ac 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.7rem 2.2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(245, 56, 108, 0.10);
+    transition: background 0.2s, transform 0.15s;
+}
+
+.modal-box button:hover {
+    background: linear-gradient(90deg, #ec407a 60%, #ab47bc 100%);
+    transform: translateY(-2px) scale(1.03);
+}
+
+/* Animación de entrada */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-40px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

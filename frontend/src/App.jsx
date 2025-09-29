@@ -5,6 +5,8 @@ import Landing from './pages/Landing';
 import Entrevista from "./pages/Entrevista";
 import CandidatosEntrevista from "./pages/CandidatosEntrevista";
 import Turnos from './pages/Turnos';
+import Login from './pages/Login';
+import Registro from './pages/RegistroUsuario';
 
 function App() {
   // Simular un ID de profesional logueado. Cambiar el valor en localStorage para probar.
@@ -19,6 +21,8 @@ function App() {
           <Route path="/formulario-entrevista" element={<Entrevista />} />
           <Route path="/candidatos-entrevista" element={<CandidatosEntrevista />} />
           <Route path="/turnos" element={<Turnos loggedInProfesionalId={loggedInProfesionalId} />} />
+          <Route path ="/login" element={<Login />} />
+          <Route path ="/registro" element={<Registro />} />
         </Routes>
       </Router>
     </NotificacionProvider>

@@ -1,0 +1,65 @@
+form {
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 32px 24px;
+    background: #df366e; /* Fondo rosado muy suave */
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(245, 56, 108, 0.10);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border: 1.5px solid #971b46;
+}
+
+form div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+label {
+    font-weight: 600;
+    color: #ebe6e8; /* Rosado fuerte */
+    margin-bottom: 2px;
+}
+
+input, select {
+    padding: 10px 12px;
+    border: 1.5px solid #f8bbd0; /* Borde rosado claro */
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #fff; /* Fondo blanco para contraste */
+    transition: border 0.2s, background 0.2s;
+    color: #ad1457;
+}
+
+input:focus, select:focus {
+    border-color: #f06292; /* Rosado más intenso al enfocar */
+    outline: none;
+    background: #fce4ec; /* Fondo rosado claro al enfocar */
+}
+
+button[type="submit"] {
+    margin-top: 10px;
+    padding: 12px 0;
+    background: linear-gradient(90deg, #f05b8d 0%, #f591b4 100%);
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 2px 8px rgba(245, 56, 108, 0.10);
+    letter-spacing: 0.5px;
+}
+
+button[type="submit"]:hover {
+    background: linear-gradient(90deg, #ec407a 0%, #f06292 100%);
+    transform: translateY(-2px) scale(1.02);
+}
+
+::-webkit-input-placeholder { color: #ce538a; opacity: 1; }
+::-moz-placeholder { color: #ce538a; opacity: 1; }
+:-ms-input-placeholder { color: #ce538a; opacity: 1; }
+::placeholder { color: #ce538a; opacity: 1; }
