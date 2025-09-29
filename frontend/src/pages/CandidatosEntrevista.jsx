@@ -4,6 +4,8 @@ import axios from 'axios';
 import '../styles/CandidatosEntrevista.css';
 import { MdEdit, MdDelete } from 'react-icons/md';
 import { FaCheck, FaTimes, FaInfoCircle } from 'react-icons/fa';
+import API_BASE_URL from "../constants/api";
+
 
 const ESTADOS = [
   { key: 'entrevistar', label: 'Entrevistar' },
@@ -40,7 +42,7 @@ export default function CandidatosEntrevista() {
   const fetchCandidatos = async (search = '', pageNum = 1) => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/candidatos', {
+      const res = await axios.get(API_BASE_URL+'/api/candidatos', {
         params: { search, page: pageNum, pageSize },
       });
       setCandidatos(res.data.data || []);
@@ -61,7 +63,7 @@ export default function CandidatosEntrevista() {
   const cambiarEstado = async (id_candidato, estado) => {
     setActualizando(id_candidato + '-' + estado);
     try {
-      await axios.put(`http://localhost:5000/api/candidatos/${id_candidato}/estado`, { estado_entrevista: estado });
+      await axios.put(API_BASE_URL+`/api/candidatos/${id_candidato}/estado`, { estado_entrevista: estado });
       await fetchCandidatos(busqueda, page);
     } catch {
       setError('No se pudo cambiar el estado');
@@ -205,7 +207,7 @@ export default function CandidatosEntrevista() {
                                 title="Guardar"
                                 onClick={async () => {
                                   try {
-                                    await axios.put(`http://localhost:5000/api/candidatos/${c.id_candidato}`, editData);
+                                    await axios.put(API_BASE_URL+`/api/candidatos/${c.id_candidato}`, editData);
                                     setEditId(null);
                                     setEditData({});
                                     await fetchCandidatos(busqueda, page);
@@ -260,7 +262,7 @@ export default function CandidatosEntrevista() {
                                 onClick={async () => {
                                   if (window.confirm('¿Seguro que quieres borrar este candidato?')) {
                                     try {
-                                      await axios.delete(`http://localhost:5000/api/candidatos/${c.id_candidato}`);
+                                      await axios.delete(API_BASE_URL+`/api/candidatos/${c.id_candidato}`);
                                       await fetchCandidatos(busqueda, page);
                                     } catch {
                                       setError('No se pudo borrar el candidato');

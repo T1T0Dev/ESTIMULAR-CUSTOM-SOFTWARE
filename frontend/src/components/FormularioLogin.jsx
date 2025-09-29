@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import '../styles/FormularioLogin.css'
+import API_BASE_URL from "../constants/api";
 
 const FormularioLogin = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -38,7 +39,7 @@ const FormularioLogin = () => {
       return
     }
     try {
-      const response = await fetch('http://localhost:3001/api/login', {
+      const response = await fetch(API_BASE_URL+"/api/login", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

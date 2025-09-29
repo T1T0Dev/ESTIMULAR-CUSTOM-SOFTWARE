@@ -4,6 +4,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 const MySwal = withReactContent(Swal);
+import API_BASE_URL from "../constants/api";
 
 /* ---------- Helpers / Validations ---------- */
 const normalize = (s = "") =>
@@ -59,7 +60,7 @@ function useObrasSociales() {
     (async () => {
       try {
         const res = await axios.get(
-          "http://localhost:5000/api/obras-sociales/"
+          API_BASE_URL+"/api/obras-sociales/"
         );
         if (!mounted) return;
         if (res.data && res.data.success && Array.isArray(res.data.data))
@@ -313,7 +314,7 @@ export default function FormularioEntrevista() {
     };
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/entrevista/crear-candidato",
+        API_BASE_URL+"/api/entrevista/crear-candidato",
         {
           candidato: candidatoPayload,
           responsable: responsablePayload,

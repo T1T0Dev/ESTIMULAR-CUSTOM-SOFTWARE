@@ -1,6 +1,7 @@
 import React from 'react';
 import moment from 'moment';
 import './../styles/PacienteModal.css';
+import API_BASE_URL from "../constants/api";
 
 const calculateAge = (birthDate) => {
   if (!birthDate) return 'N/A';
@@ -21,7 +22,7 @@ export default function PacienteModal({ paciente, onClose }) {
         
         <div className="paciente-modal-header">
           <img 
-            src={`http://localhost:3001/documentos/${paciente.paciente_dni}.jpg`} 
+            src={API_BASE_URL+`/documentos/${paciente.paciente_dni}.jpg`} 
             alt={`Foto de ${paciente.paciente_nombre}`}
             className="paciente-profile-img"
             onError={(e) => { e.target.onerror = null; e.target.src='/src/assets/persona_prueba1.png'}} // Fallback

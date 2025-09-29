@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
+import API_BASE_URL from "../constants/api";
 
 import "../styles/FormularioConsulta.css";
 
@@ -30,7 +31,7 @@ export default function FormularioConsulta() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5000/api/contact/enviar-mail", form);
+      const res = await axios.post(API_BASE_URL+"/api/contact/enviar-mail", form);
 
       if (res.data.success) {
         setStatus({ success: true, message: res.data.message });
