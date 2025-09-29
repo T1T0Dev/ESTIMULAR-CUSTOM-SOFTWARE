@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { NotificacionProvider } from './context/NotificacionContext';
 
 import Landing from './pages/Landing';
-import Entrevista from './pages/Entrevista';
+import Entrevista from "./pages/Entrevista";
+import CandidatosEntrevista from "./pages/CandidatosEntrevista";
 import Turnos from './pages/Turnos';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           {/* Rutas publicas */}
           <Route path="/" element={<Landing />} />
           <Route path="/formulario-entrevista" element={<Entrevista />} />
+          <Route path="/candidatos-entrevista" element={<CandidatosEntrevista />} />
           <Route path="/turnos" element={<Turnos loggedInProfesionalId={loggedInProfesionalId} />} />
         </Routes>
       </Router>

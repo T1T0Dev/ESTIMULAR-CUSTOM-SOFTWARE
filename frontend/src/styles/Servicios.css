@@ -30,7 +30,7 @@
   background: var(--color-fondo);
   border-radius: 12px;
   padding: 1rem;
-  box-shadow: 0 4px 12px var(--color-sombra-servicio);
+  box-shadow: 0 4px 12px var(--color-rosa1);
   transition: transform 0.4s cubic-bezier(.4,0,.2,1), box-shadow 0.4s, flex 0.4s, opacity 0.4s;
   cursor: pointer;
   flex: 1;
@@ -40,7 +40,7 @@
 
 .service-item:hover {
   transform: translateY(-6px) scale(1.03);
-  box-shadow: 0 8px 24px var(--color-sombra-servicio-hover);
+  box-shadow: 0 8px 24px var(--color-amarillo1);
 }
 
 .service-item--active {
@@ -92,4 +92,65 @@
 .service-icon.red {
   background: var(--color-rojo2);
   box-shadow: 0 2px 8px var(--color-sombra-icono-red);
+}
+
+/* ...tu código existente... */
+
+/* Responsive: Tablets (≤ 900px) */
+@media (max-width: 900px) {
+  .services-list {
+    gap: 2rem;
+    max-width: 90%;
+  }
+  .service-item {
+    width: 220px;
+    padding: 0.8rem;
+  }
+
+}
+
+/* Responsive: Móviles grandes (≤ 600px) */
+@media (max-width: 600px) {
+  .services-section {
+    padding: 2rem 0.5rem;
+  }
+  .services-title {
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+  }
+  .services-list {
+    flex-direction: column;
+    gap: 1.2rem;
+    align-items: center;
+  }
+  .service-item,
+  .service-item--active {
+    width: 100%;
+    min-width: 0;
+    max-width: 400px;
+    margin: 0 auto;
+    flex: unset;
+    transform: none;
+  }
+  .service-item--hidden {
+    display: none;
+  }
+  .service-icon {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* Responsive: Móviles pequeños (≤ 400px) */
+@media (max-width: 400px) {
+  .services-title {
+    font-size: 1.7rem;
+  }
+  .service-item {
+    padding: 0.5rem;
+  }
+  .service-icon {
+    width: 36px;
+    height: 36px;
+  }
 }

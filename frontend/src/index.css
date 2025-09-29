@@ -1,25 +1,31 @@
-
 :root {
+  /* Paleta principal */
   /* Rosas */
   --color-rosa1: #e5007d;
   --color-rosa2: #e91e63;
+  --pink-1: #ff6fa6;
+  --pink-2: #f08bbd;
 
   /* Rojos */
   --color-rojo1: #e53935;
   --color-rojo2: #ffe0e0;
+  --accent-red: #E57373;
 
   /* Verdes */
   --color-verde1: #4caf50; /* Tronco/hojas */
   --color-verde2: #8bc53f;
   --color-verde3: #25d366; /* WhatsApp */
+  --accent-green: #67C18C;
 
   /* Amarillos */
   --color-amarillo1: #ffeb3b;
   --color-amarillo2: #fff9c4;
+  --accent-yellow: #FFB74D;
 
   /* Azules */
   --color-azul2: #e3f2fd;
   --color-accent-blue: #2196f3;
+  --accent-blue: #64B5F6;
 
   /* Naranjas */
   --color-naranja1: #ff9f1c;
@@ -27,6 +33,29 @@
 
   /* Morados */
   --color-accent-purple: #9c27b0;
+
+  /* Neutrales y fondo */
+  --neutral-100: #ffffff;
+  --neutral-200: #f7f7f8;
+  --neutral-300: #f2f2f4;
+  --neutral-400: #e6e6e9;
+  --neutral-600: #333333;
+  --bg: #fafafa;
+  --card-bg: #ffffff;
+  --color-fondo: #ffffff;
+  --color-text: #333333;
+  --color-muted: #f5f5f5;
+  --color-border: #dddddd;
+  --color-gris-label: #888;
+  --muted: rgba(0,0,0,0.45);
+
+  /* Extras para gradientes, sombras y transparencias */
+  --color-blanco-translucido-95: rgba(255, 255, 255, 0.95);
+  --color-blanco-translucido-70: rgba(255, 255, 255, 0.7);
+  --color-blanco-translucido-10: rgba(255, 255, 255, 0.1);
+  --color-sombra-rosa1-10: rgba(233, 30, 99, 0.1);
+  --color-negro: #000;
+  --color-transparente: transparent;
 
   /* Sombras generales */
   --color-sombra-galeria: rgba(0, 0, 0, 0.08);
@@ -46,23 +75,11 @@
   --color-sombra-whatsapp: rgba(37, 211, 102, 0.18);
   --color-sombra-whatsapp-hover: rgba(37, 211, 102, 0.28);
 
-  /* Fondo y texto */
-  --color-fondo: #ffffff;
-  --color-text: #333333;
-  --color-muted: #f5f5f5;
-  --color-border: #dddddd;
-  --color-gris-label: #888;
-
-  /* Extras para gradientes, sombras y transparencias */
-  --color-blanco-translucido-95: rgba(255,255,255,0.95);
-  --color-blanco-translucido-70: rgba(255,255,255,0.7);
-  --color-blanco-translucido-10: rgba(255,255,255,0.1);
-  --color-sombra-rosa1-10: rgba(233,30,99,0.10);
-  --color-negro: #000;
-  --color-transparente: transparent;
+  /* Utilidades */
+  --shadow: 0 8px 28px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --pill-min: 96px;
 }
-
-
 
 * {
   margin: 0;
@@ -70,16 +87,29 @@
   box-sizing: border-box;
 }
 
-html{
-    scroll-behavior: smooth;
+textarea {
+  resize: none;
 }
 
-
-textarea{
-  resize:none
-}
-
-
-html,body {
+html,
+body {
+  scroll-behavior: smooth;
   overflow-x: hidden;
+  font-family: "Montserrat", sans-serif;
+  scrollbar-color: var(--color-rosa1) var(--color-fondo);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-rosa1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-fondo);
+}
+
+fieldset {
+  border: none;
 }

@@ -4,10 +4,6 @@
   height: 64px;
   bottom: 32px;
   right: 32px;
-  background-color: var(--color-verde3);
-  color: var(--color-fondo);
-  border-radius: 50%;
-  box-shadow: 0 4px 16px var(--color-sombra-whatsapp);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -16,8 +12,9 @@
 }
 
 .whatsapp_float img {
-  width: 38px;
-  height: 38px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
   display: block;
 }
 

@@ -1,12 +1,14 @@
-import Sidebar from '../components/Sidebar';
 import FormularioEntrevista from '../components/FormularioEntrevista';
+
+// Layout de la entrevista
+import EntrevistaLayout from '../layouts/EntrevistaLayout';
 
 export default function Entrevista() {
   return (
-    <div className="entrevista__layout">
-      <Sidebar />
-      <FormularioEntrevista />
-    </div>
+    <EntrevistaLayout>
+        <FormularioEntrevista />
+    </EntrevistaLayout>
+    
   )
 }
 

@@ -1,6 +1,7 @@
 import React from 'react'
 
 
+import { profesionales } from '../constants/profesionales';
 
 import '../styles/BotonWhatsapp.css';
 import whatsappIcon from '../assets/whatsapp_button.jpeg';
@@ -10,7 +11,7 @@ import whatsappIcon from '../assets/whatsapp_button.jpeg';
 
 export default function WhatsappButton() {
 
-  const numeroTelefono = "549381"; // Reemplaza con el número de teléfono real
+  const numeroTelefono = "549" + profesionales[0].telefono.replace(/\D/g, ''); // Reemplaza con el número de teléfono real
   const mensaje = "Hola, tengo interés en sus servicios. Me gustaría obtener más información."
 
   return (

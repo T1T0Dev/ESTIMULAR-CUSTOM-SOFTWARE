@@ -1,6 +1,16 @@
 // src/components/Navbar.jsx
 import React, { useState, useEffect } from 'react';
 import {useNavigate } from 'react-router-dom';
+import {
+ FaHome, 
+  FaConciergeBell, 
+  FaComments, 
+  FaImages, 
+  FaEnvelope, 
+  FaClipboardList 
+} from "react-icons/fa";
+
+
 
 import '../styles/Navbar.css';
 
@@ -27,12 +37,12 @@ export default function Navbar() {
         </label>
 
         <ul className="navbar__menu">
-          <li><a href="#home">Home</a></li>
-          <li><a href="#services">Servicios</a></li>
-          <li><a href="#testimonials">Testimonios</a></li>
-          <li><a href="#gallery">Galería</a></li>
-          <li><a href="#contact">Contacto</a></li>
-          <li className="navbar__cta" onClick={() => navigate('/formulario-entrevista')}> <a> Solicitar Entrevista </a></li>
+          <li><a href="#home"><FaHome/> Home</a></li>
+          <li><a href="#services"><FaConciergeBell/> Servicios</a></li>
+          <li><a href="#testimonials"><FaComments/> Testimonios</a></li>
+          <li><a href="#gallery"><FaImages/> Galería</a></li>
+          <li><a href="#contact"><FaEnvelope/> Contacto</a></li>
+          <li className="navbar__cta" onClick={() => navigate('/formulario-entrevista')}> <a> <FaClipboardList/> Solicitar Entrevista </a></li>
         </ul>
       </div>
     </nav>

@@ -3,30 +3,34 @@ import persona_prueba1 from '../assets/persona_prueba1.png';
 
 export const profesionales = [
   {
-    nombre: "Lic. Noelia Urquiza",
+    id:1,
+    nombre: "Noelia Urquiza",
     profesion: "Psicóloga",
-    telefono: "381 339-0033",
+    telefono: "3813390033",
     foto: persona_prueba1,
     servicio: "Psicología"
   },
   {
-    nombre: "Lic. Ivana Garcia",
+    id:2,
+    nombre: "Ivana Garcia",
     profesion: "Fonoaudióloga",
-    telefono: "381 367-9893",
+    telefono: "3813679893",
     foto: persona_prueba1,
     servicio: "Fonoaudiología"
   },
   {
-    nombre: "Lic. Daiana Nuñez ",
+    id:3,
+    nombre: "Daiana Nuñez ",
     profesion: "Psicopedagoga",
-    telefono: "386 556-0493",
+    telefono: "3865560493",
     foto: persona_prueba1,
     servicio: "Psicopedagogía"
   },
   {
-    nombre: "Lic. Alejandra Gonzalez",
+    id:4,
+    nombre: "Alejandra Gonzalez",
     profesion: "Terapeuta Ocupacional",
-    telefono: "381 223-5510",
+    telefono: "3812235510",
     foto: persona_prueba1,
     servicio: "Terapia Ocupacional"
   },

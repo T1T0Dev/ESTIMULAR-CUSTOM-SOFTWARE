@@ -1,7 +1,13 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const contactRoutes = require('./src/routes/contactRoutes');
+require('dotenv').config();
+
+
+const contactosRoutes = require('./src/routes/contactoRoutes');
+const entrevistaRoutes = require('./src/routes/entrevistaRoutes');
+const obrasSocRoutes = require ('./src/routes/obrasSocRoutes');
+const candidatosRoutes = require('./src/routes/candidatosRoutes');
+
 const turnoRoutes = require('./src/routes/turnoRoutes');
 const pagoRoutes = require('./src/routes/pagoRoutes');
 const notificacionRoutes = require('./src/routes/notificacionRoutes');
@@ -13,7 +19,10 @@ app.use(cors());
 app.use(express.json());
 
 // Rutas
-app.use('/api', contactRoutes);
+app.use('/api/contact', contactosRoutes);
+app.use('/api/entrevista', entrevistaRoutes);
+app.use('/api/obras-sociales', obrasSocRoutes);
+app.use('/api/candidatos', candidatosRoutes);
 app.use('/api', turnoRoutes);
 app.use('/api', pagoRoutes);
 app.use('/api', notificacionRoutes);
@@ -22,12 +31,3 @@ app.listen(PORT, () => {
 	console.log(`Servidor backend escuchando en puerto ${PORT}`);
 });
 
-// Instrucciones para Ethereal:
-// 1. Ve a https://ethereal.email/create y crea una cuenta de prueba.
-// 2. Copia usuario y contraseña en tu archivo .env:
-//    SMTP_HOST=smtp.ethereal.email
-//    SMTP_PORT=587
-//    SMTP_USER=tu_usuario@ethereal.email
-//    SMTP_PASS=tu_password
-//    CONTACT_EMAIL=tu_correo_real_o_ethereal
-//    PORT=3001

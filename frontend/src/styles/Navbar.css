@@ -86,18 +86,21 @@
 .navbar__hamburger span {
   width: 25px;
   height: 2px;
-  background: var(--color-text);
+  background: var(--color-rosa2);
   margin-bottom: 5px;
   border-radius: 2px;
 }
 
+
+
+
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
   .navbar__menu {
     position: fixed;
     top: 60px;
     right: -100%;
-    width: 220px;
+    width: 100%;
     height: calc(100% - 60px);
     background: var(--color-fondo);
     flex-direction: column;
@@ -108,6 +111,13 @@
   .navbar__menu li {
     margin: 1rem 0;
   }
+
+  .navbar__cta {
+    display: block;
+    margin: 1rem 0 0 0;
+    padding: 0.5rem 1rem;
+  }
+
 
   .navbar__toggle:checked + .navbar__hamburger + .navbar__menu {
     right: 0;
