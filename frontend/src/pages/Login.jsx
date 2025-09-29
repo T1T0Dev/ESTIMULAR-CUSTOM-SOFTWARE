@@ -4,7 +4,7 @@ import Sidebarlogin from '../components/Sidebarlogin'
 
 const Login = () => {
   return (
-    <div className='entrevista__layout'>
+    <div className='login__layout'>
       <FormularioLogin />
       <Sidebarlogin />
     

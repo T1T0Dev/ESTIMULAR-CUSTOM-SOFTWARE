@@ -88,7 +88,7 @@
   cursor: pointer;
 }
 
-.entrevista__formulario {
+.login__formulario {
   flex: 1 1 60vw;
   max-width: 60vw;
   background: #fdecec; /* fondo rosa claro */
@@ -102,19 +102,19 @@
 }
 
 /* Responsive para el layout principal */
-.entrevista__layout {
+.login__layout {
   display: flex;
   min-height: 100vh;
   width: 100vw;
 }
 
 @media (max-width: 900px) {
-  .entrevista__layout {
+  .login__layout {
     flex-direction: column;
     min-width: 100vw;
   }
   .barra-lateral-login,
-  .entrevista__formulario {
+  .login__formulario {
     max-width: 100vw;
     min-width: 0;
     width: 100vw;
@@ -126,7 +126,7 @@
     padding: 32px 0 24px 0;
     border-bottom: 1px solid #eee;
   }
-  .entrevista__formulario {
+  .login__formulario {
     min-height: calc(100vh - 260px);
     padding: 32px 0;
     align-items: center;

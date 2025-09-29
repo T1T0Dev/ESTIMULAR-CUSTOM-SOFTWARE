@@ -60,7 +60,7 @@ const FormularioLogin = () => {
   }
 
   return (
-    <div className="entrevista__formulario">
+    <div className="login__formulario">
       <div className="formulario-login-box">
         <h1 className="formulario-login-title">Login</h1>
         <p className="formulario-login-subtitle">Ingresa los datos de tu cuenta</p>
