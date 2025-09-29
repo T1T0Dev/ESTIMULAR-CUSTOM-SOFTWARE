@@ -75,7 +75,6 @@
 
 .barra-lateral__footer {
   margin-top: auto;
-
 }
 
 @media (max-width: 768px) {
@@ -85,11 +84,15 @@
     width: 100%;
     max-width: 100%;
     box-shadow: 0 4px 16px var(--color-fondo);
+    flex-direction:row;
+  }
+  .barra-lateral__separador{
+    display:none;
   }
 
   .barra-lateral__logo {
-    width: 8rem;
-    height: 8rem;
+    width: 6rem;
+    height: 6rem;
   }
 
   .barra-lateral__logo--placeholder {
@@ -99,14 +102,20 @@
   }
 
   .barra-lateral__slogan {
+    margin-top:1rem;
     font-size: 1rem;
   }
 
   .btn-logout {
     padding: 8px 24px;
+    margin: 1rem;
     font-size: 0.9rem;
+    display:flex;
   }
- 
 
-  
+  .barra-lateral__informacion{
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+  }
 }

@@ -27,22 +27,24 @@ export default function Sidebar({
         </div>
       )}
       <div className="barra-lateral__separador" />
-      <div className="barra-lateral__slogan" aria-live="polite">
-        <q>{slogan}</q>
-      </div>
+      <div className="barra-lateral__informacion">
+        <div className="barra-lateral__slogan" aria-live="polite">
+          <q>{slogan}</q>
+        </div>
 
-      <div className="barra-lateral__cta">
-        <button
-          className="btn-logout"
-          type="button"
-          aria-label="Cerrar sesión"
-          onClick={() => {
-            localStorage.clear();
-            navigate("/");
-          }}
-        >
-          Regresar al inicio
-        </button>
+        <div className="barra-lateral__cta">
+          <button
+            className="btn-logout"
+            type="button"
+            aria-label="Cerrar sesión"
+            onClick={() => {
+              localStorage.clear();
+              navigate("/");
+            }}
+          >
+            Regresar al inicio
+          </button>
+        </div>
       </div>
     </div>
   );
