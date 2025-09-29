@@ -238,7 +238,6 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
       {turnoForPago && (
         <PagoModal
           turno={turnoForPago}
-          turno={turnoForPago}
           onClose={handleClosePagoModal}
         />
       )}

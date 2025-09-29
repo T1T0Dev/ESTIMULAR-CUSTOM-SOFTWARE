@@ -59,7 +59,7 @@ export default function Footer() {
   return (
     <footer id="contact" className="footer">
       <div className="footer-bottom">
-        <p>© {añoActual} Estimular. Todos los derechos reservados.</p>
+        <p>© {currentYear} Estimular. Todos los derechos reservados.</p>
       </div>
     </footer>
   );
