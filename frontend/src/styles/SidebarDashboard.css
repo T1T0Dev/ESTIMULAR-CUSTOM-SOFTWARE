@@ -13,6 +13,9 @@
   flex-direction: column;
   gap: 18px;
   box-shadow: var(--color-sombra-sidebar-logo) 0 0 0;
+  height: 100vh; /* Sidebar ocupa toda la altura de la ventana */
+  position: sticky; /* Se mantiene fija al hacer scroll de la página */
+  top: 0;
 }
 .sd-top {
   padding-bottom: 8px;
@@ -28,6 +31,9 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 12px;
+  flex: 1 1 auto; /* Ocupa el espacio disponible */
+  min-height: 0; /* Necesario para que overflow funcione dentro de flex */
+  overflow-y: auto; /* Si hay muchos ítems, el menú hace scroll */
 }
 .sd-link {
   display: flex;
@@ -39,13 +45,24 @@
   color: var(--neutral-600);
   font-weight: 700;
 }
+
+.sd-link svg {
+  color: var(--color-rosa1); /* Todos los íconos en rosado */
+  flex-shrink: 0;
+}
 .sd-link.active {
   background: linear-gradient(90deg, var(--pink-1), var(--pink-2));
   color: #fff;
 }
+.sd-link.active svg {
+  color: var(--color-rosa1); /* Mantener íconos rosados también en activo */
+}
 
 .sd-footer {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .sd-logout {
   width: 100%;
@@ -58,7 +75,7 @@
 
 /* User card */
 .sd-user-card {
-  margin: 8px 0 12px 0;
+  margin: 0;
 }
 .sd-user-btn {
   width: 100%;

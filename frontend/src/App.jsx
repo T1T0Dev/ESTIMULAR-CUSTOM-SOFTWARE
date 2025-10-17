@@ -5,6 +5,7 @@ import Entrevista from "./pages/Entrevista";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Ninos from "./pages/Ninos";
 import EditarProfesional from "./pages/EditarProfesional";
+import ObrasSociales from "./pages/ObrasSociales";
 import EntrevistaPage from "./pages/Entrevista";
 function App() {
   return (
@@ -48,12 +49,7 @@ function App() {
                       </div>
                     }
                   />
-                  <Route
-                    path="obras-sociales"
-                    element={
-                      <div className="p-24">Obras sociales (placeholder)</div>
-                    }
-                  />
+                  <Route path="obras-sociales" element={<ObrasSociales />} />
                   <Route
                     path="turnos"
                     element={<div className="p-24">Turnos (placeholder)</div>}

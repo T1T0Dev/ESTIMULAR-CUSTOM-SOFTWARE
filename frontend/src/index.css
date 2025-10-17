@@ -125,3 +125,24 @@ fieldset {
 .mb-16 {
   margin-bottom: 16px;
 }
+
+/* Layout helpers */
+.w-100 {
+  width: 100%;
+}
+.justify-start {
+  justify-content: flex-start;
+}
+.justify-end {
+  justify-content: flex-end;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}

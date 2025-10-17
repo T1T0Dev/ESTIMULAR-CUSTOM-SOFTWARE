@@ -5,6 +5,7 @@ import CrearNino from "../components/CrearNino";
 import Swal from "sweetalert2";
 import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
+import { formatDateDMY } from "../utils/date";
 
 function calcularEdad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
@@ -105,7 +106,7 @@ export default function Ninos() {
   return (
     <section className="ninos-page">
       <div className="ninos-top">
-        <h1 className="ninos-title">Niños  </h1>
+        <h1 className="ninos-title">Niños </h1>
         <div className="ninos-controls">
           <form
             className="busqueda-form"
@@ -269,7 +270,9 @@ export default function Ninos() {
                               }
                             />
                           ) : c.fecha_nacimiento ? (
-                            `${calcularEdad(c.fecha_nacimiento)} años`
+                            `${formatDateDMY(
+                              c.fecha_nacimiento
+                            )} (${calcularEdad(c.fecha_nacimiento)} años)`
                           ) : (
                             "—"
                           )}
@@ -618,7 +621,8 @@ export default function Ninos() {
                 <span>Apellido:</span> {modalData.apellido}
               </div>
               <div className="modal-row">
-                <span>Fecha de nacimiento:</span> {modalData.fecha_nacimiento} (
+                <span>Fecha de nacimiento:</span>{" "}
+                {formatDateDMY(modalData.fecha_nacimiento)} (
                 {calcularEdad(modalData.fecha_nacimiento)} años)
               </div>
               <div className="modal-row">

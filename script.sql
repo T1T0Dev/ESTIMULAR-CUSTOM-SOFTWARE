@@ -14,7 +14,7 @@ CREATE TABLE public.departamentos (
   descripcion text,
   responsable_id bigint,
   CONSTRAINT departamentos_pkey PRIMARY KEY (id_departamento),
-  CONSTRAINT departamentos_responsable_id_fkey FOREIGN KEY (responsable_id) REFERENCES public.profesionales(id_profesional)
+  CONSTRAINT departamentos_responsable_id_fkey FOREIGN KEY (responsable_id) REFERENCES public.equipo(id_profesional)
 );
 CREATE TABLE public.entrevista_cita_resultados (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -43,9 +43,21 @@ CREATE TABLE public.entrevista_citas (
   nino_id bigint,
   CONSTRAINT entrevista_citas_pkey PRIMARY KEY (id),
   CONSTRAINT entrevista_citas_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento),
-  CONSTRAINT entrevista_citas_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT entrevista_citas_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.equipo(id_profesional),
   CONSTRAINT entrevista_citas_consultorio_id_fkey FOREIGN KEY (consultorio_id) REFERENCES public.consultorios(id),
   CONSTRAINT entrevista_citas_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id_nino)
+);
+CREATE TABLE public.equipo (
+  id_profesional bigint NOT NULL,
+  nombre character varying NOT NULL,
+  apellido character varying NOT NULL,
+  telefono character varying,
+  email character varying UNIQUE,
+  fecha_nacimiento date NOT NULL,
+  foto_perfil text,
+  profesion text,
+  CONSTRAINT equipo_pkey PRIMARY KEY (id_profesional),
+  CONSTRAINT profesionales_id_profesional_fkey FOREIGN KEY (id_profesional) REFERENCES public.usuarios(id_usuario)
 );
 CREATE TABLE public.nino_departamentos (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -58,7 +70,7 @@ CREATE TABLE public.nino_departamentos (
   actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT nino_departamentos_pkey PRIMARY KEY (id),
   CONSTRAINT candidato_departamentos_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento),
-  CONSTRAINT candidato_departamentos_profesional_asignado_id_fkey FOREIGN KEY (profesional_asignado_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT candidato_departamentos_profesional_asignado_id_fkey FOREIGN KEY (profesional_asignado_id) REFERENCES public.equipo(id_profesional),
   CONSTRAINT nino_departamentos_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id_nino)
 );
 CREATE TABLE public.nino_responsables (
@@ -99,19 +111,8 @@ CREATE TABLE public.profesional_departamentos (
   profesional_id bigint NOT NULL,
   departamento_id bigint NOT NULL,
   CONSTRAINT profesional_departamentos_pkey PRIMARY KEY (profesional_id, departamento_id),
-  CONSTRAINT profesional_departamentos_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT profesional_departamentos_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.equipo(id_profesional),
   CONSTRAINT profesional_departamentos_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento)
-);
-CREATE TABLE public.profesionales (
-  id_profesional bigint NOT NULL,
-  nombre_profesional character varying NOT NULL,
-  apellido_profesional character varying NOT NULL,
-  telefono_profesional character varying,
-  email_profesional character varying UNIQUE,
-  fecha_nacimiento date NOT NULL,
-  foto_perfil text,
-  CONSTRAINT profesionales_pkey PRIMARY KEY (id_profesional),
-  CONSTRAINT profesionales_id_profesional_fkey FOREIGN KEY (id_profesional) REFERENCES public.usuarios(id_usuario)
 );
 CREATE TABLE public.responsables (
   id_responsable bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -135,7 +136,7 @@ CREATE TABLE public.turno_profesionales (
   rol_en_turno character varying NOT NULL DEFAULT 'responsable'::character varying,
   CONSTRAINT turno_profesionales_pkey PRIMARY KEY (profesional_id, turno_id),
   CONSTRAINT turno_profesionales_turno_id_fkey FOREIGN KEY (turno_id) REFERENCES public.turnos(id),
-  CONSTRAINT turno_profesionales_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional)
+  CONSTRAINT turno_profesionales_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.equipo(id_profesional)
 );
 CREATE TABLE public.turnos (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -164,6 +165,7 @@ CREATE TABLE public.usuarios (
   activo boolean NOT NULL DEFAULT true,
   creado_en timestamp with time zone NOT NULL DEFAULT now(),
   actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  rol text,
   CONSTRAINT usuarios_pkey PRIMARY KEY (id_usuario),
   CONSTRAINT usuarios_id_rol_fkey FOREIGN KEY (id_rol) REFERENCES public.roles(id_rol)
 );
