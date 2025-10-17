@@ -4,10 +4,8 @@ require('dotenv').config();
 
 
 const contactosRoutes = require('./src/routes/contactoRoutes');
-const entrevistaRoutes = require('./src/routes/entrevistaRoutes');
 const obrasSocRoutes = require('./src/routes/obrasSocRoutes');
-const candidatosRoutes = require('./src/routes/candidatosRoutes');
-const turnosRoutes = require('./src/routes/turnosRoutes');
+const ninosRoutes = require('./src/routes/ninosRoutes');
 const responsablesRoutes = require('./src/routes/responsablesRoutes');
 
 
@@ -27,10 +25,8 @@ try {
 
 // Rutas
 app.use('/api/contact', contactosRoutes);
-app.use('/api/entrevista', entrevistaRoutes);
 app.use('/api/obras-sociales', obrasSocRoutes);
-app.use('/api/candidatos', candidatosRoutes);
-app.use('/api/turnos', turnosRoutes);
+app.use('/api/ninos', ninosRoutes);
 app.use('/api/responsables', responsablesRoutes);
 
 app.listen(PORT, () => {

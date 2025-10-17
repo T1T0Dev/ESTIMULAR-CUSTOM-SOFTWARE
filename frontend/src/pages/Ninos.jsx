@@ -1,15 +1,10 @@
-// CandidatosEntrevista.jsx
-import { useState, useEffect } from "react";
-import { useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
-import "../styles/CandidatosEntrevista.css";
-import CrearCandidato from "../components/CrearCandidato";
+import "../styles/NinosPage.css";
+import CrearNino from "../components/CrearNino";
 import Swal from "sweetalert2";
 import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
-
-// Removed interview states from this module: state and turno management
-// will be handled in the Entrevistas/Turnos module (EntrevistasCrud.jsx).
 
 function calcularEdad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
@@ -23,12 +18,12 @@ function calcularEdad(fechaNacimiento) {
   return edad;
 }
 
-export default function CandidatosEntrevista() {
-  const [candidatos, setCandidatos] = useState([]);
+export default function Ninos() {
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // state for inline operations (reserved)
   const [busqueda, setBusqueda] = useState("");
+  const [tipo, setTipo] = useState("todos"); // todos | candidato | paciente
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [editId, setEditId] = useState(null);
@@ -39,7 +34,6 @@ export default function CandidatosEntrevista() {
   const [obrasSociales, setObrasSociales] = useState([]);
   const skipPageEffectRef = useRef(false);
 
-  // simple debounce hook local to this file
   function useDebounce(value, delay) {
     const [debounced, setDebounced] = useState(value);
     useEffect(() => {
@@ -48,99 +42,81 @@ export default function CandidatosEntrevista() {
     }, [value, delay]);
     return debounced;
   }
-
   const debouncedBusqueda = useDebounce(busqueda, 300);
 
-  // cargar obras sociales disponibles para el select
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
+    (async () => {
       try {
         const res = await axios.get("http://localhost:5000/api/obras-sociales");
-        if (mounted && res.data && res.data.data)
-          setObrasSociales(res.data.data);
-      } catch (err) {
-        console.warn("No se pudo cargar obras sociales", err?.message || err);
+        if (mounted) setObrasSociales(res?.data?.data || []);
+      } catch (e) {
+        // Evitar fallo silencioso y ayudar en debug si la petición falla
+        console.error("Error cargando obras sociales:", e);
       }
-    };
-    load();
+    })();
     return () => (mounted = false);
   }, []);
 
-  const fetchCandidatos = async (search = "", pageNum = 1) => {
-    setLoading(true);
-    try {
-      const res = await axios.get("http://localhost:5000/api/candidatos", {
-        params: { search, page: pageNum, pageSize },
-      });
-      setCandidatos(res.data.data || []);
-      setTotal(res.data.total || 0);
-      setError(null);
-    } catch {
-      setError("Error al obtener los candidatos");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchNinos = useCallback(
+    async (search = "", pageNum = 1, tipoSel = "todos") => {
+      setLoading(true);
+      try {
+        const res = await axios.get("http://localhost:5000/api/ninos", {
+          params: { search, page: pageNum, pageSize, tipo: tipoSel },
+        });
+        setItems(res.data.data || []);
+        setTotal(res.data.total || 0);
+        setError(null);
+      } catch (e) {
+        console.error("Error al obtener los niños:", e);
+        setError("Error al obtener los niños");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pageSize]
+  );
 
-  // When debounced search changes, reset to page 1 and fetch results
   useEffect(() => {
-    // if the debounced value changed, we want to reset pagination
     skipPageEffectRef.current = true;
     setPage(1);
-    fetchCandidatos(debouncedBusqueda, 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedBusqueda]);
+    fetchNinos(debouncedBusqueda, 1, tipo);
+  }, [debouncedBusqueda, tipo, fetchNinos]);
 
-  // When page changes (user pagination), fetch current search/page
   useEffect(() => {
     if (skipPageEffectRef.current) {
-      // clear the flag and skip this automatic fetch because the debounced effect already fetched
       skipPageEffectRef.current = false;
       return;
     }
-    fetchCandidatos(busqueda, page);
+    fetchNinos(busqueda, page, tipo);
+    // We intentionally only react to page changes here; search/tipo changes are handled above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
-
-  // Note: state transitions handled in Entrevistas/Turnos module; no cambiarEstado here
 
   const handleBuscar = (e) => {
     e.preventDefault();
     setPage(1);
-    fetchCandidatos(busqueda, 1);
+    fetchNinos(busqueda, 1, tipo);
   };
 
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <section className="candidatos-page">
-      <div className="candidatos-top">
-        <h1 className="candidatos-title">Candidatos a entrevista</h1>
-
-        <div className="candidatos-controls">
+    <section className="ninos-page">
+      <div className="ninos-top">
+        <h1 className="ninos-title">Niños  </h1>
+        <div className="ninos-controls">
           <form
             className="busqueda-form"
             onSubmit={handleBuscar}
             role="search"
-            aria-label="Buscar candidatos"
+            aria-label="Buscar niños"
           >
             <label className="sr-only" htmlFor="buscar">
               Buscar
             </label>
             <div className="search">
-              <svg
-                className="icon search-icon"
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                aria-hidden
-              >
-                <path
-                  fill="currentColor"
-                  d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5z"
-                />
-              </svg>
               <input
                 id="buscar"
                 type="text"
@@ -153,32 +129,40 @@ export default function CandidatosEntrevista() {
           </form>
 
           <div className="action-buttons">
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className="btn outline-pink"
+            >
+              <option value="todos">Todos</option>
+              <option value="candidato">Candidatos</option>
+              <option value="paciente">Pacientes</option>
+            </select>
             <button
               className="btn primary"
-              onClick={() => setModalOpen((s) => !s)}
+              onClick={() => {
+                setModalData(null);
+                setModalOpen(true);
+              }}
             >
-              + Agregar candidato
+              + Agregar niño
             </button>
-            <button className="btn outline-pink">Filtrar</button>
-            <button className="btn ghost">Exportar</button>
           </div>
         </div>
-        {/* end candidatos-controls */}
       </div>
-      {/* end candidatos-top */}
 
-      <div className="card candidatos-card">
+      <div className="card ninos-card">
         {loading ? (
-          <div className="loader">Cargando candidatos...</div>
+          <div className="loader">Cargando…</div>
         ) : error ? (
           <div className="error">{error}</div>
-        ) : candidatos.length === 0 ? (
-          <div className="empty">No se encontraron candidatos.</div>
+        ) : items.length === 0 ? (
+          <div className="empty">No se encontraron registros.</div>
         ) : (
           <>
             <div className="table-tools">
               <div className="left">
-                <div className="meta">{total} candidatos</div>
+                <div className="meta">{total} registros</div>
               </div>
               <div className="right">
                 <div className="meta">
@@ -191,7 +175,7 @@ export default function CandidatosEntrevista() {
               <table
                 className="table candidatos-table"
                 role="table"
-                aria-label="Lista de candidatos"
+                aria-label="Lista de niños"
               >
                 <thead>
                   <tr>
@@ -202,101 +186,80 @@ export default function CandidatosEntrevista() {
                     <th className="col-cert">Certificado</th>
                     <th className="col-os">Obra Social</th>
                     <th className="col-resp">Responsable</th>
+                    <th>Tipo</th>
                     <th className="col-actions">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {candidatos.map((c) => {
-                    const isEditing = editId === c.id_candidato;
-                    // Normalizar datos de obra social y responsable según el backend
+                  {items.map((c) => {
+                    const isEditing = editId === c.id_nino;
                     const obraSocialName =
-                      c.obra_social?.nombre_obra_social ||
-                      c.obra_social?.nombre ||
-                      c.nombre_obra_social ||
-                      null;
-                    const responsableRel =
-                      Array.isArray(c.responsables) && c.responsables.length > 0
-                        ? c.responsables[0].responsable || c.responsables[0]
-                        : null;
-                    const responsableNombre = responsableRel
-                      ? responsableRel.nombre_responsable ||
-                        responsableRel.nombre
-                      : null;
-                    const responsableApellido = responsableRel
-                      ? responsableRel.apellido_responsable ||
-                        responsableRel.apellido
-                      : null;
-                    // In this module we don't surface turno/state controls.
-
+                      c.obra_social?.nombre_obra_social || null;
+                    const resp = c.responsable || null;
                     return (
-                      <tr key={c.id_candidato}>
-                        {/* DNI */}
+                      <tr key={c.id_nino}>
                         <td className="col-dni">
                           {isEditing ? (
                             <input
                               className="edit-input"
                               type="text"
-                              value={editData.dni_nino ?? c.dni_nino}
+                              value={editData.dni ?? c.dni ?? ""}
                               onChange={(e) =>
                                 setEditData((ed) => ({
                                   ...ed,
-                                  dni_nino: e.target.value,
+                                  dni: e.target.value,
                                 }))
                               }
                             />
                           ) : (
-                            c.dni_nino || "—"
+                            c.dni || "—"
                           )}
                         </td>
-
-                        {/* Nombre */}
                         <td className="col-name">
                           {isEditing ? (
                             <input
                               className="edit-input"
                               type="text"
-                              value={editData.nombre_nino ?? c.nombre_nino}
+                              value={editData.nombre ?? c.nombre}
                               onChange={(e) =>
                                 setEditData((ed) => ({
                                   ...ed,
-                                  nombre_nino: e.target.value,
+                                  nombre: e.target.value,
                                 }))
                               }
                             />
                           ) : (
-                            c.nombre_nino || "—"
+                            c.nombre || "—"
                           )}
                         </td>
-
-                        {/* Apellido */}
                         <td className="col-last">
                           {isEditing ? (
                             <input
                               className="edit-input"
                               type="text"
-                              value={editData.apellido_nino ?? c.apellido_nino}
+                              value={editData.apellido ?? c.apellido}
                               onChange={(e) =>
                                 setEditData((ed) => ({
                                   ...ed,
-                                  apellido_nino: e.target.value,
+                                  apellido: e.target.value,
                                 }))
                               }
                             />
                           ) : (
-                            c.apellido_nino || "—"
+                            c.apellido || "—"
                           )}
                         </td>
-
-                        {/* Edad */}
                         <td className="col-dniNac">
                           {isEditing ? (
                             <input
                               type="date"
                               className="edit-input"
                               value={
-                                editData.fecha_nacimiento ??
-                                c.fecha_nacimiento ??
-                                ""
+                                editData.fecha_nacimiento !== undefined
+                                  ? editData.fecha_nacimiento
+                                  : c.fecha_nacimiento
+                                  ? String(c.fecha_nacimiento).slice(0, 10)
+                                  : ""
                               }
                               onChange={(e) =>
                                 setEditData((ed) => ({
@@ -311,18 +274,13 @@ export default function CandidatosEntrevista() {
                             "—"
                           )}
                         </td>
-
-                        {/* Certificado */}
                         <td className="col-cert">
                           {isEditing ? (
                             <select
                               className="edit-select"
                               value={
-                                editData.certificado_discapacidad === undefined
-                                  ? c.certificado_discapacidad
-                                    ? "si"
-                                    : "no"
-                                  : editData.certificado_discapacidad
+                                editData.certificado_discapacidad ??
+                                c.certificado_discapacidad
                                   ? "si"
                                   : "no"
                               }
@@ -343,8 +301,6 @@ export default function CandidatosEntrevista() {
                             "NO"
                           )}
                         </td>
-
-                        {/* Obra Social */}
                         <td className="col-os">
                           {isEditing ? (
                             <select
@@ -379,59 +335,31 @@ export default function CandidatosEntrevista() {
                             obraSocialName || "—"
                           )}
                         </td>
-
-                        {/* Responsable */}
                         <td className="col-resp">
+                          {resp
+                            ? `${resp.nombre || ""} ${
+                                resp.apellido || ""
+                              }`.trim()
+                            : "—"}
+                        </td>
+                        <td>
                           {isEditing ? (
                             <select
-                              className="edit-select"
-                              value={
-                                editData.selected_responsable_id ??
-                                (Array.isArray(c.responsables) &&
-                                c.responsables.length > 0
-                                  ? c.responsables[0].responsable
-                                      ?.id_responsable ||
-                                    c.responsables[0].id_responsable
-                                  : "")
-                              }
+                              value={editData.tipo ?? c.tipo ?? "candidato"}
                               onChange={(e) =>
                                 setEditData((ed) => ({
                                   ...ed,
-                                  selected_responsable_id: e.target.value
-                                    ? Number(e.target.value)
-                                    : null,
+                                  tipo: e.target.value,
                                 }))
                               }
                             >
-                              <option value="">
-                                -- Seleccionar responsable --
-                              </option>
-                              {Array.isArray(c.responsables) &&
-                                c.responsables.map((rel) => {
-                                  const r = rel.responsable || rel;
-                                  const id = r.id_responsable || r.id;
-                                  const label = `${
-                                    r.nombre_responsable || r.nombre || ""
-                                  } ${
-                                    r.apellido_responsable || r.apellido || ""
-                                  }`.trim();
-                                  return (
-                                    <option key={id} value={id}>
-                                      {label}
-                                    </option>
-                                  );
-                                })}
+                              <option value="candidato">candidato</option>
+                              <option value="paciente">paciente</option>
                             </select>
-                          ) : responsableNombre || responsableApellido ? (
-                            `${responsableNombre || ""} ${
-                              responsableApellido || ""
-                            }`.trim()
                           ) : (
-                            "—"
+                            c.tipo
                           )}
                         </td>
-
-                        {/* Acciones */}
                         <td className="col-actions">
                           <div className="row-actions">
                             <button
@@ -444,7 +372,6 @@ export default function CandidatosEntrevista() {
                             >
                               <FaInfoCircle size={20} />
                             </button>
-
                             {isEditing ? (
                               <>
                                 <button
@@ -452,85 +379,105 @@ export default function CandidatosEntrevista() {
                                   title="Guardar"
                                   onClick={async () => {
                                     try {
-                                      const payload = {
-                                        nombre_nino: editData.nombre_nino,
-                                        apellido_nino: editData.apellido_nino,
-                                        dni_nino: editData.dni_nino,
-                                        fecha_nacimiento:
-                                          editData.fecha_nacimiento,
-                                        certificado_discapacidad:
-                                          !!editData.certificado_discapacidad,
-                                        motivo_consulta:
-                                          editData.motivo_consulta,
-                                        id_obra_social:
-                                          editData.id_obra_social ??
-                                          c.id_obra_social ??
-                                          null,
-                                      };
-
-                                      // show loading
                                       Swal.fire({
                                         title: "Guardando...",
                                         allowOutsideClick: false,
                                         didOpen: () => Swal.showLoading(),
                                       });
-
-                                      // 1) Guardar cambios principales del candidato
+                                      // Build payload only with changed fields, avoid overwriting unintentionally
+                                      const payload = {};
+                                      // nombre
+                                      if (
+                                        editData.nombre !== undefined &&
+                                        editData.nombre !== c.nombre
+                                      ) {
+                                        payload.nombre = editData.nombre;
+                                      }
+                                      // apellido
+                                      if (
+                                        editData.apellido !== undefined &&
+                                        editData.apellido !== c.apellido
+                                      ) {
+                                        payload.apellido = editData.apellido;
+                                      }
+                                      // dni (send trimmed string or null)
+                                      if (editData.dni !== undefined) {
+                                        const newDni =
+                                          editData.dni !== null &&
+                                          editData.dni !== undefined
+                                            ? String(editData.dni).trim()
+                                            : null;
+                                        if (newDni !== (c.dni ?? null))
+                                          payload.dni = newDni;
+                                      }
+                                      // fecha_nacimiento (normalize empty string to null)
+                                      if (
+                                        editData.fecha_nacimiento !== undefined
+                                      ) {
+                                        const newFecha =
+                                          editData.fecha_nacimiento === ""
+                                            ? null
+                                            : editData.fecha_nacimiento;
+                                        const currentFecha =
+                                          c.fecha_nacimiento ?? null;
+                                        if (newFecha !== currentFecha)
+                                          payload.fecha_nacimiento = newFecha;
+                                      }
+                                      // certificado_discapacidad (coalesce and compare)
+                                      if (
+                                        editData.certificado_discapacidad !==
+                                        undefined
+                                      ) {
+                                        const newCert =
+                                          !!editData.certificado_discapacidad;
+                                        if (
+                                          newCert !==
+                                          !!c.certificado_discapacidad
+                                        )
+                                          payload.certificado_discapacidad =
+                                            newCert;
+                                      }
+                                      // id_obra_social (allow null)
+                                      if (
+                                        editData.id_obra_social !== undefined
+                                      ) {
+                                        const newOs =
+                                          editData.id_obra_social ?? null;
+                                        if (
+                                          (newOs ?? null) !==
+                                          (c.id_obra_social ?? null)
+                                        )
+                                          payload.id_obra_social = newOs;
+                                      }
+                                      // tipo
+                                      if (
+                                        editData.tipo !== undefined &&
+                                        editData.tipo !== c.tipo
+                                      ) {
+                                        payload.tipo = editData.tipo;
+                                      }
                                       await axios.put(
-                                        `http://localhost:5000/api/candidatos/${c.id_candidato}`,
+                                        `http://localhost:5000/api/ninos/${c.id_nino}`,
                                         payload
                                       );
-
-                                      // 2) Si se seleccionó un responsable distinto, llamar al endpoint para marcarlo principal
-                                      const newRespId =
-                                        editData.selected_responsable_id ??
-                                        null;
-                                      const currentRespId =
-                                        Array.isArray(c.responsables) &&
-                                        c.responsables.length > 0
-                                          ? c.responsables[0].responsable
-                                              ?.id_responsable ||
-                                            c.responsables[0].id_responsable ||
-                                            null
-                                          : null;
-                                      if (
-                                        newRespId &&
-                                        newRespId !== currentRespId
-                                      ) {
-                                        try {
-                                          await axios.put(
-                                            `http://localhost:5000/api/candidatos/${c.id_candidato}/responsable`,
-                                            { id_responsable: newRespId }
-                                          );
-                                        } catch (err) {
-                                          console.warn(
-                                            "No se pudo actualizar responsable principal:",
-                                            err?.message || err
-                                          );
-                                        }
-                                      }
-
                                       setEditId(null);
                                       setEditData({});
-                                      await fetchCandidatos(busqueda, page);
-
+                                      await fetchNinos(busqueda, page, tipo);
                                       Swal.close();
                                       Swal.fire({
                                         icon: "success",
                                         title: "Guardado",
-                                        text: "Cambios guardados correctamente",
-                                        timer: 1400,
+                                        timer: 1200,
                                         showConfirmButton: false,
                                       });
                                     } catch (err) {
-                                      console.error(err);
                                       Swal.close();
                                       Swal.fire({
                                         icon: "error",
                                         title: "Error",
                                         text:
                                           err?.response?.data?.message ||
-                                          "No se pudo editar el candidato",
+                                          "No se pudo guardar",
                                       });
                                     }
                                   }}
@@ -554,33 +501,21 @@ export default function CandidatosEntrevista() {
                                   className="icon-btn edit"
                                   title="Editar"
                                   onClick={() => {
-                                    // initialize editData with full editable fields
-                                    // find current principal responsable id if exists
-                                    const principalRel = Array.isArray(
-                                      c.responsables
-                                    )
-                                      ? c.responsables.find(
-                                          (r) => r.es_principal === true
-                                        ) || c.responsables[0]
-                                      : null;
-                                    const principalId = principalRel
-                                      ? principalRel.responsable
-                                          ?.id_responsable ||
-                                        principalRel.id_responsable ||
-                                        principalRel.responsable?.id ||
-                                        principalRel.id
-                                      : null;
-                                    setEditId(c.id_candidato);
+                                    setEditId(c.id_nino);
                                     setEditData({
-                                      nombre_nino: c.nombre_nino,
-                                      apellido_nino: c.apellido_nino,
-                                      dni_nino: c.dni_nino,
-                                      fecha_nacimiento:
-                                        c.fecha_nacimiento || "",
+                                      nombre: c.nombre,
+                                      apellido: c.apellido,
+                                      dni: c.dni,
+                                      fecha_nacimiento: c.fecha_nacimiento
+                                        ? String(c.fecha_nacimiento).slice(
+                                            0,
+                                            10
+                                          )
+                                        : "",
                                       certificado_discapacidad:
                                         !!c.certificado_discapacidad,
                                       id_obra_social: c.id_obra_social ?? null,
-                                      selected_responsable_id: principalId,
+                                      tipo: c.tipo,
                                     });
                                   }}
                                 >
@@ -591,7 +526,7 @@ export default function CandidatosEntrevista() {
                                   title="Eliminar"
                                   onClick={async () => {
                                     const result = await Swal.fire({
-                                      title: "¿Eliminar candidato?",
+                                      title: "¿Eliminar?",
                                       text: "Esta acción no se puede deshacer.",
                                       icon: "warning",
                                       showCancelButton: true,
@@ -606,15 +541,14 @@ export default function CandidatosEntrevista() {
                                           didOpen: () => Swal.showLoading(),
                                         });
                                         await axios.delete(
-                                          `http://localhost:5000/api/candidatos/${c.id_candidato}`
+                                          `http://localhost:5000/api/ninos/${c.id_nino}`
                                         );
-                                        await fetchCandidatos(busqueda, page);
+                                        await fetchNinos(busqueda, page, tipo);
                                         Swal.close();
                                         Swal.fire({
                                           icon: "success",
                                           title: "Eliminado",
-                                          text: "El candidato fue eliminado",
-                                          timer: 1400,
+                                          timer: 1200,
                                           showConfirmButton: false,
                                         });
                                       } catch (err) {
@@ -624,7 +558,7 @@ export default function CandidatosEntrevista() {
                                           title: "Error",
                                           text:
                                             err?.response?.data?.message ||
-                                            "No se pudo borrar el candidato",
+                                            "No se pudo eliminar",
                                         });
                                       }
                                     }
@@ -667,61 +601,53 @@ export default function CandidatosEntrevista() {
           </>
         )}
       </div>
+
       {modalOpen && modalData && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal-info" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setModalOpen(false)}>
               &times;
             </button>
-            <h2>Información del candidato</h2>
+            <h2>Información del niño</h2>
             <div className="modal-section">
-              <h3>Niño</h3>
+              <h3>Datos</h3>
               <div className="modal-row">
-                <span>Nombre:</span> {modalData.nombre_nino}
+                <span>Nombre:</span> {modalData.nombre}
               </div>
               <div className="modal-row">
-                <span>Apellido:</span> {modalData.apellido_nino}
+                <span>Apellido:</span> {modalData.apellido}
               </div>
               <div className="modal-row">
                 <span>Fecha de nacimiento:</span> {modalData.fecha_nacimiento} (
                 {calcularEdad(modalData.fecha_nacimiento)} años)
               </div>
               <div className="modal-row">
-                <span>DNI:</span> {modalData.dni_nino}
+                <span>DNI:</span> {modalData.dni}
               </div>
               <div className="modal-row">
                 <span>Certificado discapacidad:</span>{" "}
                 {modalData.certificado_discapacidad ? "SI" : "NO"}
               </div>
               <div className="modal-row">
-                <span>Motivo consulta:</span> {modalData.motivo_consulta}
+                <span>Tipo:</span> {modalData.tipo}
               </div>
             </div>
             <div className="modal-section">
               <h3>Responsable</h3>
-              {Array.isArray(modalData.responsables) &&
-              modalData.responsables.length > 0 &&
-              modalData.responsables[0].responsable ? (
+              {modalData.responsable ? (
                 <>
                   <div className="modal-row">
-                    <span>Nombre:</span>{" "}
-                    {modalData.responsables[0].responsable.nombre_responsable}
+                    <span>Nombre:</span> {modalData.responsable.nombre}
                   </div>
                   <div className="modal-row">
-                    <span>Apellido:</span>{" "}
-                    {modalData.responsables[0].responsable.apellido_responsable}
+                    <span>Apellido:</span> {modalData.responsable.apellido}
                   </div>
                   <div className="modal-row">
-                    <span>Email:</span>{" "}
-                    {modalData.responsables[0].responsable.email}
+                    <span>Email:</span> {modalData.responsable.email || "—"}
                   </div>
                   <div className="modal-row">
                     <span>Teléfono:</span>{" "}
-                    {modalData.responsables[0].responsable.telefono}
-                  </div>
-                  <div className="modal-row">
-                    <span>Parentesco:</span>{" "}
-                    {modalData.responsables[0].parentesco}
+                    {modalData.responsable.telefono || "—"}
                   </div>
                 </>
               ) : (
@@ -731,19 +657,21 @@ export default function CandidatosEntrevista() {
             <div className="modal-section">
               <h3>Obra Social</h3>
               <div className="modal-row">
-                <span>Nombre:</span> {modalData.obra_social?.nombre || "—"}
+                <span>Nombre:</span>{" "}
+                {modalData.obra_social?.nombre_obra_social || "—"}
               </div>
             </div>
           </div>
         </div>
       )}
+
       {modalOpen && !modalData && (
-        <CrearCandidato
+        <CrearNino
           onClose={() => setModalOpen(false)}
           obrasSociales={obrasSociales}
           onCreated={async () => {
             setModalOpen(false);
-            await fetchCandidatos(busqueda, page);
+            await fetchNinos(busqueda, page, tipo);
           }}
         />
       )}

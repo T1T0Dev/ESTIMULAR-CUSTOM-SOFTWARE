@@ -184,7 +184,7 @@ const SelectConOtra = ({
       <option value="">-- Seleccionar --</option>
       {obras.map((obra) => (
         <option key={obra.id_obra_social} value={obra.id_obra_social}>
-          {obra.nombre}
+          {obra.nombre_obra_social || obra.nombre}
         </option>
       ))}
       <option value="otra">Otra</option>
@@ -252,7 +252,9 @@ export default function FormularioEntrevista() {
     const textoNormalizado = normalizarTexto(datos.obra_social_texto || "");
     if (!textoNormalizado) return;
     const coincidencia = listaObras.find(
-      (obra) => normalizarTexto(obra.nombre || "") === textoNormalizado
+      (obra) =>
+        normalizarTexto(obra.nombre_obra_social || obra.nombre || "") ===
+        textoNormalizado
     );
     if (coincidencia) {
       actualizarCampo("id_obra_social", String(coincidencia.id_obra_social));
@@ -314,35 +316,33 @@ export default function FormularioEntrevista() {
     evento.preventDefault();
     if (!validarTodo()) return;
 
-    const datosCandidato = {
-      nombre_nino: datos.nombre_nino,
-      apellido_nino: datos.apellido_nino,
-      fecha_nacimiento: datos.fecha_nacimiento,
-      dni_nino: datos.dni_nino,
-      certificado_discapacidad: datos.certificado_discapacidad,
+    const payloadNino = {
+      nombre: datos.nombre_nino,
+      apellido: datos.apellido_nino,
+      fecha_nacimiento: datos.fecha_nacimiento || null,
+      dni: datos.dni_nino || null,
+      certificado_discapacidad: !!datos.certificado_discapacidad,
       id_obra_social:
         datos.tiene_obra_social && !usarOtraObra ? datos.id_obra_social : null,
       obra_social_texto:
         datos.tiene_obra_social && usarOtraObra
           ? datos.obra_social_texto
           : null,
-      motivo_consulta: datos.motivo_consulta,
-      servicios: datos.servicios,
-    };
-
-    const datosResponsable = {
-      nombre_responsable: datos.nombre_responsable,
-      apellido_responsable: datos.apellido_responsable,
-      telefono: datos.telefono,
-      email: datos.email,
-      parentesco: datos.parentesco,
-      es_principal: true,
+      tipo: "candidato",
+      responsable: {
+        nombre: datos.nombre_responsable,
+        apellido: datos.apellido_responsable,
+        telefono: datos.telefono || null,
+        email: datos.email || null,
+        parentesco: datos.parentesco || null,
+        dni: null,
+      },
     };
 
     try {
       const respuesta = await axios.post(
-        "http://localhost:5000/api/entrevista/crear-candidato",
-        { candidato: datosCandidato, responsable: datosResponsable }
+        "http://localhost:5000/api/ninos",
+        payloadNino
       );
 
       if (respuesta.data?.success) {

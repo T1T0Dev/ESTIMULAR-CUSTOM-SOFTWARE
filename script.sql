@@ -1,295 +1,169 @@
--- ============================================================
---  ESTIMULAR — Esquema completo (Supabase / PostgreSQL 13+)
---  Sin triggers. Unificado: servicios ⇢ departamentos
---  Flujo: candidato → deptos → entrevistas → (aprobado) → paciente → turnos
---  Nota: 'turnos' asocia EXACTAMENTE a un candidato O a un paciente (XOR).
--- ============================================================
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
-create extension if not exists "pgcrypto";
-
--- =========================
--- TIPOS (ENUMS)
--- =========================
-do $$
-begin
-  if not exists (select 1 from pg_type where typname = 'entrevista_depto_estado') then
-    create type entrevista_depto_estado as enum ('pendiente','asignada','agendada','realizada','aprobada','rechazada','cancelada');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'entrevista_estado') then
-    create type entrevista_estado as enum ('entrevistar','parcial','aprobada','rechazada');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'modalidad_entrevista') then
-    create type modalidad_entrevista as enum ('individual','conjunta');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'estado_cita_entrevista') then
-    create type estado_cita_entrevista as enum ('pendiente','confirmada','completada','cancelada','ausente');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'obra_social_estado') then
-    create type obra_social_estado as enum ('pendiente','activa','inactiva');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'estado_turno') then
-    create type estado_turno as enum ('pendiente','confirmado','asistido','ausente','cancelado');
-  end if;
-end$$;
-
--- =========================
--- ROLES / USUARIOS / PROFESIONALES
--- =========================
-create table if not exists public.roles (
-  id_rol        bigint generated always as identity primary key,
-  nombre_rol    varchar(120) not null unique,
-  creado_en     timestamptz not null default now()
+CREATE TABLE public.consultorios (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nombre character varying NOT NULL UNIQUE,
+  ubicacion character varying,
+  CONSTRAINT consultorios_pkey PRIMARY KEY (id)
 );
-
-create table if not exists public.usuarios (
-  id_usuario      bigint generated always as identity primary key,
-  id_rol          bigint not null references public.roles(id_rol),
-  dni             bigint unique,
-  password_hash   varchar(255),
-  activo          boolean not null default true,
-  creado_en       timestamptz not null default now(),
-  actualizado_en  timestamptz not null default now()
+CREATE TABLE public.departamentos (
+  id_departamento bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nombre character varying NOT NULL UNIQUE,
+  duracion_default_min integer NOT NULL DEFAULT 30,
+  descripcion text,
+  responsable_id bigint,
+  CONSTRAINT departamentos_pkey PRIMARY KEY (id_departamento),
+  CONSTRAINT departamentos_responsable_id_fkey FOREIGN KEY (responsable_id) REFERENCES public.profesionales(id_profesional)
 );
-
-create index if not exists idx_usuarios_activo on public.usuarios(activo);
-
--- Perfil profesional 1:1 con usuarios (si el usuario es profesional)
-create table if not exists public.profesionales (
-  id_profesional        bigint primary key references public.usuarios(id_usuario) on delete cascade,
-  nombre_profesional    varchar(120) not null,
-  apellido_profesional  varchar(120) not null,
-  telefono_profesional  varchar(60),
-  email_profesional     varchar(160) unique,
-  fecha_nacimiento      date not null,
-  foto_perfil           text
+CREATE TABLE public.entrevista_cita_resultados (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  cita_id bigint NOT NULL,
+  resultado USER-DEFINED NOT NULL,
+  informe text,
+  registrado_por bigint,
+  registrado_en timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT entrevista_cita_resultados_pkey PRIMARY KEY (id),
+  CONSTRAINT entrevista_cita_resultados_cita_id_fkey FOREIGN KEY (cita_id) REFERENCES public.entrevista_citas(id),
+  CONSTRAINT entrevista_cita_resultados_registrado_por_fkey FOREIGN KEY (registrado_por) REFERENCES public.usuarios(id_usuario)
 );
-
--- =========================
--- DEPARTAMENTOS (unifica "servicios") y N:M con profesionales
--- =========================
-create table if not exists public.departamentos (
-  id_departamento       bigint generated always as identity primary key,
-  nombre                varchar(160) not null unique,
-  -- Campos heredados de "servicios":
-  duracion_default_min  int not null default 30,
-  descripcion           text,
-  -- Responsable (jefa) del departamento
-  responsable_id        bigint references public.profesionales(id_profesional)
+CREATE TABLE public.entrevista_citas (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  departamento_id bigint NOT NULL,
+  profesional_id bigint NOT NULL,
+  inicio timestamp with time zone NOT NULL,
+  fin timestamp with time zone NOT NULL,
+  consultorio_id bigint,
+  modalidad USER-DEFINED NOT NULL DEFAULT 'individual'::modalidad_entrevista,
+  estado USER-DEFINED NOT NULL DEFAULT 'pendiente'::estado_cita_entrevista,
+  grupo_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
+  observaciones text,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  nino_id bigint,
+  CONSTRAINT entrevista_citas_pkey PRIMARY KEY (id),
+  CONSTRAINT entrevista_citas_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento),
+  CONSTRAINT entrevista_citas_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT entrevista_citas_consultorio_id_fkey FOREIGN KEY (consultorio_id) REFERENCES public.consultorios(id),
+  CONSTRAINT entrevista_citas_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id_nino)
 );
-
-create table if not exists public.profesional_departamentos (
-  profesional_id  bigint not null references public.profesionales(id_profesional) on delete cascade,
-  departamento_id bigint not null references public.departamentos(id_departamento) on delete cascade,
-  primary key (profesional_id, departamento_id)
+CREATE TABLE public.nino_departamentos (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nino_id bigint NOT NULL,
+  departamento_id bigint NOT NULL,
+  estado USER-DEFINED NOT NULL DEFAULT 'pendiente'::entrevista_depto_estado,
+  profesional_asignado_id bigint,
+  notas text,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT nino_departamentos_pkey PRIMARY KEY (id),
+  CONSTRAINT candidato_departamentos_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento),
+  CONSTRAINT candidato_departamentos_profesional_asignado_id_fkey FOREIGN KEY (profesional_asignado_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT nino_departamentos_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id_nino)
 );
-
-create index if not exists idx_pd_depto on public.profesional_departamentos(departamento_id);
-
--- =========================
--- OBRAS SOCIALES
--- =========================
-create table if not exists public.obras_sociales (
-  id_obra_social     bigint generated always as identity primary key,
-  nombre_obra_social text not null unique,
-  estado             obra_social_estado not null default 'pendiente',
-  created_at         timestamptz not null default now()
+CREATE TABLE public.nino_responsables (
+  id_nino_responsable bigint NOT NULL DEFAULT nextval('nino_responsables_id_nino_responsable_seq'::regclass),
+  id_nino bigint NOT NULL,
+  id_responsable bigint NOT NULL,
+  parentesco character varying NOT NULL,
+  es_principal boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT nino_responsables_pkey PRIMARY KEY (id_nino_responsable),
+  CONSTRAINT nino_responsables_id_nino_fkey FOREIGN KEY (id_nino) REFERENCES public.ninos(id_nino),
+  CONSTRAINT nino_responsables_id_responsable_fkey FOREIGN KEY (id_responsable) REFERENCES public.responsables(id_responsable)
 );
-
--- =========================
--- RESPONSABLES (unificada para candidatos/pacientes)
--- =========================
-create table if not exists public.responsables (
-  id_responsable bigint generated always as identity primary key,
-  nombre         text not null,
-  apellido       text not null,
-  telefono       text,
-  email          text,
-  creado_en      timestamptz not null default now()
+CREATE TABLE public.ninos (
+  id_nino bigint NOT NULL DEFAULT nextval('ninos_id_nino_seq'::regclass),
+  id_obra_social bigint,
+  nombre text NOT NULL,
+  apellido text NOT NULL,
+  fecha_nacimiento date NOT NULL,
+  dni character varying UNIQUE,
+  certificado_discapacidad boolean NOT NULL DEFAULT false,
+  tipo USER-DEFINED NOT NULL,
+  responsable_id bigint,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT ninos_pkey PRIMARY KEY (id_nino),
+  CONSTRAINT ninos_id_obra_social_fkey FOREIGN KEY (id_obra_social) REFERENCES public.obras_sociales(id_obra_social),
+  CONSTRAINT ninos_responsable_id_fkey FOREIGN KEY (responsable_id) REFERENCES public.responsables(id_responsable)
 );
-
--- =========================
--- PACIENTES (post-aprobación)
--- =========================
-create table if not exists public.pacientes (
-  id_paciente        bigint generated always as identity primary key,
-  nombre_paciente    varchar(160),
-  apellido_paciente  varchar(160),
-  fecha_nacimiento   date,
-  dni_paciente       varchar(32) unique,
-  telefono_paciente  varchar(60),
-  email_paciente     varchar(160),
-  titular_nombre     varchar(160),
-  obra_social        varchar(160),
-  creado_en          timestamptz not null default now(),
-  actualizado_en     timestamptz not null default now()
+CREATE TABLE public.obras_sociales (
+  id_obra_social bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nombre_obra_social text NOT NULL UNIQUE,
+  estado USER-DEFINED NOT NULL DEFAULT 'pendiente'::obra_social_estado,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT obras_sociales_pkey PRIMARY KEY (id_obra_social)
 );
-
--- Responsables asociados al paciente (N:M)
-create table if not exists public.paciente_responsables (
-  id_paciente_responsable bigint generated always as identity primary key,
-  id_paciente             bigint not null references public.pacientes(id_paciente) on delete cascade,
-  id_responsable          bigint not null references public.responsables(id_responsable),
-  parentesco              varchar(80) not null,
-  es_principal            boolean not null default false,
-  created_at              timestamptz not null default now(),
-  constraint uq_paciente_responsable unique (id_paciente, id_responsable)
+CREATE TABLE public.profesional_departamentos (
+  profesional_id bigint NOT NULL,
+  departamento_id bigint NOT NULL,
+  CONSTRAINT profesional_departamentos_pkey PRIMARY KEY (profesional_id, departamento_id),
+  CONSTRAINT profesional_departamentos_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional),
+  CONSTRAINT profesional_departamentos_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento)
 );
-
--- =========================
--- CANDIDATOS (pre-paciente)
--- =========================
-create table if not exists public.candidatos (
-  id_candidato             bigint generated always as identity primary key,
-  id_obra_social           bigint references public.obras_sociales(id_obra_social),
-  nombre_nino              text not null,
-  apellido_nino            text not null,
-  fecha_nacimiento         date not null,
-  dni_nino                 varchar(32) unique,
-  certificado_discapacidad boolean not null default false,
-  motivo_consulta          text not null,
-  created_at               timestamptz not null default now(),
-  estado_entrevista        entrevista_estado not null default 'entrevistar',
-  -- al aprobar, se linkea manualmente a paciente:
-  paciente_id              bigint unique references public.pacientes(id_paciente)
+CREATE TABLE public.profesionales (
+  id_profesional bigint NOT NULL,
+  nombre_profesional character varying NOT NULL,
+  apellido_profesional character varying NOT NULL,
+  telefono_profesional character varying,
+  email_profesional character varying UNIQUE,
+  fecha_nacimiento date NOT NULL,
+  foto_perfil text,
+  CONSTRAINT profesionales_pkey PRIMARY KEY (id_profesional),
+  CONSTRAINT profesionales_id_profesional_fkey FOREIGN KEY (id_profesional) REFERENCES public.usuarios(id_usuario)
 );
-
--- Responsables asociados al candidato (N:M)
-create table if not exists public.candidato_responsables (
-  id_candidato_responsable bigint generated always as identity primary key,
-  id_candidato             bigint not null references public.candidatos(id_candidato) on delete cascade,
-  id_responsable           bigint not null references public.responsables(id_responsable),
-  parentesco               varchar(80) not null,
-  es_principal             boolean not null default false,
-  created_at               timestamptz not null default now(),
-  constraint uq_candidato_responsable unique (id_candidato, id_responsable)
+CREATE TABLE public.responsables (
+  id_responsable bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nombre text NOT NULL,
+  apellido text NOT NULL,
+  telefono text,
+  email text,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  DNI bigint,
+  CONSTRAINT responsables_pkey PRIMARY KEY (id_responsable)
 );
-
--- =========================
--- CONSULTORIOS
--- =========================
-create table if not exists public.consultorios (
-  id         bigint generated always as identity primary key,
-  nombre     varchar(120) not null unique,
-  ubicacion  varchar(200)
+CREATE TABLE public.roles (
+  id_rol bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nombre_rol character varying NOT NULL UNIQUE,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT roles_pkey PRIMARY KEY (id_rol)
 );
-
--- =========================
--- DEPARTAMENTOS requeridos por candidato (seguimiento por depto)
--- =========================
-create table if not exists public.candidato_departamentos (
-  id                       bigint generated always as identity primary key,
-  id_candidato             bigint not null references public.candidatos(id_candidato) on delete cascade,
-  departamento_id          bigint not null references public.departamentos(id_departamento),
-  estado                   entrevista_depto_estado not null default 'pendiente',
-  profesional_asignado_id  bigint references public.profesionales(id_profesional),
-  notas                    text,
-  creado_en                timestamptz not null default now(),
-  actualizado_en           timestamptz not null default now(),
-  constraint uq_candidato_depto unique (id_candidato, departamento_id)
+CREATE TABLE public.turno_profesionales (
+  turno_id bigint NOT NULL,
+  profesional_id bigint NOT NULL,
+  rol_en_turno character varying NOT NULL DEFAULT 'responsable'::character varying,
+  CONSTRAINT turno_profesionales_pkey PRIMARY KEY (profesional_id, turno_id),
+  CONSTRAINT turno_profesionales_turno_id_fkey FOREIGN KEY (turno_id) REFERENCES public.turnos(id),
+  CONSTRAINT turno_profesionales_profesional_id_fkey FOREIGN KEY (profesional_id) REFERENCES public.profesionales(id_profesional)
 );
-
-create index if not exists idx_cand_depto_estado on public.candidato_departamentos(id_candidato, estado);
-create index if not exists idx_cand_depto_prof   on public.candidato_departamentos(profesional_asignado_id);
-
--- =========================
--- CITAS DE ENTREVISTA (pre-paciente)
--- =========================
-create table if not exists public.entrevista_citas (
-  id               bigint generated always as identity primary key,
-  id_candidato     bigint  not null references public.candidatos(id_candidato) on delete cascade,
-  departamento_id  bigint  not null references public.departamentos(id_departamento),
-  profesional_id   bigint  not null references public.profesionales(id_profesional),
-  inicio           timestamptz not null,
-  fin              timestamptz not null,
-  consultorio_id   bigint references public.consultorios(id),
-  modalidad        modalidad_entrevista not null default 'individual',
-  estado           estado_cita_entrevista not null default 'pendiente',
-  grupo_uuid       uuid not null default gen_random_uuid(),
-  observaciones    text,
-  creado_en        timestamptz not null default now(),
-  actualizado_en   timestamptz not null default now(),
-  constraint chk_entrevista_intervalo check (fin > inicio)
+CREATE TABLE public.turnos (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  departamento_id bigint NOT NULL,
+  inicio timestamp with time zone NOT NULL,
+  fin timestamp with time zone NOT NULL,
+  duracion_min integer NOT NULL,
+  consultorio_id bigint,
+  estado USER-DEFINED NOT NULL DEFAULT 'pendiente'::estado_turno,
+  creado_por bigint,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  notas text,
+  nino_id bigint,
+  CONSTRAINT turnos_pkey PRIMARY KEY (id),
+  CONSTRAINT turnos_departamento_id_fkey FOREIGN KEY (departamento_id) REFERENCES public.departamentos(id_departamento),
+  CONSTRAINT turnos_consultorio_id_fkey FOREIGN KEY (consultorio_id) REFERENCES public.consultorios(id),
+  CONSTRAINT turnos_creado_por_fkey FOREIGN KEY (creado_por) REFERENCES public.usuarios(id_usuario),
+  CONSTRAINT turnos_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id_nino)
 );
-
-create index if not exists idx_ent_citas_candidato on public.entrevista_citas(id_candidato);
-create index if not exists idx_ent_citas_prof_inicio on public.entrevista_citas(profesional_id, inicio);
-create index if not exists idx_ent_citas_consultorio_inicio on public.entrevista_citas(consultorio_id, inicio);
-create index if not exists idx_ent_citas_estado on public.entrevista_citas(estado);
-
--- Resultados/informes por cita
-create table if not exists public.entrevista_cita_resultados (
-  id              bigint generated always as identity primary key,
-  cita_id         bigint not null references public.entrevista_citas(id) on delete cascade,
-  resultado       entrevista_depto_estado not null,
-  informe         text,
-  registrado_por  bigint references public.usuarios(id_usuario),
-  registrado_en   timestamptz not null default now()
+CREATE TABLE public.usuarios (
+  id_usuario bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  id_rol bigint NOT NULL,
+  dni bigint UNIQUE,
+  password_hash character varying,
+  activo boolean NOT NULL DEFAULT true,
+  creado_en timestamp with time zone NOT NULL DEFAULT now(),
+  actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT usuarios_pkey PRIMARY KEY (id_usuario),
+  CONSTRAINT usuarios_id_rol_fkey FOREIGN KEY (id_rol) REFERENCES public.roles(id_rol)
 );
-
--- =========================
--- TURNOS (Agenda unificada: candidato O paciente) usando DEPARTAMENTOS
--- =========================
-create table if not exists public.turnos (
-  id               bigint generated always as identity primary key,
-  -- EXACTAMENTE uno de estos dos debe tener valor:
-  candidato_id     bigint references public.candidatos(id_candidato) on delete cascade,
-  paciente_id      bigint references public.pacientes(id_paciente) on delete cascade,
-
-  departamento_id  bigint not null references public.departamentos(id_departamento),
-  inicio           timestamptz not null,
-  fin              timestamptz not null,
-  duracion_min     int not null,
-  consultorio_id   bigint references public.consultorios(id),
-  estado           estado_turno not null default 'pendiente',
-  creado_por       bigint references public.usuarios(id_usuario),
-  creado_en        timestamptz not null default now(),
-  actualizado_en   timestamptz not null default now(),
-  notas            text,
-
-  constraint chk_turno_intervalo check (fin > inicio),
-
-  -- XOR: o candidato o paciente (pero no ambos y no ninguno)
-  constraint chk_turno_candidato_xor_paciente check (
-    (candidato_id is not null and paciente_id is null) or
-    (candidato_id is null and paciente_id is not null)
-  )
-);
-
-create index if not exists idx_turnos_candidato_inicio on public.turnos(candidato_id, inicio);
-create index if not exists idx_turnos_paciente_inicio  on public.turnos(paciente_id, inicio);
-create index if not exists idx_turnos_depto_inicio     on public.turnos(departamento_id, inicio);
-create index if not exists idx_turnos_estado_inicio    on public.turnos(estado, inicio);
-
--- Profesionales asignados al turno (N:M)
-create table if not exists public.turno_profesionales (
-  turno_id       bigint not null references public.turnos(id) on delete cascade,
-  profesional_id bigint not null references public.profesionales(id_profesional),
-  rol_en_turno   varchar(32) not null default 'responsable',
-  primary key (profesional_id, turno_id)
-);
-
--- =========================
--- FIN DEL SCRIPT
-
--- ============================================================
--- FUNCTIONS: search helpers (accent-insensitive search)
--- Requires the unaccent extension
--- ============================================================
-create extension if not exists unaccent;
-
--- Returns matching candidato ids for a search term (accent- and case-insensitive)
-create or replace function public.search_candidatos_ids(term text)
-returns table(id_candidato bigint) as $$
-  select id_candidato from public.candidatos
-  where unaccent(lower(nombre_nino)) like unaccent(lower('%' || term || '%'))
-     or unaccent(lower(apellido_nino)) like unaccent(lower('%' || term || '%'))
-     or unaccent(lower(dni_nino)) like unaccent(lower('%' || term || '%'))
-  order by created_at desc;
-$$ language sql stable;
-
--- =========================

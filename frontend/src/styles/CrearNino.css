@@ -15,6 +15,7 @@
   padding: 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
   position: relative;
+  border: 1px solid rgba(255, 111, 166, 0.08);
 }
 .crear-close {
   position: absolute;
@@ -23,6 +24,7 @@
   background: none;
   border: none;
   font-size: 22px;
+  color: var(--pink-1, #ff6fa6);
 }
 .crear-modal h2 {
   margin-top: 0;
@@ -61,27 +63,6 @@
   margin-bottom: 6px;
 }
 
-/* Estimular palette accents */
-.crear-modal {
-  border: 1px solid rgba(255, 111, 166, 0.08);
-}
-.crear-close {
-  color: var(--pink-1, #ff6fa6);
-}
-.btn.primary {
-  background: linear-gradient(
-    180deg,
-    var(--pink-1, #ff6fa6),
-    var(--pink-2, #ff4f8a)
-  );
-  color: #fff;
-}
-.btn.outline {
-  border: 1px solid var(--pink-1, #ff6fa6);
-  background: transparent;
-  color: var(--pink-1, #ff6fa6);
-}
-
 .dni-actions {
   margin-top: 6px;
   display: flex;
@@ -102,7 +83,6 @@
   border-radius: 6px;
 }
 
-/* small responsive tweaks */
 @media (max-width: 520px) {
   .crear-modal {
     padding: 14px;

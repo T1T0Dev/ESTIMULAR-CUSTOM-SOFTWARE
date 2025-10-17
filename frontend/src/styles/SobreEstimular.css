@@ -38,7 +38,7 @@
   margin: 0;
 }
 
-.contenido-sobre-estimular li{
+.contenido-sobre-estimular li {
   font-weight: bold;
 }
 
@@ -62,6 +62,10 @@
   margin-top: 1.2rem;
 }
 
+.texto-acento-rosa {
+  color: #e91e63;
+}
+
 .about-title {
   color: var(--color-rosa2);
   font-size: 1.7rem;
@@ -81,8 +85,6 @@
   font-size: 1.05rem;
   margin-top: 1rem;
 }
-
-
 
 /* Responsive: Logo arriba, info debajo en tablets y móviles */
 @media (max-width: 900px) {

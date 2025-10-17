@@ -56,6 +56,55 @@
   cursor: pointer;
 }
 
+/* User card */
+.sd-user-card {
+  margin: 8px 0 12px 0;
+}
+.sd-user-btn {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, var(--color-rosa2), var(--pink-2));
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(233, 30, 99, 0.18);
+}
+.sd-user-btn:hover {
+  filter: brightness(0.98);
+}
+.sd-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-blanco-translucido-70);
+  color: var(--color-rosa2);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+}
+.sd-user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.sd-user-name {
+  font-weight: 800;
+  font-size: 0.98rem;
+}
+.sd-user-role {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+.sd-user-email {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
 .sd-content {
   flex: 1 1 auto;
   padding: 24px;

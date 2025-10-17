@@ -9,23 +9,23 @@
   /* Rojos */
   --color-rojo1: #e53935;
   --color-rojo2: #ffe0e0;
-  --accent-red: #E57373;
+  --accent-red: #e57373;
 
   /* Verdes */
   --color-verde1: #4caf50; /* Tronco/hojas */
   --color-verde2: #8bc53f;
   --color-verde3: #25d366; /* WhatsApp */
-  --accent-green: #67C18C;
+  --accent-green: #67c18c;
 
   /* Amarillos */
   --color-amarillo1: #ffeb3b;
   --color-amarillo2: #fff9c4;
-  --accent-yellow: #FFB74D;
+  --accent-yellow: #ffb74d;
 
   /* Azules */
   --color-azul2: #e3f2fd;
   --color-accent-blue: #2196f3;
-  --accent-blue: #64B5F6;
+  --accent-blue: #64b5f6;
 
   /* Naranjas */
   --color-naranja1: #ff9f1c;
@@ -47,7 +47,7 @@
   --color-muted: #f5f5f5;
   --color-border: #dddddd;
   --color-gris-label: #888;
-  --muted: rgba(0,0,0,0.45);
+  --muted: rgba(0, 0, 0, 0.45);
 
   /* Extras para gradientes, sombras y transparencias */
   --color-blanco-translucido-95: rgba(255, 255, 255, 0.95);
@@ -76,7 +76,7 @@
   --color-sombra-whatsapp-hover: rgba(37, 211, 102, 0.28);
 
   /* Utilidades */
-  --shadow: 0 8px 28px rgba(0,0,0,0.08);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   --radius: 12px;
   --pill-min: 96px;
 }
@@ -115,6 +115,13 @@ fieldset {
 }
 
 @media (max-width: 900px) {
-  
+}
 
+/* Utilidades */
+.p-24 {
+  padding: 24px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
 }

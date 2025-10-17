@@ -1,8 +1,9 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import "../styles/SidebarDashboard.css";
 
 export default function SidebarDashboard() {
+  const navigate = useNavigate();
   return (
     <aside className="sd-sidebar" aria-label="Sidebar de navegación">
       <div className="sd-top">
@@ -20,12 +21,20 @@ export default function SidebarDashboard() {
           🏠 Dashboard
         </NavLink>
         <NavLink
-          to="/dashboard/candidatos"
+          to="/dashboard/turnos"
           className={({ isActive }) =>
             isActive ? "sd-link active" : "sd-link"
           }
         >
-          👥 Candidatos
+          📅 Turnos
+        </NavLink>
+        <NavLink
+          to="/dashboard/ninos"
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
+        >
+          👥 Niños
         </NavLink>
         <NavLink
           to="/dashboard/usuarios"
@@ -59,22 +68,8 @@ export default function SidebarDashboard() {
         >
           🏥 Obras sociales
         </NavLink>
-        <NavLink
-          to="/dashboard/turnos"
-          className={({ isActive }) =>
-            isActive ? "sd-link active" : "sd-link"
-          }
-        >
-          📅 Turnos
-        </NavLink>
-        <NavLink
-          to="/dashboard/pacientes"
-          className={({ isActive }) =>
-            isActive ? "sd-link active" : "sd-link"
-          }
-        >
-          🧾 Pacientes
-        </NavLink>
+
+        {/* Pacientes unificado en Niños */}
         <NavLink
           to="/dashboard/responsables"
           className={({ isActive }) =>
@@ -84,6 +79,23 @@ export default function SidebarDashboard() {
           🧑‍👩‍👧 Responsables
         </NavLink>
       </nav>
+
+      <div className="sd-user-card">
+        <button
+          className="sd-user-btn"
+          onClick={() => navigate("/dashboard/editar-profesional")}
+          aria-label="Editar perfil profesional"
+        >
+          <div className="sd-user-avatar" aria-hidden="true">
+            NR
+          </div>
+          <div className="sd-user-info">
+            <div className="sd-user-name">Noelia Robles</div>
+            <div className="sd-user-role">Psicóloga</div>
+            <div className="sd-user-email">noelia.robles@estimular.com</div>
+          </div>
+        </button>
+      </div>
 
       <div className="sd-footer">
         <button className="sd-logout">Cerrar sesión</button>
