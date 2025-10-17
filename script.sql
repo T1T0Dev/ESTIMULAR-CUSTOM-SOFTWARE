@@ -93,12 +93,11 @@ CREATE TABLE public.ninos (
   dni character varying UNIQUE,
   certificado_discapacidad boolean NOT NULL DEFAULT false,
   tipo USER-DEFINED NOT NULL,
-  responsable_id bigint,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
+  activo boolean NOT NULL DEFAULT true,
   CONSTRAINT ninos_pkey PRIMARY KEY (id_nino),
-  CONSTRAINT ninos_id_obra_social_fkey FOREIGN KEY (id_obra_social) REFERENCES public.obras_sociales(id_obra_social),
-  CONSTRAINT ninos_responsable_id_fkey FOREIGN KEY (responsable_id) REFERENCES public.responsables(id_responsable)
+  CONSTRAINT ninos_id_obra_social_fkey FOREIGN KEY (id_obra_social) REFERENCES public.obras_sociales(id_obra_social)
 );
 CREATE TABLE public.obras_sociales (
   id_obra_social bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -121,7 +120,8 @@ CREATE TABLE public.responsables (
   telefono text,
   email text,
   creado_en timestamp with time zone NOT NULL DEFAULT now(),
-  DNI bigint,
+  dni bigint,
+  activo boolean NOT NULL DEFAULT true,
   CONSTRAINT responsables_pkey PRIMARY KEY (id_responsable)
 );
 CREATE TABLE public.roles (

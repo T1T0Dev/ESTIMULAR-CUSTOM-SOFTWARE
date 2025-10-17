@@ -186,7 +186,6 @@ export default function Ninos() {
                     <th className="col-dniNac">Edad</th>
                     <th className="col-cert">Certificado</th>
                     <th className="col-os">Obra Social</th>
-                    <th className="col-resp">Responsable</th>
                     <th>Tipo</th>
                     <th className="col-actions">Acciones</th>
                   </tr>
@@ -196,7 +195,6 @@ export default function Ninos() {
                     const isEditing = editId === c.id_nino;
                     const obraSocialName =
                       c.obra_social?.nombre_obra_social || null;
-                    const resp = c.responsable || null;
                     return (
                       <tr key={c.id_nino}>
                         <td className="col-dni">
@@ -338,13 +336,7 @@ export default function Ninos() {
                             obraSocialName || "—"
                           )}
                         </td>
-                        <td className="col-resp">
-                          {resp
-                            ? `${resp.nombre || ""} ${
-                                resp.apellido || ""
-                              }`.trim()
-                            : "—"}
-                        </td>
+
                         <td>
                           {isEditing ? (
                             <select
@@ -636,28 +628,7 @@ export default function Ninos() {
                 <span>Tipo:</span> {modalData.tipo}
               </div>
             </div>
-            <div className="modal-section">
-              <h3>Responsable</h3>
-              {modalData.responsable ? (
-                <>
-                  <div className="modal-row">
-                    <span>Nombre:</span> {modalData.responsable.nombre}
-                  </div>
-                  <div className="modal-row">
-                    <span>Apellido:</span> {modalData.responsable.apellido}
-                  </div>
-                  <div className="modal-row">
-                    <span>Email:</span> {modalData.responsable.email || "—"}
-                  </div>
-                  <div className="modal-row">
-                    <span>Teléfono:</span>{" "}
-                    {modalData.responsable.telefono || "—"}
-                  </div>
-                </>
-              ) : (
-                <div className="modal-row">No hay responsable principal</div>
-              )}
-            </div>
+
             <div className="modal-section">
               <h3>Obra Social</h3>
               <div className="modal-row">

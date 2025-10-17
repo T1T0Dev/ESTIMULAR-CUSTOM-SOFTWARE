@@ -6,6 +6,7 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import Ninos from "./pages/Ninos";
 import EditarProfesional from "./pages/EditarProfesional";
 import ObrasSociales from "./pages/ObrasSociales";
+import Responsables from "./pages/Responsables";
 import EntrevistaPage from "./pages/Entrevista";
 function App() {
   return (
@@ -60,12 +61,7 @@ function App() {
                       <div className="p-24">Pacientes (placeholder)</div>
                     }
                   />
-                  <Route
-                    path="responsables"
-                    element={
-                      <div className="p-24">Responsables (placeholder)</div>
-                    }
-                  />
+                  <Route path="responsables" element={<Responsables />} />
                 </Routes>
               </DashboardLayout>
             }

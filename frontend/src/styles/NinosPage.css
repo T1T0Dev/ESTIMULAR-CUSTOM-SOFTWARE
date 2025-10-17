@@ -130,6 +130,10 @@
   box-shadow: 0 2px 8px var(--color-sombra-galeria);
   min-width: 900px;
 }
+.dashboard-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
 .table thead th {
   text-align: left;
   padding: 10px 12px;
@@ -238,8 +242,8 @@
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   padding: 2.2rem 2rem 1.5rem 2rem;
-  min-width: 340px;
-  max-width: 420px;
+  min-width: 480px;
+  max-width: 760px;
   width: 100%;
   position: relative;
   animation: modalIn 0.2s ease;
@@ -279,24 +283,27 @@
   color: var(--pink-1);
   margin-bottom: 0.5rem;
 }
-.modal-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 1rem;
-  margin-bottom: 0.3rem;
-  padding: 2px 0;
+/* Key-value grid inside modal for better spacing/accessibility */
+.modal-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 10px 18px;
+  align-items: left;
 }
-.modal-row span {
-  font-weight: 600;
+.modal-grid .label {
+  justify-self: end;
+  font-weight: 700;
   color: var(--muted);
-  margin-right: 8px;
+}
+.modal-grid .value {
+  justify-self: start;
+  color: var(--neutral-700);
 }
 
 /* Row actions */
 .row-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 10px;
   align-items: center;
 }
@@ -316,9 +323,19 @@
   background: rgba(255, 235, 240, 0.5);
   color: var(--pink-1);
 }
+.icon-btn.success {
+  background: rgba(230, 255, 230, 0.6);
+  color: var(--accent-green);
+  border: 1.5px solid var(--accent-green);
+}
 .icon-btn.delete {
   background: rgba(255, 230, 230, 0.6);
   color: var(--accent-red);
+}
+.icon-btn.danger {
+  background: rgba(255, 230, 230, 0.6);
+  color: var(--accent-red);
+  border: 1.5px solid var(--accent-red);
 }
 .icon-btn.state {
   width: 120px;
@@ -368,6 +385,24 @@
 /* Date input small tweak */
 input[type="date"].edit-input {
   padding: 6px 8px;
+}
+
+/* Generic small input for table inline edits */
+.table-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-300);
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--neutral-700);
+}
+
+/* Inline checkbox label */
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Pagination */
@@ -441,6 +476,16 @@ input[type="date"].edit-input {
   }
 }
 @media (max-width: 720px) {
+  .modal-info {
+    min-width: unset;
+    width: 95vw;
+    max-width: 95vw;
+    padding: 1.4rem 1rem 1rem 1rem;
+  }
+  .modal-grid {
+    grid-template-columns: 1fr;
+    gap: 8px 0;
+  }
   .table thead {
     display: table-header-group;
   }
