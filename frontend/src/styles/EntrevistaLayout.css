@@ -5,7 +5,7 @@
 
 .pagina-entrevista {
   display: flex;
-  flex-direction: column;    /* mobile: apilado */
+  flex-direction: column; /* mobile: apilado */
   min-height: 100vh;
   width: 100%;
   overflow: hidden;
@@ -28,8 +28,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* Evitar scroll del contenedor: cada pantalla (step) debe encajar en el alto de viewport */
+  overflow: hidden;
   width: 100%;
   padding-bottom: env(safe-area-inset-bottom, 16px); /* iOS safe area */
 }

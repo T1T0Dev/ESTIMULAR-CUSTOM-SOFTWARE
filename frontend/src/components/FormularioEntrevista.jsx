@@ -222,6 +222,7 @@ export default function FormularioEntrevista() {
         .split("T")[0];
     return { fechaMinima: aIsoLocal(limiteMenor), fechaMaxima: aIsoLocal(hoy) };
   }, []);
+  
 
   const [datos, setDatos] = useState({
     nombre_nino: "",
@@ -312,8 +313,71 @@ export default function FormularioEntrevista() {
     return Object.keys(nuevosErrores).length === 0;
   };
 
+  // Navegación por pasos (pantallas sin scroll)
+  const PASOS = 5;
+  const [paso, setPaso] = useState(1);
+  const progreso = Math.round((paso / PASOS) * 100);
+
+  const validarPaso = (p) => {
+    const hoy = new Date();
+    const fechaMin = new Date(
+      hoy.getFullYear() - 18,
+      hoy.getMonth(),
+      hoy.getDate()
+    );
+    const fechaMax = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const e = {};
+    if (p === 1) {
+      e.nombre_nino = VALIDADORES.nombre(datos.nombre_nino);
+      e.apellido_nino = VALIDADORES.nombre(datos.apellido_nino);
+      e.fecha_nacimiento = VALIDADORES.fechaEnRango(
+        fechaMin,
+        fechaMax
+      )(datos.fecha_nacimiento);
+      e.dni_nino = VALIDADORES.dni(datos.dni_nino);
+    } else if (p === 2) {
+      if (datos.tiene_obra_social) {
+        if (usarOtraObra) {
+          e.obra_social = VALIDADORES.obraSocialEscrita(
+            datos.obra_social_texto
+          );
+        } else if (!datos.id_obra_social) {
+          e.obra_social = "Seleccione la obra social.";
+        }
+      }
+    } else if (p === 3) {
+      e.nombre_responsable = VALIDADORES.nombre(datos.nombre_responsable);
+      e.apellido_responsable = VALIDADORES.nombre(datos.apellido_responsable);
+      e.telefono = VALIDADORES.telefono(datos.telefono);
+      e.email = VALIDADORES.email(datos.email);
+      e.parentesco = VALIDADORES.requerido("Seleccione parentesco.")(
+        datos.parentesco
+      );
+    } else if (p === 4) {
+      e.motivo_consulta = VALIDADORES.requerido("Motivo obligatorio.")(
+        datos.motivo_consulta
+      );
+    } else if (p === 5) {
+      if (!datos.aceptar_terminos)
+        e.aceptar_terminos = "Debe aceptar los términos.";
+    }
+    Object.keys(e).forEach((k) => e[k] == null && delete e[k]);
+    setErrores(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const siguiente = () => {
+    if (paso < PASOS && validarPaso(paso)) setPaso((p) => p + 1);
+  };
+  const anterior = () => setPaso((p) => Math.max(1, p - 1));
+
   const enviarFormulario = async (evento) => {
     evento.preventDefault();
+    if (paso < PASOS) {
+      // avanzar de paso con submit (enter)
+      if (validarPaso(paso)) setPaso((p) => p + 1);
+      return;
+    }
     if (!validarTodo()) return;
 
     const payloadNino = {
@@ -389,7 +453,7 @@ export default function FormularioEntrevista() {
   };
 
   return (
-    <section className="entrevista__formulario">
+    <section className="entrevista__formulario entrevista__screen">
       <h1 className="entrevista__titulo">Primera Entrevista</h1>
       <p className="entrevista__subtitulo">
         Por favor complete el formulario con la información del niño/a y del
@@ -401,252 +465,305 @@ export default function FormularioEntrevista() {
         className="entrevista__form"
         aria-label="Formulario de primera entrevista"
       >
-        {/* Datos del niño/a */}
-        <fieldset>
-          <legend>Datos del niño/a</legend>
-
-          <Campo
-            id="nombre_nino"
-            etiqueta="Nombre/s"
-            error={errores.nombre_nino}
-          >
-            <EntradaTexto
-              id="nombre_nino"
-              name="nombre_nino"
-              placeholder="Ej: Juan"
-              value={datos.nombre_nino}
-              onChange={(e) => actualizarCampo("nombre_nino", e.target.value)}
-            />
-          </Campo>
-
-          <Campo
-            id="apellido_nino"
-            etiqueta="Apellido/s"
-            error={errores.apellido_nino}
-          >
-            <EntradaTexto
-              id="apellido_nino"
-              name="apellido_nino"
-              placeholder="Ej: Pérez"
-              value={datos.apellido_nino}
-              onChange={(e) => actualizarCampo("apellido_nino", e.target.value)}
-            />
-          </Campo>
-
-          <Campo
-            id="fecha_nacimiento"
-            etiqueta="Fecha de nacimiento"
-            error={errores.fecha_nacimiento}
-          >
-            <EntradaTexto
-              id="fecha_nacimiento"
-              type="date"
-              name="fecha_nacimiento"
-              min={fechaMinima}
-              max={fechaMaxima}
-              value={datos.fecha_nacimiento}
-              onChange={(e) =>
-                actualizarCampo("fecha_nacimiento", e.target.value)
-              }
-            />
-          </Campo>
-
-          <Campo
-            id="dni_nino"
-            etiqueta="DNI del niño/a"
-            error={errores.dni_nino}
-          >
-            <EntradaTexto
-              id="dni_nino"
-              name="dni_nino"
-              placeholder="Ej: 12345678"
-              value={datos.dni_nino}
-              onChange={(e) => actualizarCampo("dni_nino", e.target.value)}
-            />
-          </Campo>
-
-          <SelectorSiNo
-            etiqueta="¿El niño/a posee certificado de discapacidad?"
-            activo={datos.certificado_discapacidad}
-            onSi={() => actualizarCampo("certificado_discapacidad", true)}
-            onNo={() => actualizarCampo("certificado_discapacidad", false)}
-          />
-
-          <SelectorSiNo
-            etiqueta="¿El niño/a posee obra social?"
-            activo={datos.tiene_obra_social}
-            onSi={() => actualizarCampo("tiene_obra_social", true)}
-            onNo={() => {
-              actualizarCampo("tiene_obra_social", false);
-              actualizarCampo("id_obra_social", "");
-              actualizarCampo("obra_social_texto", "");
-            }}
-          />
-
-          {datos.tiene_obra_social && (
-            <SelectConOtra
-              obras={listaObras}
-              idSeleccionado={datos.id_obra_social}
-              textoOtra={datos.obra_social_texto}
-              usarOtra={usarOtraObra}
-              onSeleccionarId={(idSeleccionado, esOtra) => {
-                actualizarCampo("id_obra_social", idSeleccionado || "");
-                if (!esOtra) actualizarCampo("obra_social_texto", "");
-              }}
-              onCambiarOtra={(valor) =>
-                actualizarCampo("obra_social_texto", valor)
-              }
-              onPerderFocoOtra={alPerderFocoObra}
-              error={errores.obra_social}
-            />
+        {/* Indicador de progreso */}
+        <div className="entrevista__progreso" aria-label={`Progreso: paso ${paso} de ${PASOS}`}>
+          <div className="entrevista__progreso-bar">
+            <div className="entrevista__progreso-fill" style={{ width: `${progreso}%` }} />
+          </div>
+          <div className="entrevista__pasos-dots" role="tablist" aria-label="Pasos del formulario">
+            {Array.from({ length: PASOS }).map((_, i) => {
+              const n = i + 1;
+              const active = n === paso;
+              const completed = n < paso;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  className={`paso-dot ${active ? "activo" : ""} ${completed ? "completado" : ""}`}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`Paso ${n} de ${PASOS}`}
+                  onClick={() => setPaso(n)}
+                />
+              );
+            })}
+          </div>
+        </div>
+        {/* contenido del paso */}
+        <div className="entrevista__contenido">
+          {paso === 1 && (
+            <fieldset>
+              <legend>Datos del niño/a</legend>
+              <Campo
+                id="nombre_nino"
+                etiqueta="Nombre/s"
+                error={errores.nombre_nino}
+              >
+                <EntradaTexto
+                  id="nombre_nino"
+                  name="nombre_nino"
+                  placeholder="Ej: Juan"
+                  value={datos.nombre_nino}
+                  onChange={(e) =>
+                    actualizarCampo("nombre_nino", e.target.value)
+                  }
+                />
+              </Campo>
+              <Campo
+                id="apellido_nino"
+                etiqueta="Apellido/s"
+                error={errores.apellido_nino}
+              >
+                <EntradaTexto
+                  id="apellido_nino"
+                  name="apellido_nino"
+                  placeholder="Ej: Pérez"
+                  value={datos.apellido_nino}
+                  onChange={(e) =>
+                    actualizarCampo("apellido_nino", e.target.value)
+                  }
+                />
+              </Campo>
+              <Campo
+                id="fecha_nacimiento"
+                etiqueta="Fecha de nacimiento"
+                error={errores.fecha_nacimiento}
+              >
+                <EntradaTexto
+                  id="fecha_nacimiento"
+                  type="date"
+                  name="fecha_nacimiento"
+                  min={fechaMinima}
+                  max={fechaMaxima}
+                  value={datos.fecha_nacimiento}
+                  onChange={(e) =>
+                    actualizarCampo("fecha_nacimiento", e.target.value)
+                  }
+                />
+              </Campo>
+              <Campo
+                id="dni_nino"
+                etiqueta="DNI del niño/a"
+                error={errores.dni_nino}
+              >
+                <EntradaTexto
+                  id="dni_nino"
+                  name="dni_nino"
+                  placeholder="Ej: 12345678"
+                  value={datos.dni_nino}
+                  onChange={(e) => actualizarCampo("dni_nino", e.target.value)}
+                />
+              </Campo>
+              <SelectorSiNo
+                etiqueta="¿El niño/a posee certificado de discapacidad?"
+                activo={datos.certificado_discapacidad}
+                onSi={() => actualizarCampo("certificado_discapacidad", true)}
+                onNo={() => actualizarCampo("certificado_discapacidad", false)}
+              />
+            </fieldset>
           )}
-        </fieldset>
 
-        {/* Datos del responsable */}
-        <fieldset>
-          <legend>Datos del responsable</legend>
-
-          <Campo
-            id="nombre_responsable"
-            etiqueta="Nombre/s"
-            error={errores.nombre_responsable}
-          >
-            <EntradaTexto
-              id="nombre_responsable"
-              name="nombre_responsable"
-              placeholder="Ej: María"
-              value={datos.nombre_responsable}
-              onChange={(e) =>
-                actualizarCampo("nombre_responsable", e.target.value)
-              }
-            />
-          </Campo>
-
-          <Campo
-            id="apellido_responsable"
-            etiqueta="Apellido/s"
-            error={errores.apellido_responsable}
-          >
-            <EntradaTexto
-              id="apellido_responsable"
-              name="apellido_responsable"
-              placeholder="Ej: García"
-              value={datos.apellido_responsable}
-              onChange={(e) =>
-                actualizarCampo("apellido_responsable", e.target.value)
-              }
-            />
-          </Campo>
-
-          <Campo id="telefono" etiqueta="Teléfono" error={errores.telefono}>
-            <EntradaTexto
-              id="telefono"
-              name="telefono"
-              placeholder="Ej: 1123456789"
-              value={datos.telefono}
-              onChange={(e) => actualizarCampo("telefono", e.target.value)}
-            />
-          </Campo>
-
-          <Campo id="email" etiqueta="Email" error={errores.email}>
-            <EntradaTexto
-              id="email"
-              name="email"
-              placeholder="Ej: ejemplo@email.com"
-              value={datos.email}
-              onChange={(e) => actualizarCampo("email", e.target.value)}
-            />
-          </Campo>
-
-          <Campo
-            id="parentesco"
-            etiqueta="Parentesco"
-            error={errores.parentesco}
-          >
-            <select
-              id="parentesco"
-              className="entrevista__input"
-              name="parentesco"
-              value={datos.parentesco}
-              onChange={(e) => actualizarCampo("parentesco", e.target.value)}
-              required
-            >
-              <option value="">Seleccione una opción</option>
-              <option value="madre">Madre</option>
-              <option value="padre">Padre</option>
-              <option value="tutor">Tutor</option>
-              <option value="otro">Otro</option>
-            </select>
-          </Campo>
-        </fieldset>
-
-        {/* Motivo + Servicios */}
-        <fieldset>
-          <Campo
-            id="motivo_consulta"
-            etiqueta="Motivo de la consulta"
-            error={errores.motivo_consulta}
-          >
-            <textarea
-              id="motivo_consulta"
-              name="motivo_consulta"
-              className="entrevista__input"
-              placeholder="Mi hijo tiene dificultades en..."
-              value={datos.motivo_consulta}
-              onChange={(e) =>
-                actualizarCampo("motivo_consulta", e.target.value)
-              }
-              maxLength={250}
-              required
-            />
-          </Campo>
-
-          <GrupoCheckbox
-            etiqueta="Servicios solicitados (puede elegir uno o varios)"
-            opciones={SERVICIOS}
-            valoresSeleccionados={datos.servicios}
-            onCambiar={(seleccion) => actualizarCampo("servicios", seleccion)}
-          />
-          {errores.servicios && (
-            <span className="error-message">{errores.servicios}</span>
+          {paso === 2 && (
+            <fieldset>
+              <legend>Obra social</legend>
+              <SelectorSiNo
+                etiqueta="¿El niño/a posee obra social?"
+                activo={datos.tiene_obra_social}
+                onSi={() => actualizarCampo("tiene_obra_social", true)}
+                onNo={() => {
+                  actualizarCampo("tiene_obra_social", false);
+                  actualizarCampo("id_obra_social", "");
+                  actualizarCampo("obra_social_texto", "");
+                }}
+              />
+              {datos.tiene_obra_social && (
+                <SelectConOtra
+                  obras={listaObras}
+                  idSeleccionado={datos.id_obra_social}
+                  textoOtra={datos.obra_social_texto}
+                  usarOtra={usarOtraObra}
+                  onSeleccionarId={(idSeleccionado, esOtra) => {
+                    actualizarCampo("id_obra_social", idSeleccionado || "");
+                    if (!esOtra) actualizarCampo("obra_social_texto", "");
+                  }}
+                  onCambiarOtra={(valor) =>
+                    actualizarCampo("obra_social_texto", valor)
+                  }
+                  onPerderFocoOtra={alPerderFocoObra}
+                  error={errores.obra_social}
+                />
+              )}
+            </fieldset>
           )}
-        </fieldset>
 
-        {/* Mensaje informativo de confidencialidad */}
-        <div className="entrevista__mensaje-confidencialidad">
-          <p>
-            Toda la información proporcionada en este formulario será utilizada
-            únicamente con fines terapéuticos y de evaluación profesional. Los
-            datos se mantendrán bajo estricta confidencialidad, conforme a las
-            normas de protección de datos personales.
-          </p>
+          {paso === 3 && (
+            <fieldset>
+              <legend>Datos del responsable</legend>
+              <Campo
+                id="nombre_responsable"
+                etiqueta="Nombre/s"
+                error={errores.nombre_responsable}
+              >
+                <EntradaTexto
+                  id="nombre_responsable"
+                  name="nombre_responsable"
+                  placeholder="Ej: María"
+                  value={datos.nombre_responsable}
+                  onChange={(e) =>
+                    actualizarCampo("nombre_responsable", e.target.value)
+                  }
+                />
+              </Campo>
+              <Campo
+                id="apellido_responsable"
+                etiqueta="Apellido/s"
+                error={errores.apellido_responsable}
+              >
+                <EntradaTexto
+                  id="apellido_responsable"
+                  name="apellido_responsable"
+                  placeholder="Ej: García"
+                  value={datos.apellido_responsable}
+                  onChange={(e) =>
+                    actualizarCampo("apellido_responsable", e.target.value)
+                  }
+                />
+              </Campo>
+              <Campo id="telefono" etiqueta="Teléfono" error={errores.telefono}>
+                <EntradaTexto
+                  id="telefono"
+                  name="telefono"
+                  placeholder="Ej: 1123456789"
+                  value={datos.telefono}
+                  onChange={(e) => actualizarCampo("telefono", e.target.value)}
+                />
+              </Campo>
+              <Campo id="email" etiqueta="Email" error={errores.email}>
+                <EntradaTexto
+                  id="email"
+                  name="email"
+                  placeholder="Ej: ejemplo@email.com"
+                  value={datos.email}
+                  onChange={(e) => actualizarCampo("email", e.target.value)}
+                />
+              </Campo>
+              <Campo
+                id="parentesco"
+                etiqueta="Parentesco"
+                error={errores.parentesco}
+              >
+                <select
+                  id="parentesco"
+                  className="entrevista__input"
+                  name="parentesco"
+                  value={datos.parentesco}
+                  onChange={(e) =>
+                    actualizarCampo("parentesco", e.target.value)
+                  }
+                  required
+                >
+                  <option value="">Seleccione una opción</option>
+                  <option value="madre">Madre</option>
+                  <option value="padre">Padre</option>
+                  <option value="tutor">Tutor</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </Campo>
+            </fieldset>
+          )}
+
+          {paso === 4 && (
+            <fieldset>
+              <legend>Motivo y servicios</legend>
+              <Campo
+                id="motivo_consulta"
+                etiqueta="Motivo de la consulta"
+                error={errores.motivo_consulta}
+              >
+                <textarea
+                  id="motivo_consulta"
+                  name="motivo_consulta"
+                  className="entrevista__input"
+                  placeholder="Mi hijo tiene dificultades en..."
+                  value={datos.motivo_consulta}
+                  onChange={(e) =>
+                    actualizarCampo("motivo_consulta", e.target.value)
+                  }
+                  maxLength={250}
+                  required
+                />
+              </Campo>
+              <GrupoCheckbox
+                etiqueta="Servicios solicitados (puede elegir uno o varios)"
+                opciones={SERVICIOS}
+                valoresSeleccionados={datos.servicios}
+                onCambiar={(seleccion) =>
+                  actualizarCampo("servicios", seleccion)
+                }
+              />
+              {errores.servicios && (
+                <span className="error-message">{errores.servicios}</span>
+              )}
+            </fieldset>
+          )}
+
+          {paso === 5 && (
+            <fieldset>
+              <legend>Términos</legend>
+              <div className="entrevista__mensaje-confidencialidad">
+                <p>
+                  Toda la información proporcionada en este formulario será
+                  utilizada únicamente con fines terapéuticos y de evaluación
+                  profesional. Los datos se mantendrán bajo estricta
+                  confidencialidad, conforme a las normas de protección de datos
+                  personales.
+                </p>
+              </div>
+              <div className="entrevista__terminos-container">
+                <input
+                  id="aceptar_terminos"
+                  className="entrevista__checkbox"
+                  type="checkbox"
+                  checked={datos.aceptar_terminos}
+                  onChange={(e) =>
+                    actualizarCampo("aceptar_terminos", e.target.checked)
+                  }
+                />
+                <label
+                  className="entrevista__label-terminos"
+                  htmlFor="aceptar_terminos"
+                >
+                  Acepto los términos y condiciones
+                </label>
+              </div>
+              {errores.aceptar_terminos && (
+                <span className="error-message">
+                  {errores.aceptar_terminos}
+                </span>
+              )}
+            </fieldset>
+          )}
         </div>
 
-        {/* Términos */}
-        <div className="entrevista__terminos-container">
-          <input
-            id="aceptar_terminos"
-            className="entrevista__checkbox"
-            type="checkbox"
-            checked={datos.aceptar_terminos}
-            onChange={(e) =>
-              actualizarCampo("aceptar_terminos", e.target.checked)
-            }
-          />
-          <label
-            className="entrevista__label-terminos"
-            htmlFor="aceptar_terminos"
+        {/* Navegación inferior */}
+        <div className="entrevista__nav">
+          <button
+            type="button"
+            className="btn-nav btn-outline"
+            onClick={anterior}
+            disabled={paso === 1}
           >
-            Acepto los términos y condiciones
-          </label>
+            Atrás
+          </button>
+          {paso < PASOS ? (
+            <button type="button" className="btn-nav" onClick={siguiente}>
+              Siguiente
+            </button>
+          ) : (
+            <button type="submit" className="btn-nav">
+              Enviar
+            </button>
+          )}
         </div>
-        {errores.aceptar_terminos && (
-          <span className="error-message">{errores.aceptar_terminos}</span>
-        )}
-
-        <button className="entrevista__boton" type="submit">
-          Enviar
-        </button>
       </form>
     </section>
   );
