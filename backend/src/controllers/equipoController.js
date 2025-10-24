@@ -16,13 +16,13 @@ const listEquipo = async (req, res) => {
         // Base select with embedded usuario
         let q = supabaseAdmin
             .from('equipo')
-            .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, profesion, usuario:usuarios (id_usuario, dni, activo, rol, id_rol)', { count: 'exact' })
+            .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, profesion, usuario:usuarios (id_usuario, dni, activo, id_rol)', { count: 'exact' })
             .order('apellido', { ascending: true })
             .range(offset, offset + parseInt(pageSize) - 1);
 
         if (String(activo) === 'true') {
-            // Filtrar solo usuarios activos
-            q = q.eq('usuarios.activo', true);
+            // Filtrar solo usuarios activos (tabla relacionada alias: usuario)
+            q = q.eq('usuario.activo', true);
         }
 
         if (searchSafe) {
@@ -33,7 +33,7 @@ const listEquipo = async (req, res) => {
             );
             // Si es numérico, intentar por DNI exacto
             if (/^\d{6,15}$/.test(searchSafe)) {
-                q = q.eq('usuarios.dni', Number(searchSafe));
+                q = q.eq('usuario.dni', Number(searchSafe));
             }
         }
 
@@ -162,7 +162,7 @@ const editarIntegrante = async (req, res) => {
         if (!updatedEq || !updatedUser) {
             const { data: current, error: currErr } = await supabaseAdmin
                 .from('equipo')
-                .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, profesion, usuario:usuarios (id_usuario, dni, activo, rol)')
+                .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, profesion, usuario:usuarios (id_usuario, dni, activo, id_rol)')
                 .eq('id_profesional', Number(id_profesional))
                 .maybeSingle();
             if (currErr) throw currErr;

@@ -57,7 +57,7 @@ CREATE TABLE public.equipo (
   foto_perfil text,
   profesion text,
   CONSTRAINT equipo_pkey PRIMARY KEY (id_profesional),
-  CONSTRAINT profesionales_id_profesional_fkey FOREIGN KEY (id_profesional) REFERENCES public.usuarios(id_usuario)
+  CONSTRAINT equipo_id_profesional_fkey FOREIGN KEY (id_profesional) REFERENCES public.usuarios(id_usuario)
 );
 CREATE TABLE public.nino_departamentos (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -166,7 +166,6 @@ CREATE TABLE public.usuarios (
   activo boolean NOT NULL DEFAULT true,
   creado_en timestamp with time zone NOT NULL DEFAULT now(),
   actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
-  rol text,
   CONSTRAINT usuarios_pkey PRIMARY KEY (id_usuario),
   CONSTRAINT usuarios_id_rol_fkey FOREIGN KEY (id_rol) REFERENCES public.roles(id_rol)
 );
