@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import logoEstimular from "../assets/logo_estimular.png";
 import { IoEyeOff, IoEye } from "react-icons/io5";
+import useAuthStore from "../store/useAuthStore";
 
 import "../styles/Login.css";
 
@@ -12,6 +13,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
 
   const onSubmit = async (e) => {
@@ -31,9 +33,9 @@ export default function Login() {
         dni,
         contrasena: password,
       });
-      const { token, firstLogin, needsProfile } = res.data || {};
+      const { token, user, profile, firstLogin, needsProfile } = res.data || {};
       if (token) {
-        localStorage.setItem("auth_token", token);
+        setAuth({ token, user, profile, needsProfile });
       }
       if (firstLogin || needsProfile) {
         navigate("/primer-registro");

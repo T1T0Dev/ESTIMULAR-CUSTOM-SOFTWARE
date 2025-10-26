@@ -29,6 +29,55 @@ function isValidDateYYYYMMDD(s) {
   return !isNaN(d.getTime());
 }
 
+async function fetchRoleName(idRol) {
+  if (!idRol) return null;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('roles')
+      .select('id_rol, nombre_rol')
+      .eq('id_rol', Number(idRol))
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error('fetchRoleName error:', error);
+      return null;
+    }
+    return data ? data.nombre_rol : null;
+  } catch (err) {
+    console.error('fetchRoleName exception:', err);
+    return null;
+  }
+}
+
+async function fetchEquipoPerfil(idUsuario) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('equipo')
+      .select('nombre, apellido, telefono, email, fecha_nacimiento, profesion, foto_perfil')
+      .eq('id_profesional', Number(idUsuario))
+      .maybeSingle();
+    if (error) {
+      console.error('fetchEquipoPerfil error:', error);
+      return null;
+    }
+    return data || null;
+  } catch (err) {
+    console.error('fetchEquipoPerfil exception:', err);
+    return null;
+  }
+}
+
+function computeNeedsProfile(perfil) {
+  if (!perfil) return true;
+  const required = [perfil.nombre, perfil.apellido, perfil.telefono];
+  return required.some((value) => value === null || value === undefined || String(value).trim() === '');
+}
+
+function extractToken(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 // Registrar un usuario (requiere id_rol según esquema)
 const registrarUsuario = async (req, res) => {
   try {
@@ -137,24 +186,25 @@ const loginUsuario = async (req, res) => {
     // Detectar primer login por uso de contraseña por defecto
     const firstLogin = String(contrasena) === DEFAULT_PWD;
 
-    // Verificar si el perfil del equipo está incompleto
-    let needsProfile = false;
-    try {
-      const { data: eq, error: eqErr } = await supabaseAdmin
-        .from('equipo')
-        .select('nombre, apellido, telefono')
-        .eq('id_profesional', user.id_usuario)
-        .maybeSingle();
-      if (!eqErr && eq) {
-        const falta = [eq.nombre, eq.apellido, eq.telefono].some((v) => v === null || v === undefined || String(v).trim() === '');
-        needsProfile = falta;
-      } else if (!eqErr && !eq) {
-        // No existe fila en equipo aún => necesita completar
-        needsProfile = true;
-      }
-    } catch (_) { }
+    const [perfil, rolNombre] = await Promise.all([
+      fetchEquipoPerfil(user.id_usuario),
+      fetchRoleName(user.id_rol),
+    ]);
+    const needsProfile = computeNeedsProfile(perfil);
 
-    res.json({ success: true, token, user: { id: user.id_usuario, dni: user.dni }, firstLogin, needsProfile });
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id_usuario,
+        dni: user.dni,
+        id_rol: user.id_rol,
+        rol_nombre: rolNombre,
+      },
+      profile: perfil,
+      firstLogin,
+      needsProfile,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -163,8 +213,7 @@ const loginUsuario = async (req, res) => {
 // Primer registro: completa datos de equipo y cambia contraseña
 const primerRegistro = async (req, res) => {
   try {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    const token = extractToken(req);
     if (!token) return res.status(401).json({ error: 'Token requerido' });
     const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
     let payload;
@@ -215,10 +264,59 @@ const primerRegistro = async (req, res) => {
       return res.status(500).json({ error: 'No se pudo actualizar la contraseña' });
     }
 
-    return res.json({ success: true, data: updatedEq });
+    const perfil = await fetchEquipoPerfil(userId);
+    return res.json({ success: true, profile: perfil });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-module.exports = { registrarUsuario, loginUsuario, primerRegistro };
+const obtenerPerfilActual = async (req, res) => {
+  try {
+    const token = extractToken(req);
+    if (!token) return res.status(401).json({ error: 'Token requerido' });
+    const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
+    let payload;
+    try {
+      payload = jwt.verify(token, secret);
+    } catch (e) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const userId = payload.id;
+    const { data: user, error } = await supabaseAdmin
+      .from('usuarios')
+      .select('id_usuario, dni, id_rol, activo')
+      .eq('id_usuario', Number(userId))
+      .maybeSingle();
+    if (error) {
+      console.error('obtenerPerfilActual user error:', error);
+      return res.status(500).json({ error: 'Error interno' });
+    }
+    if (!user || user.activo === false) {
+      return res.status(404).json({ error: 'Usuario no encontrado o inactivo' });
+    }
+
+    const [perfil, rolNombre] = await Promise.all([
+      fetchEquipoPerfil(user.id_usuario),
+      fetchRoleName(user.id_rol),
+    ]);
+    const needsProfile = computeNeedsProfile(perfil);
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id_usuario,
+        dni: user.dni,
+        id_rol: user.id_rol,
+        rol_nombre: rolNombre,
+      },
+      profile: perfil,
+      needsProfile,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { registrarUsuario, loginUsuario, primerRegistro, obtenerPerfilActual };

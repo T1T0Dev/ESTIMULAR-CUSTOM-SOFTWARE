@@ -67,7 +67,8 @@ export default function AsignarEntrevista() {
                 params: { nino_id: c.id_nino, limit: 1 },
               });
               asigns[c.id_nino] = (r?.data?.data || [])[0] || null;
-            } catch (e) {
+            } catch (error) {
+              console.error("No se pudo obtener turno asignado", error);
               asigns[c.id_nino] = null;
             }
           })

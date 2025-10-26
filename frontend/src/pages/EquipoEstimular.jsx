@@ -50,19 +50,6 @@ export default function EquipoEstimular() {
     return `${dd}/${mm}/${yyyy}`;
   }
 
-  function calcularEdad(fechaNacimiento) {
-    if (!fechaNacimiento) return "";
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    if (isNaN(nacimiento)) return "";
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const m = hoy.getMonth() - nacimiento.getMonth();
-    if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
-      edad--;
-    }
-    return edad;
-  }
-
   const fetchEquipo = useCallback(
     async (search = "", pageNum = 1, profesionSel = "todas") => {
       setLoading(true);
