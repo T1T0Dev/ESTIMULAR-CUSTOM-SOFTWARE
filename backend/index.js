@@ -9,6 +9,7 @@ const ninosRoutes = require('./src/routes/ninosRoutes');
 const responsablesRoutes = require('./src/routes/responsablesRoutes');
 const turnosRoutes = require('./src/routes/turnosRoutes');
 const equipoRoutes = require('./src/routes/equipoRoutes');
+const profesionesRoutes = require('./src/routes/profesionesRoutes');
 const loginRoutes = require('./src/routes/loginRoutes');
 
 
@@ -33,6 +34,7 @@ app.use('/api/ninos', ninosRoutes);
 app.use('/api/responsables', responsablesRoutes);
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/equipo', equipoRoutes);
+app.use('/api/profesiones', profesionesRoutes);
 app.use('/api/login', loginRoutes);
 
 app.listen(PORT, () => {
