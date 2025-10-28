@@ -45,14 +45,20 @@ async function resolveRoleIdMaybe(body) {
 async function assignRoleToUser(usuarioId, rolId) {
     if (!usuarioId || !rolId) return;
     try {
-        const { error } = await supabaseAdmin
+        // Usar conflicto compuesto; si falla por constraint ausente, intentar insert y omitir duplicados
+        let { error } = await supabaseAdmin
             .from('usuario_roles')
             .upsert(
                 [{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }],
-                { onConflict: 'usuario_id' }
+                { onConflict: 'usuario_id,rol_id' }
             );
-        if (error && error.code !== '23505') {
-            console.error('assignRoleToUser error:', error);
+        if (error) {
+            const ins = await supabaseAdmin
+                .from('usuario_roles')
+                .insert([{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }]);
+            if (ins.error && ins.error.code !== '23505') {
+                console.error('assignRoleToUser error:', ins.error);
+            }
         }
     } catch (err) {
         console.error('assignRoleToUser exception:', err);
@@ -62,9 +68,6 @@ async function assignRoleToUser(usuarioId, rolId) {
 async function insertUsuario({ dni, contrasena, id_rol, activo = true }) {
     const hash = await bcrypt.hash(String(contrasena), 12);
     const basePayload = { dni: Number(dni), password_hash: hash, activo: !!activo };
-    if (id_rol !== undefined && id_rol !== null) {
-        basePayload.id_rol = Number(id_rol);
-    }
 
     let insertData = null;
     let insertErr = null;
@@ -72,18 +75,8 @@ async function insertUsuario({ dni, contrasena, id_rol, activo = true }) {
     ({ data: insertData, error: insertErr } = await supabaseAdmin
         .from('usuarios')
         .insert([basePayload])
-        .select('id_usuario, dni, activo, id_rol')
+        .select('id_usuario, dni, activo')
         .maybeSingle());
-
-    if (insertErr && insertErr.message && insertErr.message.includes('column "id_rol"')) {
-        const retryPayload = { ...basePayload };
-        delete retryPayload.id_rol;
-        ({ data: insertData, error: insertErr } = await supabaseAdmin
-            .from('usuarios')
-            .insert([retryPayload])
-            .select('id_usuario, dni, activo')
-            .maybeSingle());
-    }
 
     if (insertErr) throw insertErr;
 
@@ -124,8 +117,8 @@ const listEquipo = async (req, res) => {
         fecha_nacimiento,
         foto_perfil,
         id_departamento,
-        departamento:profesiones ( id_departamento, nombre ),
-        usuario:usuarios ( id_usuario, dni, activo, id_rol )
+                departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
+                usuario:usuarios ( id_usuario, dni, activo )
       `, { count: 'exact' })
             .order('apellido', { ascending: true })
             .range(offset, offset + parseInt(pageSize, 10) - 1);
@@ -236,7 +229,7 @@ const crearIntegrante = async (req, res) => {
           fecha_nacimiento,
           foto_perfil,
           id_departamento,
-          departamento:profesiones ( id_departamento, nombre )
+                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
         `)
                 .maybeSingle();
             if (profesionalErr) throw profesionalErr;
@@ -322,7 +315,7 @@ const editarIntegrante = async (req, res) => {
           fecha_nacimiento,
           foto_perfil,
           id_departamento,
-          departamento:profesiones ( id_departamento, nombre )
+                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
         `)
                 .maybeSingle();
             if (error) throw error;
@@ -345,7 +338,6 @@ const editarIntegrante = async (req, res) => {
         if (usuarioUpd && Object.keys(usuarioUpd).length > 0) {
             const userPayload = {};
             if (usuarioUpd.dni !== undefined) userPayload.dni = Number(usuarioUpd.dni);
-            if (usuarioUpd.id_rol !== undefined) userPayload.id_rol = Number(usuarioUpd.id_rol);
             if (usuarioUpd.activo !== undefined) userPayload.activo = !!usuarioUpd.activo;
             if (usuarioUpd.contrasena) {
                 userPayload.password_hash = await bcrypt.hash(String(usuarioUpd.contrasena), 12);
@@ -357,19 +349,8 @@ const editarIntegrante = async (req, res) => {
                     .from('usuarios')
                     .update(userPayload)
                     .eq('id_usuario', Number(id_profesional))
-                    .select('id_usuario, dni, activo, id_rol')
+                    .select('id_usuario, dni, activo')
                     .maybeSingle());
-
-                if (userUpdateErr && userUpdateErr.message && userUpdateErr.message.includes('column "id_rol"')) {
-                    const retryPayload = { ...userPayload };
-                    delete retryPayload.id_rol;
-                    ({ data: updatedUser, error: userUpdateErr } = await supabaseAdmin
-                        .from('usuarios')
-                        .update(retryPayload)
-                        .eq('id_usuario', Number(id_profesional))
-                        .select('id_usuario, dni, activo')
-                        .maybeSingle());
-                }
 
                 if (userUpdateErr) throw userUpdateErr;
 
@@ -391,8 +372,8 @@ const editarIntegrante = async (req, res) => {
           fecha_nacimiento,
           foto_perfil,
           id_departamento,
-          departamento:profesiones ( id_departamento, nombre ),
-          usuario:usuarios ( id_usuario, dni, activo, id_rol )
+                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
+        usuario:usuarios ( id_usuario, dni, activo )
         `)
                 .eq('id_profesional', Number(id_profesional))
                 .maybeSingle();

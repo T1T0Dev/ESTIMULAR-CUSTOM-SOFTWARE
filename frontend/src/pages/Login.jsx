@@ -66,15 +66,15 @@ export default function Login() {
         </div>
         <div className="left-content">
           <h1>
-            Acompañamos tu proceso con <span>calidez</span> y{" "}
-            <span>profesionalismo</span>.
+            Si quieres ir rápido camina <span>solo</span> si quieres llegar
+            lejos camina <span>acompañado</span>.
           </h1>
           <p>
-            Plataforma de gestión para pacientes, profesionales y familias.
+            Plataforma de gestión para profesionales.
             Acceso seguro a turnos, historias y seguimiento.
           </p>
         </div>
-        <div className="left-footer">© Estimular 2025</div>
+        <div className="left-footer">© Estimular {new Date().getFullYear()}</div>
       </div>
 
       <div className="login-right">

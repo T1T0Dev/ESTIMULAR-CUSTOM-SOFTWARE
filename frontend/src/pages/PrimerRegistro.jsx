@@ -10,10 +10,13 @@ export default function PrimerRegistro() {
     apellido: "",
     telefono: "",
     fecha_nacimiento: "",
-    profesion: "",
+    profesionId: "",
+    fotoFile: null,
+    fotoPreview: "",
     nuevaContrasena: "",
     confirmacion: "",
   });
+  const [profesiones, setProfesiones] = useState([]);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,11 +37,29 @@ export default function PrimerRegistro() {
         nombre: profile.nombre || "",
         apellido: profile.apellido || "",
         telefono: profile.telefono || "",
-        fecha_nacimiento: profile.fecha_nacimiento || "",
-        profesion: profile.profesion || "",
+        fecha_nacimiento:
+          (profile.fecha_nacimiento
+            ? String(profile.fecha_nacimiento).slice(0, 10)
+            : "") || "",
+        profesionId:
+          profile.departamento_id ||
+          profile.departamento?.id_departamento ||
+          "",
       }));
     }
   }, [profile]);
+
+  // Cargar profesiones para el selector
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/profesiones");
+        setProfesiones(res?.data?.data || []);
+      } catch (e) {
+        console.error("No se pudieron cargar profesiones", e);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!useAuthStore.persist.hasHydrated()) return;
@@ -63,6 +84,10 @@ export default function PrimerRegistro() {
       setError("La nueva contraseña no coincide");
       return;
     }
+    if (!form.profesionId) {
+      setError("Seleccioná tu profesión");
+      return;
+    }
     setLoading(true);
     try {
       const response = await axios.post(
@@ -72,7 +97,9 @@ export default function PrimerRegistro() {
           apellido: form.apellido,
           telefono: form.telefono,
           fecha_nacimiento: form.fecha_nacimiento,
-          profesion: form.profesion || null,
+          tipoUsuario: "profesional",
+          profesionId: Number(form.profesionId),
+          foto_perfil: form.fotoPreview || null,
           nuevaContrasena: form.nuevaContrasena,
         }
       );
@@ -147,6 +174,47 @@ export default function PrimerRegistro() {
 
           <div className="grid-2">
             <div>
+              <label>Foto de perfil</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (!file) {
+                    setForm((prev) => ({
+                      ...prev,
+                      fotoFile: null,
+                      fotoPreview: "",
+                    }));
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setForm((prev) => ({
+                      ...prev,
+                      fotoFile: file,
+                      fotoPreview: String(reader.result || ""),
+                    }));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {form.fotoPreview ? (
+                <div style={{ marginTop: 8 }}>
+                  <img
+                    src={form.fotoPreview}
+                    alt="Vista previa"
+                    style={{
+                      width: 72,
+                      height: 72,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div>
               <label>Fecha de nacimiento</label>
               <input
                 type="date"
@@ -159,12 +227,20 @@ export default function PrimerRegistro() {
             </div>
             <div>
               <label>Profesión</label>
-              <input
-                value={form.profesion}
+              <select
+                value={form.profesionId}
                 onChange={(e) =>
-                  setForm({ ...form, profesion: e.target.value })
+                  setForm({ ...form, profesionId: e.target.value })
                 }
-              />
+                required
+              >
+                <option value="">— Seleccionar —</option>
+                {profesiones.map((p) => (
+                  <option key={p.id_departamento} value={p.id_departamento}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

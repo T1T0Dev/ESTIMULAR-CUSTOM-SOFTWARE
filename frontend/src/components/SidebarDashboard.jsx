@@ -21,11 +21,32 @@ export default function SidebarDashboard() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const fullName = React.useMemo(() => {
-    return [profile?.nombre, profile?.apellido].filter(Boolean).join(" ").trim();
+    return [profile?.nombre, profile?.apellido]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
   }, [profile?.nombre, profile?.apellido]);
 
   const displayName = fullName || (user?.dni ? `DNI ${user.dni}` : "Usuario");
-  const displayRole = profile?.profesion || user?.rol_nombre || "Rol no asignado";
+  const primaryRole = React.useMemo(() => {
+    // 1) Profesión del perfil profesional si existe
+    if (profile?.profesion) return profile.profesion;
+    if (profile?.departamento?.nombre) return profile.departamento.nombre;
+    // 2) Rol asignado desde backend (string plano)
+    if (user?.rol_nombre) return user.rol_nombre;
+    // 3) Roles múltiples (si existen)
+    if (Array.isArray(user?.roles) && user.roles.length > 0) {
+      const names = user.roles.map((r) => r?.nombre).filter(Boolean);
+      if (names.length) return names.join(", ");
+    }
+    return null;
+  }, [
+    profile?.profesion,
+    profile?.departamento?.nombre,
+    user?.rol_nombre,
+    user?.roles,
+  ]);
+  const displayRole = primaryRole || "Rol no asignado";
   const displayEmail = profile?.email || "Sin email";
 
   const initials = React.useMemo(() => {
@@ -58,21 +79,27 @@ export default function SidebarDashboard() {
         <NavLink
           to="/dashboard"
           end
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdDashboard size={18} /> <span>Dashboard</span>
         </NavLink>
 
         <NavLink
           to="/dashboard/turnos"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdEventAvailable size={18} /> <span>Turnos</span>
         </NavLink>
 
         <NavLink
           to="/dashboard/profesionales"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdGroups size={18} /> <span>Equipo Estimular</span>
         </NavLink>
@@ -80,28 +107,36 @@ export default function SidebarDashboard() {
         {/* Entidades relacionadas entre sí */}
         <NavLink
           to="/dashboard/ninos"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdPerson size={18} /> <span>Niños</span>
         </NavLink>
 
         <NavLink
           to="/dashboard/responsables"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdFamilyRestroom size={18} /> <span>Padres/Tutores</span>
         </NavLink>
 
         <NavLink
           to="/dashboard/entrevistas"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdAssignment size={18} /> <span>Entrevistas</span>
         </NavLink>
 
         <NavLink
           to="/dashboard/obras-sociales"
-          className={({ isActive }) => (isActive ? "sd-link active" : "sd-link")}
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
         >
           <MdLocalHospital size={18} /> <span>Obras sociales</span>
         </NavLink>

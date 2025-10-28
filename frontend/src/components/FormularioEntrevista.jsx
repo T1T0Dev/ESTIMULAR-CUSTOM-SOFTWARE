@@ -222,7 +222,6 @@ export default function FormularioEntrevista() {
         .split("T")[0];
     return { fechaMinima: aIsoLocal(limiteMenor), fechaMaxima: aIsoLocal(hoy) };
   }, []);
-  
 
   const [datos, setDatos] = useState({
     nombre_nino: "",
@@ -466,11 +465,21 @@ export default function FormularioEntrevista() {
         aria-label="Formulario de primera entrevista"
       >
         {/* Indicador de progreso */}
-        <div className="entrevista__progreso" aria-label={`Progreso: paso ${paso} de ${PASOS}`}>
+        <div
+          className="entrevista__progreso"
+          aria-label={`Progreso: paso ${paso} de ${PASOS}`}
+        >
           <div className="entrevista__progreso-bar">
-            <div className="entrevista__progreso-fill" style={{ width: `${progreso}%` }} />
+            <div
+              className="entrevista__progreso-fill"
+              style={{ width: `${progreso}%` }}
+            />
           </div>
-          <div className="entrevista__pasos-dots" role="tablist" aria-label="Pasos del formulario">
+          <div
+            className="entrevista__pasos-dots"
+            role="tablist"
+            aria-label="Pasos del formulario"
+          >
             {Array.from({ length: PASOS }).map((_, i) => {
               const n = i + 1;
               const active = n === paso;
@@ -479,7 +488,9 @@ export default function FormularioEntrevista() {
                 <button
                   key={n}
                   type="button"
-                  className={`paso-dot ${active ? "activo" : ""} ${completed ? "completado" : ""}`}
+                  className={`paso-dot ${active ? "activo" : ""} ${
+                    completed ? "completado" : ""
+                  }`}
                   aria-current={active ? "step" : undefined}
                   aria-label={`Paso ${n} de ${PASOS}`}
                   onClick={() => setPaso(n)}

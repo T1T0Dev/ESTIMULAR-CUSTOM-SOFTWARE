@@ -34,8 +34,8 @@
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255,182,193,0.18);
-  border: 1px solid rgba(255,182,193,0.35);
+  background: rgba(255, 182, 193, 0.18);
+  border: 1px solid rgba(255, 182, 193, 0.35);
   overflow: hidden;
 }
 .entrevista__progreso-fill {
@@ -57,10 +57,16 @@
   background: transparent;
   cursor: pointer;
 }
-.entrevista__pasos-dots .paso-dot.activo { background: var(--color-rosa1); }
-.entrevista__pasos-dots .paso-dot.completado { background: rgba(255,182,193,0.6); }
+.entrevista__pasos-dots .paso-dot.activo {
+  background: var(--color-rosa1);
+}
+.entrevista__pasos-dots .paso-dot.completado {
+  background: rgba(255, 182, 193, 0.6);
+}
 
-.field { margin-bottom: 0.5rem; }
+.field {
+  margin-bottom: 0.5rem;
+}
 
 .entrevista__radio-group {
   display: flex;
@@ -140,8 +146,12 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
-.entrevista__nav .btn-nav:hover:not([disabled]) { filter: brightness(1.08); }
-.entrevista__nav .btn-outline:hover:not([disabled]) { background: rgba(255,182,193,0.08); }
+.entrevista__nav .btn-nav:hover:not([disabled]) {
+  filter: brightness(1.08);
+}
+.entrevista__nav .btn-outline:hover:not([disabled]) {
+  background: rgba(255, 182, 193, 0.08);
+}
 
 /* Accesibilidad: sólo mostrar focus para teclado */
 .entrevista__input:focus-visible,
@@ -152,7 +162,7 @@
 select.entrevista__input:focus-visible,
 textarea.entrevista__input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(255,182,193,0.25);
+  box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.25);
   border-color: var(--color-rosa1);
 }
 
@@ -224,22 +234,45 @@ textarea.entrevista__input {
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem 1rem;
   }
-  .entrevista__form fieldset > .field { margin-bottom: 0; }
-  .entrevista__radio-group { grid-column: 1 / -1; }
+  .entrevista__form fieldset > .field {
+    margin-bottom: 0;
+  }
+  .entrevista__radio-group {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Dispositivos de poca altura: compactar aún más */
 @media (max-height: 700px) {
-  .entrevista__titulo { font-size: clamp(1.3rem, 3.4vw, 2.1rem); }
-  .entrevista__subtitulo { font-size: clamp(0.9rem, 2vw, 1.05rem); margin-bottom: 0.8rem; }
-  .entrevista__form legend { padding-bottom: 0.35rem; }
-  .entrevista__form fieldset { padding: 0.65rem; }
-  .entrevista__input, textarea.entrevista__input, select.entrevista__input { min-height: 40px; padding: 0.5rem 0.8rem; }
-  textarea.entrevista__input { min-height: 100px; max-height: 180px; }
+  .entrevista__titulo {
+    font-size: clamp(1.3rem, 3.4vw, 2.1rem);
+  }
+  .entrevista__subtitulo {
+    font-size: clamp(0.9rem, 2vw, 1.05rem);
+    margin-bottom: 0.8rem;
+  }
+  .entrevista__form legend {
+    padding-bottom: 0.35rem;
+  }
+  .entrevista__form fieldset {
+    padding: 0.65rem;
+  }
+  .entrevista__input,
+  textarea.entrevista__input,
+  select.entrevista__input {
+    min-height: 40px;
+    padding: 0.5rem 0.8rem;
+  }
+  textarea.entrevista__input {
+    min-height: 100px;
+    max-height: 180px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .entrevista__progreso-fill { transition: none !important; }
+  .entrevista__progreso-fill {
+    transition: none !important;
+  }
 }
 
 select.entrevista__input {

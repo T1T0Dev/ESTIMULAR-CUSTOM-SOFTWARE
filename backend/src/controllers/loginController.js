@@ -25,25 +25,7 @@ function isValidDateYYYYMMDD(s) {
   return !isNaN(d.getTime());
 }
 
-async function fetchRoleName(idRol) {
-  if (!idRol) return null;
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('roles')
-      .select('id_rol, nombre_rol')
-      .eq('id_rol', Number(idRol))
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.error('fetchRoleName error:', error);
-      return null;
-    }
-    return data ? data.nombre_rol : null;
-  } catch (err) {
-    console.error('fetchRoleName exception:', err);
-    return null;
-  }
-}
+// Nota: ya no se usa id_rol en usuarios; los nombres de roles se obtienen desde usuario_roles -> roles
 
 async function fetchUserRoles(idUsuario) {
   if (!idUsuario) return [];
@@ -87,7 +69,7 @@ async function fetchProfessionalProfile(idUsuario) {
         fecha_nacimiento,
         foto_perfil,
         id_departamento,
-        departamento:profesiones ( id_departamento, nombre )
+        departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
       `)
       .eq('id_profesional', Number(idUsuario))
       .maybeSingle();
@@ -179,18 +161,74 @@ function extractToken(req) {
 async function assignRoleToUser(usuarioId, rolId) {
   if (!usuarioId || !rolId) return;
   try {
-    const { error } = await supabaseAdmin
+    // Intentar upsert con conflicto en (usuario_id, rol_id); si no hay constraint, fallback a insert simple
+    let { error } = await supabaseAdmin
       .from('usuario_roles')
       .upsert(
         [{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }],
-        { onConflict: 'usuario_id' }
+        { onConflict: 'usuario_id,rol_id' }
       );
-    if (error && error.code !== '23505') {
-      console.error('assignRoleToUser error:', error);
+    if (error) {
+      // Fallback: intentar insert; ignorar duplicados
+      const ins = await supabaseAdmin
+        .from('usuario_roles')
+        .insert([{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }]);
+      if (ins.error && ins.error.code !== '23505') {
+        console.error('assignRoleToUser error:', ins.error);
+      }
     }
   } catch (err) {
     console.error('assignRoleToUser exception:', err);
   }
+}
+
+// Helpers para almacenamiento de imagenes en Supabase Storage
+function parseDataUrlImage(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const m = dataUrl.match(/^data:(image\/(png|jpeg|jpg|webp));base64,(.+)$/i);
+  if (!m) return null;
+  const contentType = m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
+  const base64 = m[3];
+  try {
+    const buffer = Buffer.from(base64, 'base64');
+    return { buffer, contentType };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function uploadProfileImageIfNeeded(usuarioId, dataUrl) {
+  const parsed = parseDataUrlImage(dataUrl);
+  if (!parsed) return null;
+  try {
+    const bucket = 'equipoestimular';
+    const ext = parsed.contentType.split('/')[1] || 'png';
+    const fileName = `perfil_${usuarioId}_${Date.now()}.${ext}`;
+    const path = fileName; // plano en bucket raíz; opcional: `usuarios/${usuarioId}/${fileName}`
+
+    const { error: upErr } = await supabaseAdmin.storage
+      .from(bucket)
+      .upload(path, parsed.buffer, { contentType: parsed.contentType, upsert: true });
+    if (upErr) {
+      console.error('uploadProfileImageIfNeeded upload error:', upErr);
+      return null;
+    }
+    const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (err) {
+    console.error('uploadProfileImageIfNeeded exception:', err);
+    return null;
+  }
+}
+
+function isProfessionalProfileComplete(row) {
+  if (!row) return false;
+  const required = [row.nombre, row.apellido, row.telefono, row.fecha_nacimiento];
+  if (required.some((v) => v === null || v === undefined || String(v).trim() === '')) {
+    return false;
+  }
+  if (!row.id_departamento) return false;
+  return true;
 }
 
 async function resolveRoleIdMaybe(body) {
@@ -257,9 +295,6 @@ const registrarUsuario = async (req, res) => {
     }
 
     const basePayload = { dni: Number(dni), password_hash: hash, activo: true };
-    if (roleId !== null && roleId !== undefined) {
-      basePayload.id_rol = Number(roleId);
-    }
 
     let insertData = null;
     let insertErr = null;
@@ -267,18 +302,8 @@ const registrarUsuario = async (req, res) => {
     ({ data: insertData, error: insertErr } = await supabaseAdmin
       .from('usuarios')
       .insert([basePayload])
-      .select('id_usuario, dni, activo, id_rol')
+      .select('id_usuario, dni, activo')
       .maybeSingle());
-
-    if (insertErr && insertErr.message && insertErr.message.includes('column "id_rol"')) {
-      const retryPayload = { ...basePayload };
-      delete retryPayload.id_rol;
-      ({ data: insertData, error: insertErr } = await supabaseAdmin
-        .from('usuarios')
-        .insert([retryPayload])
-        .select('id_usuario, dni, activo')
-        .maybeSingle());
-    }
 
     if (insertErr) {
       console.error('Error inserting user:', insertErr);
@@ -307,20 +332,10 @@ const loginUsuario = async (req, res) => {
 
     ({ data: user, error: findErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id_usuario, dni, password_hash, activo, id_rol')
+      .select('id_usuario, dni, password_hash, activo')
       .eq('dni', Number(dni))
       .limit(1)
       .maybeSingle());
-
-    if (findErr && findErr.message && findErr.message.includes('column "id_rol"')) {
-      ({ data: user, error: findErr } = await supabaseAdmin
-        .from('usuarios')
-        .select('id_usuario, dni, password_hash, activo')
-        .eq('dni', Number(dni))
-        .limit(1)
-        .maybeSingle());
-      if (user) user.id_rol = null;
-    }
 
     if (findErr) {
       console.error('Error fetching user for login:', findErr);
@@ -366,10 +381,7 @@ const loginUsuario = async (req, res) => {
       fetchUserRoles(user.id_usuario),
     ]);
 
-    let rolNombre = roles[0]?.nombre || null;
-    if (!rolNombre) {
-      rolNombre = await fetchRoleName(user.id_rol);
-    }
+    const rolNombre = roles[0]?.nombre || null;
 
     const needsProfile = computeNeedsProfile(perfil);
 
@@ -379,7 +391,7 @@ const loginUsuario = async (req, res) => {
       user: {
         id: user.id_usuario,
         dni: user.dni,
-        id_rol: user.id_rol ?? roles[0]?.id ?? null,
+        id_rol: roles[0]?.id ?? null,
         rol_nombre: rolNombre,
         roles,
       },
@@ -415,6 +427,7 @@ const primerRegistro = async (req, res) => {
       seleccion,
       tipoUsuario,
       profesionId,
+      foto_perfil,
       nuevaContrasena,
     } = req.body || {};
 
@@ -457,7 +470,31 @@ const primerRegistro = async (req, res) => {
       return res.status(400).json({ error: 'Tipo de usuario inválido' });
     }
 
+    // Verificar si ya existe perfil profesional completo para evitar múltiples primer-registro
+    let existingProfesional = null;
+    try {
+      const { data: exRow, error: exErr } = await supabaseAdmin
+        .from('profesionales')
+        .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, id_departamento')
+        .eq('id_profesional', Number(userId))
+        .maybeSingle();
+      if (exErr && exErr.code !== 'PGRST116') {
+        console.warn('primerRegistro fetch existing profesional warn:', exErr.message);
+      }
+      existingProfesional = exRow || null;
+    } catch (e) {
+      // ignorar
+    }
+
     if (resolvedTipo === 'profesional') {
+      if (existingProfesional && isProfessionalProfileComplete(existingProfesional)) {
+        return res.status(409).json({ error: 'El perfil ya fue completado' });
+      }
+
+      let fotoUrl = null;
+      if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
+        fotoUrl = await uploadProfileImageIfNeeded(userId, foto_perfil);
+      }
       const profesionalPayload = {
         id_profesional: userId,
         nombre,
@@ -465,7 +502,7 @@ const primerRegistro = async (req, res) => {
         telefono,
         email: email || null,
         fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: null,
+        foto_perfil: fotoUrl || foto_perfil || existingProfesional?.foto_perfil || null,
         id_departamento: resolvedProfesionId,
       };
 
@@ -494,7 +531,9 @@ const primerRegistro = async (req, res) => {
         telefono,
         email: email || null,
         fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: null,
+        foto_perfil: (foto_perfil && foto_perfil.startsWith('data:image'))
+          ? (await uploadProfileImageIfNeeded(userId, foto_perfil))
+          : (foto_perfil || null),
       };
 
       const { error: secretarioErr } = await supabaseAdmin
@@ -538,7 +577,7 @@ const obtenerPerfilActual = async (req, res) => {
     const userId = payload.id;
     const { data: user, error } = await supabaseAdmin
       .from('usuarios')
-      .select('id_usuario, dni, id_rol, activo')
+      .select('id_usuario, dni, activo')
       .eq('id_usuario', Number(userId))
       .maybeSingle();
 
@@ -555,10 +594,7 @@ const obtenerPerfilActual = async (req, res) => {
       fetchUserRoles(user.id_usuario),
     ]);
 
-    let rolNombre = roles[0]?.nombre || null;
-    if (!rolNombre) {
-      rolNombre = await fetchRoleName(user.id_rol);
-    }
+    const rolNombre = roles[0]?.nombre || null;
 
     const needsProfile = computeNeedsProfile(perfil);
 
@@ -567,7 +603,7 @@ const obtenerPerfilActual = async (req, res) => {
       user: {
         id: user.id_usuario,
         dni: user.dni,
-        id_rol: user.id_rol ?? roles[0]?.id ?? null,
+        id_rol: roles[0]?.id ?? null,
         rol_nombre: rolNombre,
         roles,
       },
