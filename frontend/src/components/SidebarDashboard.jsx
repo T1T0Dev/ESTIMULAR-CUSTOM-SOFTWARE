@@ -58,6 +58,13 @@ export default function SidebarDashboard() {
   ]);
   const displayRole = primaryRole || "Rol no asignado";
   const displayEmail = profile?.email || "Sin email";
+  const profilePhoto = React.useMemo(() => {
+    const ensureUrl = (value) =>
+      typeof value === "string" && /^https?:\/\//i.test(value) ? value : null;
+    return (
+      ensureUrl(profile?.foto_perfil) || ensureUrl(profile?.foto_perfil_url)
+    );
+  }, [profile?.foto_perfil, profile?.foto_perfil_url]);
 
   const initials = React.useMemo(() => {
     if (fullName) {
@@ -161,7 +168,7 @@ export default function SidebarDashboard() {
             disabled={!user}
           >
             <div className="sd-user-avatar" aria-hidden="true">
-              {initials}
+              {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
             </div>
             <div className="sd-user-info">
               <div className="sd-user-name">{displayName}</div>

@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/db');
 const { upsertWithIdentityOverride } = require('../utils/upsertWithIdentityOverride');
+const { resolveStorageAsset } = require('../utils/storage');
 const bcrypt = require('bcrypt');
 
 function sanitize(text = '') {
@@ -95,6 +96,29 @@ function mapProfesionalRow(row) {
     };
 }
 
+async function mapProfesionalRowWithStorage(row) {
+    if (!row) return row;
+    const base = mapProfesionalRow(row);
+    const foto = await resolveStorageAsset(base?.foto_perfil);
+    return {
+        ...base,
+        foto_perfil: foto.signedUrl || base?.foto_perfil || null,
+        foto_perfil_url: foto.signedUrl || null,
+        foto_perfil_path: foto.path,
+    };
+}
+
+async function mapSecretarioRowWithStorage(row) {
+    if (!row) return row;
+    const foto = await resolveStorageAsset(row.foto_perfil);
+    return {
+        ...row,
+        foto_perfil: foto.signedUrl || row.foto_perfil || null,
+        foto_perfil_url: foto.signedUrl || null,
+        foto_perfil_path: foto.path,
+    };
+}
+
 // GET /api/equipo
 const listEquipo = async (req, res) => {
     const { search = '', page = 1, pageSize = 10, activo = 'true', profesion = '', tipo = 'profesional' } = req.query || {};
@@ -156,7 +180,7 @@ const listEquipo = async (req, res) => {
         const { data, error, count } = await q;
         if (error) throw error;
 
-        const mapped = (data || []).map(mapProfesionalRow);
+        const mapped = await Promise.all((data || []).map((row) => mapProfesionalRowWithStorage(row)));
         return res.json({ success: true, data: mapped, total: count || 0 });
     } catch (err) {
         console.error('listEquipo error:', err);
@@ -242,7 +266,8 @@ const crearIntegrante = async (req, res) => {
                     { onConflict: 'profesional_id,departamento_id' }
                 );
 
-            return res.status(201).json({ success: true, data: mapProfesionalRow(profesional) });
+            const mappedProfesional = await mapProfesionalRowWithStorage(profesional);
+            return res.status(201).json({ success: true, data: mappedProfesional });
         }
 
         // Secretarios
@@ -312,7 +337,8 @@ const crearIntegrante = async (req, res) => {
 
         if (secretarioErr) throw secretarioErr;
 
-        return res.status(201).json({ success: true, data: secretario });
+        const mappedSecretario = await mapSecretarioRowWithStorage(secretario);
+        return res.status(201).json({ success: true, data: mappedSecretario });
     } catch (err) {
         if (insertedUsuario) {
             try {
@@ -428,10 +454,20 @@ const editarIntegrante = async (req, res) => {
                 .eq('id_profesional', Number(id_profesional))
                 .maybeSingle();
             if (currErr) throw currErr;
-            return res.json({ success: true, data: mapProfesionalRow(current) });
+            const mappedCurrent = await mapProfesionalRowWithStorage(current);
+            return res.json({ success: true, data: mappedCurrent });
         }
 
-        return res.json({ success: true, data: { ...(updatedProfesional || {}), usuario: updatedUser || {} } });
+        const mappedUpdate = updatedProfesional
+            ? await mapProfesionalRowWithStorage(updatedProfesional)
+            : null;
+        return res.json({
+            success: true,
+            data: {
+                ...(mappedUpdate || {}),
+                usuario: updatedUser || {},
+            },
+        });
     } catch (err) {
         console.error('editarIntegrante error:', err);
         return res.status(500).json({ success: false, message: 'Error al editar integrante', error: err.message });

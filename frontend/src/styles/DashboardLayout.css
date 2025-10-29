@@ -5,11 +5,12 @@
   width: 100%;
   background: var(--bg);
   position: relative;
+  --sidebar-width: 300px;
 }
 
 .dashboard-sidebar {
-  flex: 0 0 260px; /* fixed width sidebar */
-  width: 260px;
+  flex: 0 0 var(--sidebar-width); /* fixed width sidebar */
+  width: var(--sidebar-width);
   border-right: 1px solid var(--neutral-200);
   background: var(--card-bg);
   position: relative;
@@ -29,7 +30,7 @@
   position: fixed;
   top: 50%;
   transform: translateY(-50%);
-  left: 260px; /* ancho del sidebar abierto */
+  left: var(--sidebar-width); /* ancho del sidebar abierto */
   z-index: 20;
   width: 32px;
   height: 56px;
@@ -125,15 +126,14 @@
 }
 
 @media (max-width: 1000px) {
-  .dashboard-sidebar {
-    flex: 0 0 200px;
-    width: 200px;
+  .dashboard-layout {
+    --sidebar-width: 220px;
   }
   .dashboard-main {
     padding: 12px 16px;
   }
   .dashboard-toggle-curtain {
-    left: 200px;
+    left: var(--sidebar-width);
   }
 }
 

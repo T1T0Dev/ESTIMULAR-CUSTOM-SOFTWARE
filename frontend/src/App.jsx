@@ -13,6 +13,7 @@ import PrimerRegistro from "./pages/PrimerRegistro";
 import Entrevista from "./pages/Entrevista";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Ninos from "./pages/Ninos";
+import MainDashboard from "./pages/MainDashboard";
 import EditarProfesional from "./pages/EditarProfesional";
 import ObrasSociales from "./pages/ObrasSociales";
 import Responsables from "./pages/Responsables";
@@ -50,10 +51,7 @@ function DashboardRoutes() {
   return (
     <DashboardLayout>
       <Routes>
-        <Route
-          index
-          element={<div className="p-24">Bienvenido al Dashboard</div>}
-        />
+        <Route index element={<MainDashboard />} />
         <Route path="ninos" element={<Ninos />} />
         <Route path="editar-profesional" element={<EditarProfesional />} />
         <Route

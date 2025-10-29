@@ -295,6 +295,56 @@ export default function EditarProfesional() {
         </button>
       </header>
 
+
+      <div className="form-photo">
+            <div>
+              <label htmlFor="foto_perfil">Foto de perfil</label>
+              <p className="help-text">
+                Se mostrará en el listado de profesionales y secretaría.
+              </p>
+              <input
+                id="foto_perfil"
+                type="file"
+                accept="image/*"
+                onChange={onFileChange}
+              />
+              <div className="form-photo__actions">
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() =>
+                    document.getElementById("foto_perfil")?.click()
+                  }
+                >
+                  Seleccionar nueva foto
+                </button>
+                {(fotoPreview || profile?.foto_perfil) && (
+                  <button
+                    type="button"
+                    className="btn-link danger"
+                    onClick={onRemovePhoto}
+                  >
+                    Quitar foto
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="form-photo__preview">
+              {fotoPreview ? (
+                <img src={fotoPreview} alt="Vista previa" />
+              ) : profile?.foto_perfil && !removeFoto ? (
+                <img src={profile.foto_perfil} alt="Foto actual" />
+              ) : (
+                <div className="placeholder-avatar">
+                  {`${(form.nombre?.[0] || "U").toUpperCase()}${(
+                    form.apellido?.[0] || "S"
+                  ).toUpperCase()}`}
+                </div>
+              )}
+            </div>
+          </div>
+
+
       {loading ? (
         <div className="editar-profesional__loading">Cargando…</div>
       ) : (
@@ -377,54 +427,7 @@ export default function EditarProfesional() {
             )}
           </div>
 
-          <div className="form-photo">
-            <div>
-              <label htmlFor="foto_perfil">Foto de perfil</label>
-              <p className="help-text">
-                Se mostrará en el listado de profesionales y secretaría.
-              </p>
-              <input
-                id="foto_perfil"
-                type="file"
-                accept="image/*"
-                onChange={onFileChange}
-              />
-              <div className="form-photo__actions">
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() =>
-                    document.getElementById("foto_perfil")?.click()
-                  }
-                >
-                  Seleccionar nueva foto
-                </button>
-                {(fotoPreview || profile?.foto_perfil) && (
-                  <button
-                    type="button"
-                    className="btn-link danger"
-                    onClick={onRemovePhoto}
-                  >
-                    Quitar foto
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="form-photo__preview">
-              {fotoPreview ? (
-                <img src={fotoPreview} alt="Vista previa" />
-              ) : profile?.foto_perfil && !removeFoto ? (
-                <img src={profile.foto_perfil} alt="Foto actual" />
-              ) : (
-                <div className="placeholder-avatar">
-                  {`${(form.nombre?.[0] || "U").toUpperCase()}${(
-                    form.apellido?.[0] || "S"
-                  ).toUpperCase()}`}
-                </div>
-              )}
-            </div>
-          </div>
-
+          
           <footer className="form-footer">
             <button
               type="button"

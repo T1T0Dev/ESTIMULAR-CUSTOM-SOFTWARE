@@ -2,13 +2,12 @@ const { supabaseAdmin } = require('../config/db');
 const { upsertWithIdentityOverride } = require('../utils/upsertWithIdentityOverride');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
-const SUPABASE_SERVICE_ROLE_KEY = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  ''
-).trim();
+const {
+  resolveStorageAsset,
+  deleteStorageAsset,
+  uploadProfileImageIfNeeded,
+  isHttpUrl,
+} = require('../utils/storage');
 
 const DEFAULT_PASSWORD = process.env.DEFAULT_PASSWORD_LOGIN || 'estimular_2025';
 
@@ -90,6 +89,7 @@ async function fetchProfessionalProfile(idUsuario) {
       return null;
     }
     if (!data) return null;
+    const foto = await resolveStorageAsset(data.foto_perfil);
     return {
       tipo: 'profesional',
       id_profesional: data.id_profesional,
@@ -98,7 +98,9 @@ async function fetchProfessionalProfile(idUsuario) {
       telefono: data.telefono,
       email: data.email,
       fecha_nacimiento: data.fecha_nacimiento,
-      foto_perfil: data.foto_perfil,
+      foto_perfil: foto.signedUrl || data.foto_perfil,
+      foto_perfil_url: foto.signedUrl || null,
+      foto_perfil_path: foto.path,
       departamento_id: data.id_departamento || data.departamento?.id_departamento || null,
       departamento: data.departamento
         ? {
@@ -106,6 +108,7 @@ async function fetchProfessionalProfile(idUsuario) {
           nombre: data.departamento.nombre,
         }
         : null,
+      profesion: data.departamento?.nombre || null,
     };
   } catch (err) {
     console.error('fetchProfessionalProfile exception:', err);
@@ -139,6 +142,7 @@ async function fetchSecretaryProfile(idUsuario) {
       return null;
     }
     if (!data) return null;
+    const foto = await resolveStorageAsset(data.foto_perfil);
     return {
       tipo: 'secretario',
       id_secretario: data.usuario_id ?? data.id,
@@ -147,7 +151,9 @@ async function fetchSecretaryProfile(idUsuario) {
       telefono: data.telefono,
       email: data.email,
       fecha_nacimiento: data.fecha_nacimiento,
-      foto_perfil: data.foto_perfil,
+      foto_perfil: foto.signedUrl || data.foto_perfil,
+      foto_perfil_url: foto.signedUrl || null,
+      foto_perfil_path: foto.path,
     };
   } catch (err) {
     console.error('fetchSecretaryProfile exception:', err);
@@ -207,127 +213,6 @@ async function assignRoleToUser(usuarioId, rolId) {
     }
   } catch (err) {
     console.error('assignRoleToUser exception:', err);
-  }
-}
-
-// Helpers para almacenamiento de imagenes en Supabase Storage
-function parseDataUrlImage(dataUrl) {
-  if (!dataUrl || typeof dataUrl !== 'string') return null;
-  const m = dataUrl.match(/^data:(image\/(png|jpeg|jpg|webp));base64,(.+)$/i);
-  if (!m) return null;
-  const contentType = m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
-  const base64 = m[3];
-  try {
-    const buffer = Buffer.from(base64, 'base64');
-    return { buffer, contentType };
-  } catch (e) {
-    return null;
-  }
-}
-
-function buildStorageObjectUrl(bucket, path) {
-  const cleanedUrl = SUPABASE_URL.replace(/\/$/, '');
-  const encodedPath = path
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-  return `${cleanedUrl}/storage/v1/object/${bucket}/${encodedPath}`;
-}
-
-async function uploadToStorageWithServiceRole(bucket, path, buffer, contentType) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('uploadToStorageWithServiceRole: falta SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY para subir archivos.');
-    return null;
-  }
-
-  if (typeof fetch !== 'function') {
-    console.error('uploadToStorageWithServiceRole: fetch API no disponible en este entorno.');
-    return null;
-  }
-
-  const endpoint = buildStorageObjectUrl(bucket, path);
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': contentType || 'application/octet-stream',
-        'x-upsert': 'true',
-      },
-      body: buffer,
-    });
-
-    const text = await response.text();
-    let parsed = null;
-    if (text) {
-      try {
-        parsed = JSON.parse(text);
-      } catch (err) {
-        parsed = null;
-      }
-    }
-
-    if (!response.ok) {
-      const err = new Error(
-        parsed?.message || parsed?.error?.message || parsed?.error_description || response.statusText
-      );
-      err.status = response.status;
-      err.code = parsed?.code;
-      err.details = parsed?.details;
-      console.error('uploadToStorageWithServiceRole fallo:', err.message, err.status, err.code);
-      throw err;
-    }
-
-    const storedPath = parsed?.Key || parsed?.key || path;
-    const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(storedPath);
-    return { publicUrl: data?.publicUrl || null, path: storedPath };
-  } catch (err) {
-    console.error('uploadToStorageWithServiceRole exception:', err);
-    return null;
-  }
-}
-
-async function uploadProfileImageIfNeeded(usuarioId, dataUrl) {
-  const parsed = parseDataUrlImage(dataUrl);
-  if (!parsed) return null;
-  try {
-    const bucket = 'equipoestimular';
-    const ext = parsed.contentType.split('/')[1] || 'png';
-    const fileName = `perfil_${usuarioId}_${Date.now()}.${ext}`;
-    const path = fileName; // plano en bucket raíz; opcional: `usuarios/${usuarioId}/${fileName}`
-
-    const { error: upErr } = await supabaseAdmin.storage
-      .from(bucket)
-      .upload(path, parsed.buffer, { contentType: parsed.contentType, upsert: true });
-    if (upErr) {
-      const statusCode = upErr?.statusCode || upErr?.status || upErr?.code;
-      const message = upErr?.message || '';
-      console.error('uploadProfileImageIfNeeded upload error:', upErr);
-
-      if (
-        statusCode === 403 ||
-        String(statusCode).startsWith('403') ||
-        message.toLowerCase().includes('row-level security')
-      ) {
-        const fallback = await uploadToStorageWithServiceRole(
-          bucket,
-          path,
-          parsed.buffer,
-          parsed.contentType
-        );
-        if (fallback?.publicUrl) {
-          return fallback.publicUrl;
-        }
-      }
-      return null;
-    }
-    const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
-    return data?.publicUrl || null;
-  } catch (err) {
-    console.error('uploadProfileImageIfNeeded exception:', err);
-    return null;
   }
 }
 
@@ -638,14 +523,24 @@ const primerRegistro = async (req, res) => {
       }
     }
 
-    let uploadedFotoUrl = null;
-    if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
-      uploadedFotoUrl = await uploadProfileImageIfNeeded(userId, foto_perfil);
-    }
-
     if (resolvedTipo === 'profesional') {
       if (existingProfesional && isProfessionalProfileComplete(existingProfesional)) {
         return res.status(409).json({ error: 'El perfil ya fue completado' });
+      }
+
+      const existingProfesionalPath = existingProfesional?.foto_perfil || null;
+      let uploadedProfesionalFoto = null;
+      if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
+        uploadedProfesionalFoto = await uploadProfileImageIfNeeded(userId, foto_perfil, {
+          previousPath: existingProfesionalPath,
+        });
+      }
+
+      let fotoPathToStore = existingProfesionalPath;
+      if (uploadedProfesionalFoto?.path) {
+        fotoPathToStore = uploadedProfesionalFoto.path;
+      } else if (typeof foto_perfil === 'string' && isHttpUrl(foto_perfil)) {
+        fotoPathToStore = foto_perfil;
       }
 
       const profesionalPayload = {
@@ -655,7 +550,7 @@ const primerRegistro = async (req, res) => {
         telefono,
         email: email || null,
         fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: uploadedFotoUrl || foto_perfil || existingProfesional?.foto_perfil || null,
+        foto_perfil: fotoPathToStore || null,
         id_departamento: resolvedProfesionId,
       };
 
@@ -677,13 +572,28 @@ const primerRegistro = async (req, res) => {
         console.warn('primerRegistro profesional_departamentos warning:', linkErr.message);
       }
     } else {
+      const existingSecretarioPath = existingSecretario?.foto_perfil || null;
+      let uploadedSecretarioFoto = null;
+      if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
+        uploadedSecretarioFoto = await uploadProfileImageIfNeeded(userId, foto_perfil, {
+          previousPath: existingSecretarioPath,
+        });
+      }
+
+      let secretarioFotoPath = existingSecretarioPath;
+      if (uploadedSecretarioFoto?.path) {
+        secretarioFotoPath = uploadedSecretarioFoto.path;
+      } else if (typeof foto_perfil === 'string' && isHttpUrl(foto_perfil)) {
+        secretarioFotoPath = foto_perfil;
+      }
+
       const secretarioPayload = {
         nombre,
         apellido,
         telefono,
         email: email || null,
         fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: uploadedFotoUrl || foto_perfil || existingSecretario?.foto_perfil || null,
+        foto_perfil: secretarioFotoPath || null,
       };
 
       if (secretariosHasUsuarioIdColumn) {
@@ -707,7 +617,7 @@ const primerRegistro = async (req, res) => {
             telefono,
             email: email || null,
             fecha_nacimiento: String(fecha_nacimiento),
-            foto_perfil: uploadedFotoUrl || foto_perfil || existingSecretario?.foto_perfil || null,
+            foto_perfil: secretarioFotoPath || null,
           };
           if (secretariosHasUsuarioIdColumn) {
             overridePayload.usuario_id = userId;
@@ -773,6 +683,8 @@ const actualizarPerfil = async (req, res) => {
       return res.status(404).json({ error: 'Perfil no encontrado para el usuario' });
     }
 
+    const previousPhotoPath = currentProfile?.foto_perfil_path || null;
+
     let resolvedTipo = null;
     if (typeof tipoUsuario === 'string' && tipoUsuario.trim()) {
       resolvedTipo = tipoUsuario.trim().toLowerCase();
@@ -795,14 +707,21 @@ const actualizarPerfil = async (req, res) => {
     let fotoUrlToStore;
     if (removeFoto === true) {
       fotoUrlToStore = null;
-    }
-    if (foto_perfil !== undefined) {
+      await deleteStorageAsset(previousPhotoPath);
+    } else if (foto_perfil !== undefined) {
       if (typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
-        fotoUrlToStore = await uploadProfileImageIfNeeded(userId, foto_perfil);
+        const uploadResult = await uploadProfileImageIfNeeded(userId, foto_perfil, {
+          previousPath: previousPhotoPath,
+        });
+        fotoUrlToStore = uploadResult?.path || previousPhotoPath || null;
       } else if (foto_perfil === null || (typeof foto_perfil === 'string' && foto_perfil.trim() === '')) {
         fotoUrlToStore = null;
+        await deleteStorageAsset(previousPhotoPath);
       } else if (typeof foto_perfil === 'string') {
         fotoUrlToStore = foto_perfil;
+        if (previousPhotoPath && foto_perfil !== previousPhotoPath) {
+          await deleteStorageAsset(previousPhotoPath);
+        }
       }
     }
 
