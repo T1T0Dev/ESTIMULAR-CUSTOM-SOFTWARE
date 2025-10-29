@@ -15,6 +15,15 @@ function isValidDateYYYYMMDD(s) {
     return !isNaN(d.getTime());
 }
 
+function isSafePassword(pwd) {
+    const forbidden = [/('|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
+    return (
+        typeof pwd === 'string'
+        && pwd.length >= 8
+        && !forbidden.some((regex) => regex.test(pwd))
+    );
+}
+
 async function resolveRoleIdMaybe(body) {
     if (!body) return null;
     const idCandidate = body.id_rol ?? body.rol_id;
@@ -64,6 +73,42 @@ async function assignRoleToUser(usuarioId, rolId) {
         }
     } catch (err) {
         console.error('assignRoleToUser exception:', err);
+    }
+}
+
+async function fetchRolesForUsers(userIds = []) {
+    const uniqueIds = Array.from(new Set((userIds || []).map((id) => Number(id)).filter((id) => !Number.isNaN(id))));
+    if (uniqueIds.length === 0) return {};
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('usuario_roles')
+            .select(`
+                usuario_id,
+                rol_id,
+                rol:roles ( id_rol, nombre_rol )
+            `)
+            .in('usuario_id', uniqueIds);
+        if (error) {
+            console.error('fetchRolesForUsers error:', error);
+            return {};
+        }
+        const map = {};
+        for (const row of data || []) {
+            if (!row) continue;
+            const usuarioId = Number(row.usuario_id);
+            if (Number.isNaN(usuarioId)) continue;
+            if (!map[usuarioId]) {
+                map[usuarioId] = [];
+            }
+            map[usuarioId].push({
+                id: row.rol_id ?? row.rol?.id_rol ?? null,
+                nombre: row.rol?.nombre_rol ?? null,
+            });
+        }
+        return map;
+    } catch (err) {
+        console.error('fetchRolesForUsers exception:', err);
+        return {};
     }
 }
 
@@ -121,67 +166,205 @@ async function mapSecretarioRowWithStorage(row) {
 
 // GET /api/equipo
 const listEquipo = async (req, res) => {
-    const { search = '', page = 1, pageSize = 10, activo = 'true', profesion = '', tipo = 'profesional' } = req.query || {};
-    if (String(tipo) !== 'profesional') {
-        return res.json({ success: true, data: [], total: 0 });
-    }
+    const {
+        search = '',
+        page = 1,
+        pageSize = 10,
+        activo = 'true',
+        profesion = '',
+        tipo = 'todos',
+    } = req.query || {};
 
-    const offset = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
+    const pageNum = Math.max(Number.parseInt(page, 10) || 1, 1);
+    const size = Math.max(Number.parseInt(pageSize, 10) || 10, 1);
+    const tipoFiltro = String(tipo || 'todos').toLowerCase();
+    const includeProfesionales = tipoFiltro === 'profesional' || tipoFiltro === 'todos';
+    const includeSecretarios = tipoFiltro === 'secretario' || tipoFiltro === 'todos';
+
+    const searchRaw = typeof search === 'string' ? search.trim() : '';
+    const profesionRaw = typeof profesion === 'string' ? profesion.trim() : '';
+    const searchLower = searchRaw.toLowerCase();
+    const searchDigits = searchRaw.replace(/\D/g, '');
+    const profesionLower = profesionRaw.toLowerCase();
+    const activoOnly = String(activo) !== 'false';
+
     try {
-        const searchSafe = sanitize(search);
-        const profesionSafe = sanitize(profesion);
+        const miembros = [];
+        const userIds = new Set();
 
-        let q = supabaseAdmin
-            .from('profesionales')
-            .select(`
-        id_profesional,
-        nombre,
-        apellido,
-        telefono,
-        email,
-        fecha_nacimiento,
-        foto_perfil,
-        id_departamento,
-                departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
-                usuario:usuarios ( id_usuario, dni, activo )
-      `, { count: 'exact' })
-            .order('apellido', { ascending: true })
-            .range(offset, offset + parseInt(pageSize, 10) - 1);
-
-        if (String(activo) === 'true') {
-            q = q.eq('usuario.activo', true);
+        let profesionalesData = [];
+        if (includeProfesionales) {
+            const { data, error } = await supabaseAdmin
+                .from('profesionales')
+                .select(`
+                    id_profesional,
+                    nombre,
+                    apellido,
+                    telefono,
+                    email,
+                    fecha_nacimiento,
+                    foto_perfil,
+                    id_departamento,
+                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
+                    usuario:usuarios ( id_usuario, dni, activo, password_hash )
+                `)
+                .order('apellido', { ascending: true });
+            if (error) throw error;
+            profesionalesData = await Promise.all((data || []).map((row) => mapProfesionalRowWithStorage(row)));
         }
 
-        if (searchSafe) {
-            const pattern = `%${searchSafe}%`;
-            q = q.or(
-                [
-                    `nombre.ilike.${pattern}`,
-                    `apellido.ilike.${pattern}`,
-                    `email.ilike.${pattern}`,
-                    `telefono.ilike.${pattern}`,
-                    `departamento.nombre.ilike.${pattern}`,
-                ].join(',')
-            );
-            if (/^\d{6,15}$/.test(searchSafe)) {
-                q = q.eq('usuario.dni', Number(searchSafe));
+        let secretariosData = [];
+        if (includeSecretarios) {
+            let secretariosResult = await supabaseAdmin
+                .from('secretarios')
+                .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
+                .order('apellido', { ascending: true });
+
+            if (secretariosResult.error && secretariosResult.error.code === '42703') {
+                secretariosResult = await supabaseAdmin
+                    .from('secretarios')
+                    .select('id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
+                    .order('apellido', { ascending: true });
             }
+
+            if (secretariosResult.error) throw secretariosResult.error;
+            const secretariosRaw = secretariosResult.data || [];
+            secretariosData = await Promise.all(secretariosRaw.map((row) => mapSecretarioRowWithStorage(row)));
         }
 
-        if (profesionSafe) {
-            if (/^\d+$/.test(profesionSafe)) {
-                q = q.eq('id_departamento', Number(profesionSafe));
-            } else {
-                const ptn = `%${profesionSafe}%`;
-                q = q.ilike('departamento.nombre', ptn);
+        const secretarioUserIds = secretariosData
+            .map((row) => Number(row.usuario_id ?? row.id))
+            .filter((id) => !Number.isNaN(id));
+
+        let usuariosSecretarios = [];
+        if (secretarioUserIds.length > 0) {
+            const { data, error } = await supabaseAdmin
+                .from('usuarios')
+                .select('id_usuario, dni, activo, password_hash')
+                .in('id_usuario', secretarioUserIds);
+            if (error) throw error;
+            usuariosSecretarios = data || [];
+        }
+        const usuariosMap = new Map();
+        usuariosSecretarios.forEach((user) => {
+            if (!user) return;
+            usuariosMap.set(Number(user.id_usuario), user);
+        });
+
+        profesionalesData.forEach((row) => {
+            const user = row.usuario || {};
+            const userId = Number(user.id_usuario ?? row.id_profesional);
+            if (!userId || Number.isNaN(userId)) {
+                return;
             }
-        }
+            userIds.add(userId);
+            miembros.push({
+                tipo: 'profesional',
+                id_usuario: userId,
+                id_profesional: row.id_profesional,
+                nombre: row.nombre || null,
+                apellido: row.apellido || null,
+                telefono: row.telefono === null || row.telefono === undefined ? null : String(row.telefono),
+                email: row.email || null,
+                fecha_nacimiento: row.fecha_nacimiento || null,
+                foto_perfil: row.foto_perfil || null,
+                foto_perfil_url: row.foto_perfil_url || row.foto_perfil || null,
+                foto_perfil_path: row.foto_perfil_path || null,
+                profesion: row.profesion || null,
+                profesion_id: row.profesion_id ?? null,
+                dni: user?.dni ?? null,
+                password_hash: user?.password_hash ?? null,
+                usuario_activo: user?.activo ?? null,
+            });
+        });
 
-        const { data, error, count } = await q;
-        if (error) throw error;
+        secretariosData.forEach((row) => {
+            const userId = Number(row.usuario_id ?? row.id);
+            if (!userId || Number.isNaN(userId)) {
+                return;
+            }
+            const user = usuariosMap.get(userId) || {};
+            userIds.add(userId);
+            miembros.push({
+                tipo: 'secretario',
+                id_usuario: userId,
+                id_secretario: row.id,
+                nombre: row.nombre || null,
+                apellido: row.apellido || null,
+                telefono: row.telefono === null || row.telefono === undefined ? null : String(row.telefono),
+                email: row.email || null,
+                fecha_nacimiento: row.fecha_nacimiento || null,
+                foto_perfil: row.foto_perfil || null,
+                foto_perfil_url: row.foto_perfil_url || row.foto_perfil || null,
+                foto_perfil_path: row.foto_perfil_path || null,
+                profesion: null,
+                profesion_id: null,
+                dni: user?.dni ?? null,
+                password_hash: user?.password_hash ?? null,
+                usuario_activo: user?.activo ?? null,
+            });
+        });
 
-        const mapped = await Promise.all((data || []).map((row) => mapProfesionalRowWithStorage(row)));
-        return res.json({ success: true, data: mapped, total: count || 0 });
+        const rolesMap = await fetchRolesForUsers(Array.from(userIds));
+        miembros.forEach((member) => {
+            const memberRoles = rolesMap[member.id_usuario] || [];
+            member.roles = memberRoles;
+            member.rol_principal = memberRoles[0]?.nombre
+                || (member.tipo === 'profesional'
+                    ? (member.profesion || 'Profesional')
+                    : 'Secretario/a');
+        });
+
+        const filtered = miembros.filter((member) => {
+            if (activoOnly && member.usuario_activo === false) return false;
+
+            if (profesionLower) {
+                const rolText = (member.rol_principal || '').toLowerCase();
+                const profText = (member.profesion || '').toLowerCase();
+                if (!rolText.includes(profesionLower) && !profText.includes(profesionLower)) {
+                    return false;
+                }
+            }
+
+            if (searchLower) {
+                const values = [
+                    member.nombre,
+                    member.apellido,
+                    member.email,
+                    member.telefono,
+                    member.dni ? String(member.dni) : '',
+                    member.rol_principal,
+                    member.profesion,
+                ]
+                    .filter(Boolean)
+                    .map((v) => String(v).toLowerCase());
+
+                let matches = values.some((value) => value.includes(searchLower));
+                if (!matches && searchDigits) {
+                    const dniValue = member.dni ? String(member.dni) : '';
+                    matches = dniValue.includes(searchDigits);
+                }
+
+                if (!matches) return false;
+            }
+
+            return true;
+        });
+
+        filtered.sort((a, b) => {
+            const apellidoA = (a.apellido || '').toLowerCase();
+            const apellidoB = (b.apellido || '').toLowerCase();
+            if (apellidoA !== apellidoB) return apellidoA.localeCompare(apellidoB, 'es');
+            const nombreA = (a.nombre || '').toLowerCase();
+            const nombreB = (b.nombre || '').toLowerCase();
+            return nombreA.localeCompare(nombreB, 'es');
+        });
+
+        const total = filtered.length;
+        const start = (pageNum - 1) * size;
+        const paginated = filtered.slice(start, start + size);
+
+        return res.json({ success: true, data: paginated, total });
     } catch (err) {
         console.error('listEquipo error:', err);
         return res.status(500).json({ success: false, message: 'Error al obtener equipo', error: err.message });
@@ -493,4 +676,43 @@ const borrarIntegrante = async (req, res) => {
     }
 };
 
-module.exports = { listEquipo, crearIntegrante, editarIntegrante, borrarIntegrante };
+const restablecerContrasena = async (req, res) => {
+    const { id_usuario } = req.params;
+    const { nuevaContrasena, contrasena, password } = req.body || {};
+
+    const userId = Number(id_usuario);
+    if (!id_usuario || Number.isNaN(userId)) {
+        return res.status(400).json({ success: false, message: 'id_usuario inválido' });
+    }
+
+    const nueva = nuevaContrasena ?? contrasena ?? password;
+    if (!isSafePassword(nueva)) {
+        return res.status(400).json({ success: false, message: 'Contraseña inválida. Debe tener al menos 8 caracteres y no contener patrones prohibidos.' });
+    }
+
+    try {
+        const { data: existingUser, error: fetchErr } = await supabaseAdmin
+            .from('usuarios')
+            .select('id_usuario')
+            .eq('id_usuario', userId)
+            .maybeSingle();
+        if (fetchErr) throw fetchErr;
+        if (!existingUser) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+
+        const hash = await bcrypt.hash(String(nueva), 12);
+        const { error: updateErr } = await supabaseAdmin
+            .from('usuarios')
+            .update({ password_hash: hash })
+            .eq('id_usuario', userId);
+        if (updateErr) throw updateErr;
+
+        return res.json({ success: true, message: 'Contraseña restablecida' });
+    } catch (err) {
+        console.error('restablecerContrasena error:', err);
+        return res.status(500).json({ success: false, message: 'Error al restablecer la contraseña', error: err.message });
+    }
+};
+
+module.exports = { listEquipo, crearIntegrante, editarIntegrante, borrarIntegrante, restablecerContrasena };
