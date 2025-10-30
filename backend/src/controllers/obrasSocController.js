@@ -1,10 +1,10 @@
-const { supabase } = require('../config/db');
+const supabase = require('../config/db');
 
 const obtenerTodasLasObrasSociales = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('obras_sociales')
-      .select('id_obra_social, nombre')
+      .select('id_obra_social, nombre:nombre_obra_social')
       .order('nombre', { ascending: true }); // orden alfabético ascendente
 
     if (error) {

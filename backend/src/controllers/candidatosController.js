@@ -1,4 +1,4 @@
-const { supabase } = require('../config/db');
+const supabase = require('../config/db');
 
 // Obtener candidatos con búsqueda y paginación
 const getCandidatos = async (req, res) => {
@@ -7,7 +7,24 @@ const getCandidatos = async (req, res) => {
   try {
     let query = supabase
       .from('candidatos')
-      .select(`*, responsables: candidato_responsables (parentesco, es_principal, responsable: responsables (*)), obra_social: obras_sociales (nombre), estado_entrevista`)
+      .select(`
+        *,
+        responsables:candidato_responsables (
+          parentesco,
+          es_principal,
+          responsable:responsables (
+            *,
+            nombre,
+            apellido
+          )
+        ),
+        obra_social:obras_sociales (
+          id_obra_social,
+          nombre:nombre_obra_social,
+          estado
+        ),
+        estado_entrevista
+      `)
       .order('created_at', { ascending: false });
 
     if (search) {
@@ -17,16 +34,54 @@ const getCandidatos = async (req, res) => {
 
     query = query.range(offset, offset + parseInt(pageSize) - 1);
 
-    const { data, error, count } = await query;
+    const { data, error } = await query;
     if (error) throw error;
 
-    // Obtener total de candidatos para paginación
+    const normalizedData = (data || []).map((candidato) => {
+      const obraSocial = candidato.obra_social
+        ? {
+            ...candidato.obra_social,
+            nombre:
+              candidato.obra_social.nombre ??
+              candidato.obra_social.nombre_obra_social ??
+              candidato.obra_social.nombre,
+          }
+        : null;
+
+      const responsables = Array.isArray(candidato.responsables)
+        ? candidato.responsables.map((relacion) => {
+            if (!relacion?.responsable) return relacion;
+            const responsable = {
+              ...relacion.responsable,
+              nombre_responsable:
+                relacion.responsable.nombre ??
+                relacion.responsable.nombre_responsable ??
+                null,
+              apellido_responsable:
+                relacion.responsable.apellido ??
+                relacion.responsable.apellido_responsable ??
+                null,
+            };
+            return {
+              ...relacion,
+              responsable,
+            };
+          })
+        : [];
+
+      return {
+        ...candidato,
+        obra_social: obraSocial,
+        responsables,
+      };
+    });
+
     const { count: totalCount, error: countError } = await supabase
       .from('candidatos')
       .select('id_candidato', { count: 'exact', head: true });
     if (countError) throw countError;
 
-    res.json({ success: true, data, total: totalCount });
+    res.json({ success: true, data: normalizedData, total: totalCount });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Error al obtener candidatos', error: err.message });
   }

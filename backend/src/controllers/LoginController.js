@@ -1,6 +1,11 @@
 const supabase = require("../config/db.js");
 const bcrypt = require("bcrypt");
 
+const DEFAULT_ROLE_CANDIDATES = (process.env.DEFAULT_ROLE_NAME || "profesional")
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean);
+
 // Función para validar DNI
 function isValidDni(dni) {
   return /^\d{7,15}$/.test(dni);
@@ -8,7 +13,6 @@ function isValidDni(dni) {
 
 // Función para validar contraseña
 function isSafePassword(pwd) {
-  // Bloquea patrones comunes de inyección SQL y comandos peligrosos
   const forbidden = [
     /('|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i,
   ];
@@ -19,12 +23,54 @@ function isSafePassword(pwd) {
   );
 }
 
+let cachedDefaultRoleId = null;
+
+async function resolveDefaultRoleId() {
+  if (cachedDefaultRoleId) return cachedDefaultRoleId;
+
+  const roleNames = Array.from(
+    new Set([
+      ...DEFAULT_ROLE_CANDIDATES,
+      "profesional",
+      "Profesional",
+    ])
+  );
+
+  for (const nombre_rol of roleNames) {
+    const { data, error } = await supabase
+      .from("roles")
+      .select("id_rol")
+      .eq("nombre_rol", nombre_rol)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id_rol) {
+      cachedDefaultRoleId = data.id_rol;
+      return cachedDefaultRoleId;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("roles")
+    .select("id_rol")
+    .order("id_rol", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id_rol) {
+    throw new Error("No se encontró ningún rol configurado en el sistema.");
+  }
+
+  cachedDefaultRoleId = data.id_rol;
+  return cachedDefaultRoleId;
+}
+
 // Registrar un usuario
 const registrarUsuario = async (req, res) => {
   try {
     const { dni, contrasena } = req.body;
 
-    // Validaciones
     if (!isValidDni(dni)) {
       return res
         .status(400)
@@ -34,23 +80,39 @@ const registrarUsuario = async (req, res) => {
       return res.status(400).json({ error: "Contraseña insegura o inválida." });
     }
 
-    // encriptar contraseña
     const hash = await bcrypt.hash(contrasena, 10);
+    const roleId = await resolveDefaultRoleId();
 
-    const { error } = await supabase
+    const { data: usuarioInsertado, error: insertError } = await supabase
       .from("usuarios")
-      .insert({ rol_id: 3, username: dni, password_hash: hash });
+      .insert({ dni, password_hash: hash })
+      .select("id_usuario, dni, activo")
+      .single();
 
-    if (error) {
-      if (error.code === "23505") {
-        // Unique violation
+    if (insertError) {
+      if (insertError.code === "23505") {
         return res.status(409).json({ error: "El usuario ya existe." });
       }
-      throw error;
+      throw insertError;
+    }
+
+    try {
+      const { error: rolError } = await supabase
+        .from("usuario_roles")
+        .insert({ usuario_id: usuarioInsertado.id_usuario, rol_id: roleId });
+
+      if (rolError) throw rolError;
+    } catch (rolError) {
+      await supabase
+        .from("usuarios")
+        .delete()
+        .eq("id_usuario", usuarioInsertado.id_usuario);
+      throw rolError;
     }
 
     res.status(201).json({ message: "Usuario registrado con éxito" });
   } catch (error) {
+    console.error("Error en registrarUsuario:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -60,7 +122,6 @@ const loginUsuario = async (req, res) => {
   try {
     const { dni, contrasena } = req.body;
 
-    // Validaciones
     if (!isValidDni(dni)) {
       return res.status(400).json({ error: "DNI inválido." });
     }
@@ -70,25 +131,62 @@ const loginUsuario = async (req, res) => {
 
     const { data: usuario, error } = await supabase
       .from("usuarios")
-      .select("*")
-      .eq("username", dni)
-      .single();
+      .select(`
+        id_usuario,
+        dni,
+        password_hash,
+        activo,
+        creado_en,
+        actualizado_en,
+        roles:usuario_roles (
+          rol:roles (
+            id_rol,
+            nombre_rol
+          )
+        )
+      `)
+      .eq("dni", dni)
+      .maybeSingle();
 
-    if (error || !usuario) {
+    if (error) throw error;
+    if (!usuario) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    const coincide = await bcrypt.compare(contrasena, usuario.password_hash);
+    if (usuario.activo === false) {
+      return res.status(403).json({ error: "Usuario inactivo" });
+    }
+
+    const coincide = await bcrypt.compare(
+      contrasena,
+      usuario.password_hash || ""
+    );
 
     if (!coincide) {
       return res.status(401).json({ error: "Contraseña incorrecta" });
     }
 
-    // Nunca devuelvas la contraseña (ni siquiera hasheada)
-    delete usuario.password_hash;
+    const roles = Array.isArray(usuario.roles)
+      ? usuario.roles
+          .map((rel) => ({
+            id_rol: rel?.rol?.id_rol ?? null,
+            nombre_rol: rel?.rol?.nombre_rol ?? null,
+          }))
+          .filter((rol) => rol.id_rol || rol.nombre_rol)
+      : [];
 
-    res.json({ message: "Login exitoso", usuario });
+    const usuarioRespuesta = {
+      id_usuario: usuario.id_usuario,
+      dni: usuario.dni,
+      activo: usuario.activo,
+      creado_en: usuario.creado_en,
+      actualizado_en: usuario.actualizado_en,
+      roles,
+    };
+
+    res.json({ message: "Login exitoso", usuario: usuarioRespuesta });
   } catch (error) {
+    console.error("Error en loginUsuario:", error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -1,4 +1,4 @@
-const { supabase } = require('../config/db');
+const supabase = require('../config/db');
 
 const enviarFormularioEntrevista = async (req, res) => {
   
@@ -35,7 +35,7 @@ const enviarFormularioEntrevista = async (req, res) => {
       const nombre = candidatoBody.obra_social_texto.trim();
       const { data: obraData, error: obraErr } = await supabase
         .from('obras_sociales')
-        .insert([{ nombre, estado: 'pendiente' }])
+        .insert([{ nombre_obra_social: nombre, estado: 'pendiente' }])
         .select()
         .single();
 
@@ -72,11 +72,11 @@ const enviarFormularioEntrevista = async (req, res) => {
 
     // 3) Insertar responsable
     const responsableInsert = {
-      nombre_responsable: responsableBody.nombre_responsable,
-      apellido_responsable: responsableBody.apellido_responsable,
+      nombre: responsableBody.nombre_responsable,
+      apellido: responsableBody.apellido_responsable,
       telefono: responsableBody.telefono || null,
       email: responsableBody.email || null,
-      created_at: new Date().toISOString(),
+      creado_en: new Date().toISOString(),
     };
 
     const { data: responsable, error: errorResponsable } = await supabase
