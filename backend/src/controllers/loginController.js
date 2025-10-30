@@ -627,6 +627,8 @@ const primerRegistro = async (req, res) => {
         secretarioFotoPath = foto_perfil;
       }
 
+      const numericUserId = Number(userId);
+
       const secretarioPayload = {
         nombre,
         apellido,
@@ -636,8 +638,12 @@ const primerRegistro = async (req, res) => {
         foto_perfil: secretarioFotoPath || null,
       };
 
-      if (secretariosHasUsuarioIdColumn) {
-        secretarioPayload.usuario_id = userId;
+      if (!Number.isNaN(numericUserId)) {
+        if (secretariosHasUsuarioIdColumn) {
+          secretarioPayload.usuario_id = numericUserId;
+        } else {
+          secretarioPayload.id = numericUserId;
+        }
       }
 
       let secretarioErr = null;
@@ -651,7 +657,7 @@ const primerRegistro = async (req, res) => {
       if (secretarioErr && ['42703', '428C9', 'PGRST204'].includes(secretarioErr.code)) {
         try {
           const overridePayload = {
-            id: userId,
+            id: numericUserId,
             nombre,
             apellido,
             telefono,
@@ -660,7 +666,7 @@ const primerRegistro = async (req, res) => {
             foto_perfil: secretarioFotoPath || null,
           };
           if (secretariosHasUsuarioIdColumn) {
-            overridePayload.usuario_id = userId;
+            overridePayload.usuario_id = numericUserId;
           }
 
           await upsertWithIdentityOverride('secretarios', overridePayload, { onConflict: 'id' });
