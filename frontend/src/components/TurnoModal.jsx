@@ -21,11 +21,22 @@ export default function TurnoModal({ event, onClose, onUpdate, onOpenPagos, onOp
   const isMyEvent = turno.profesional_ids?.split(',').includes(String(loggedInProfesionalId));
 
   const handleTimeSave = () => {
-    const originalDate = moment(event.start).format('YYYY-MM-DD');
-    const newStart = moment(`${originalDate} ${startTime}`).format('YYYY-MM-DD HH:mm:ss');
-    const newEnd = moment(`${originalDate} ${endTime}`).format('YYYY-MM-DD HH:mm:ss');
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
 
-    onUpdate(event, { inicio: newStart, fin: newEnd });
+    const startMoment = moment(event.start)
+      .clone()
+      .set({ hour: startHour || 0, minute: startMinute || 0, second: 0, millisecond: 0 });
+
+    const endMoment = moment(event.start)
+      .clone()
+      .set({ hour: endHour || 0, minute: endMinute || 0, second: 0, millisecond: 0 });
+
+    if (endMoment.isSameOrBefore(startMoment)) {
+      endMoment.add(30, 'minutes');
+    }
+
+    onUpdate(event, { inicio: startMoment.toISOString(), fin: endMoment.toISOString() });
   };
 
   const handleChangeDay = () => {

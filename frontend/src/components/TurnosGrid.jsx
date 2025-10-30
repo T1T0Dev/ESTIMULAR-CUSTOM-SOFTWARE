@@ -156,16 +156,16 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
 
   const handleEventDrop = useCallback(async ({ event, start, end, resourceId }) => {
     handleEventAction(event, {
-      inicio: moment(start).format('YYYY-MM-DD HH:mm:ss'),
-      fin: moment(end).format('YYYY-MM-DD HH:mm:ss'),
+      inicio: moment(start).toISOString(),
+      fin: moment(end).toISOString(),
       consultorio_id: resourceId
     });
   }, [handleEventAction]);
 
   const handleEventResize = useCallback(async ({ event, start, end }) => {
     handleEventAction(event, {
-      inicio: moment(start).format('YYYY-MM-DD HH:mm:ss'),
-      fin: moment(end).format('YYYY-MM-DD HH:mm:ss'),
+      inicio: moment(start).toISOString(),
+      fin: moment(end).toISOString(),
     });
   }, [handleEventAction]);
 
