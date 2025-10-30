@@ -92,6 +92,7 @@
   align-items: center;
 }
 
+
 .entrevista__form {
   display: flex;
   flex-direction: column;
@@ -145,9 +146,6 @@
 .entrevista__nav .btn-nav[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
-}
-.entrevista__nav .btn-nav:hover:not([disabled]) {
-  filter: brightness(1.08);
 }
 .entrevista__nav .btn-outline:hover:not([disabled]) {
   background: rgba(255, 182, 193, 0.08);
@@ -308,6 +306,9 @@ select.entrevista__input:focus {
   transition: all 0.25s ease;
   min-height: 44px; /* touch target */
 }
+.btn-opcion + .btn-opcion {
+  margin-left: 0.25rem;
+}
 .btn-opcion:hover {
   border-color: var(--color-rosa1);
   color: var(--color-rosa1);
@@ -332,7 +333,6 @@ select.entrevista__input:focus {
   margin-top: 0.15rem;
   color: var(--color-gris-label);
   text-align: right;
-}
 
 /* ===========================
    Términos + Confidencialidad

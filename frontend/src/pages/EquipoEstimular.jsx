@@ -27,12 +27,10 @@ function useDebounce(value, delay) {
 
 function formatDateDMY(dateStr) {
   if (!dateStr) return "";
-  const parsed = new Date(dateStr);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const yyyy = parsed.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  const normalized = String(dateStr).slice(0, 10);
+  const [yyyy, mm, dd] = normalized.split("-");
+  if (!yyyy || !mm || !dd) return "";
+  return `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yyyy}`;
 }
 
 function formatRole(member) {

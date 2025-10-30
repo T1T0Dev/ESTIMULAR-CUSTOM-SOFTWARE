@@ -24,6 +24,98 @@ function isSafePassword(pwd) {
     );
 }
 
+function normalizeRoleLabel(value = '') {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+async function resolveRoleIdsFromInputs(inputs = []) {
+    const numericIds = new Set();
+    const roleNames = new Set();
+
+    (inputs || []).forEach((entry) => {
+        if (entry === undefined || entry === null) return;
+        if (typeof entry === 'number' && !Number.isNaN(entry)) {
+            numericIds.add(Number(entry));
+            return;
+        }
+        if (typeof entry === 'object') {
+            const obj = entry || {};
+            if (obj.id_rol !== undefined) {
+                numericIds.add(Number(obj.id_rol));
+                return;
+            }
+            if (obj.rol_id !== undefined) {
+                numericIds.add(Number(obj.rol_id));
+                return;
+            }
+            if (obj.nombre) {
+                roleNames.add(String(obj.nombre));
+                return;
+            }
+            if (obj.rolNombre) {
+                roleNames.add(String(obj.rolNombre));
+                return;
+            }
+        }
+        if (typeof entry === 'string') {
+            const trimmed = entry.trim();
+            if (!trimmed) return;
+            if (/^\d+$/.test(trimmed)) {
+                numericIds.add(Number(trimmed));
+                return;
+            }
+            roleNames.add(trimmed);
+        }
+    });
+
+    const resolvedIds = Array.from(numericIds).filter((id) => !Number.isNaN(id));
+    if (!roleNames.size) {
+        return resolvedIds;
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('roles')
+            .select('id_rol, nombre_rol');
+        if (error) {
+            console.error('resolveRoleIdsFromInputs roles error:', error);
+            return resolvedIds;
+        }
+        const catalog = Array.isArray(data) ? data : [];
+        const normalizedCatalog = catalog.map((role) => ({
+            id: Number(role.id_rol),
+            nombre: role.nombre_rol,
+            key: normalizeRoleLabel(role.nombre_rol),
+        }));
+
+        roleNames.forEach((rawName) => {
+            const normalizedName = normalizeRoleLabel(rawName);
+            if (!normalizedName) return;
+
+            let matched = normalizedCatalog.find((item) => item.key === normalizedName);
+            if (!matched) {
+                matched = normalizedCatalog.find(
+                    (item) => item.key.includes(normalizedName) || normalizedName.includes(item.key)
+                );
+            }
+            if (matched && !Number.isNaN(matched.id)) {
+                resolvedIds.push(matched.id);
+            } else {
+                console.warn('resolveRoleIdsFromInputs: rol no encontrado para', rawName);
+            }
+        });
+    } catch (err) {
+        console.error('resolveRoleIdsFromInputs exception:', err);
+    }
+
+    return Array.from(new Set(resolvedIds.filter((id) => !Number.isNaN(id))));
+}
+
 async function resolveRoleIdMaybe(body) {
     if (!body) return null;
     const idCandidate = body.id_rol ?? body.rol_id;
@@ -31,24 +123,11 @@ async function resolveRoleIdMaybe(body) {
         return Number(idCandidate);
     }
     if (body.rolNombre) {
-        const roleName = String(body.rolNombre).trim();
-        if (!roleName) return null;
-        try {
-            const { data, error } = await supabaseAdmin
-                .from('roles')
-                .select('id_rol, nombre_rol')
-                .eq('nombre_rol', roleName)
-                .limit(1)
-                .maybeSingle();
-            if (error) {
-                console.error('resolveRoleIdMaybe roles error:', error);
-                return null;
-            }
-            return data ? Number(data.id_rol) : null;
-        } catch (err) {
-            console.error('resolveRoleIdMaybe exception:', err);
-            return null;
+        const ids = await resolveRoleIdsFromInputs([body.rolNombre]);
+        if (ids.length > 0) {
+            return ids[0];
         }
+        return null;
     }
     return null;
 }
@@ -127,7 +206,9 @@ async function insertUsuario({ dni, contrasena, id_rol, activo = true }) {
 
     if (insertErr) throw insertErr;
 
-    await assignRoleToUser(insertData.id_usuario, id_rol);
+    if (id_rol !== undefined && id_rol !== null && !Number.isNaN(Number(id_rol))) {
+        await assignRoleToUser(insertData.id_usuario, id_rol);
+    }
     return insertData;
 }
 
@@ -405,7 +486,45 @@ const crearIntegrante = async (req, res) => {
         contrasena,
     } = body;
 
-    const roleId = await resolveRoleIdMaybe(body);
+    const normalizedTipo = String(tipo || 'profesional').toLowerCase();
+    const rolesSeleccionados = Array.isArray(body.rolesSeleccionados)
+        ? body.rolesSeleccionados
+        : [];
+    const esAdminFlag = body.es_admin ?? body.esAdmin ?? body.admin ?? body.rolAdmin ?? false;
+
+    const baseRoleName = normalizedTipo === 'secretario' ? 'SECRETARIO' : 'PROFESIONAL';
+    const requestedRoles = new Set();
+    requestedRoles.add(baseRoleName);
+    if (normalizedTipo === 'secretario') {
+        requestedRoles.add('Secretario');
+        requestedRoles.add('Secretaria');
+    } else {
+        requestedRoles.add('Profesional');
+    }
+    if (body.rolNombre) requestedRoles.add(body.rolNombre);
+    rolesSeleccionados.forEach((value) => requestedRoles.add(value));
+
+    const adminFlag = (() => {
+        if (typeof esAdminFlag === 'boolean') return esAdminFlag;
+        if (typeof esAdminFlag === 'number') return esAdminFlag === 1;
+        if (typeof esAdminFlag === 'string') {
+            const normalized = esAdminFlag.trim().toLowerCase();
+            return ['true', '1', 'si', 'sí', 'admin', 'administrador'].includes(normalized);
+        }
+        return false;
+    })();
+    if (adminFlag) requestedRoles.add('ADMIN');
+
+    let resolvedRoleIds = await resolveRoleIdsFromInputs(Array.from(requestedRoles));
+    const baseRoleId = await resolveRoleIdMaybe({ rolNombre: baseRoleName });
+    if (baseRoleId && !resolvedRoleIds.includes(baseRoleId)) {
+        resolvedRoleIds = [baseRoleId, ...resolvedRoleIds];
+    }
+    resolvedRoleIds = Array.from(new Set(resolvedRoleIds.filter((id) => !Number.isNaN(id))));
+    if (resolvedRoleIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'No se pudieron determinar los roles solicitados para el integrante.' });
+    }
+    const primaryRoleId = resolvedRoleIds[0];
 
     if (!nombre || !apellido || !dni || !contrasena || !fecha_nacimiento) {
         return res.status(400).json({ success: false, message: 'Faltan datos obligatorios (nombre, apellido, dni, contrasena, fecha_nacimiento)' });
@@ -417,7 +536,6 @@ const crearIntegrante = async (req, res) => {
         return res.status(400).json({ success: false, message: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
     }
 
-    const normalizedTipo = String(tipo).toLowerCase();
     if (normalizedTipo === 'profesional') {
         const resolvedDep = profesionId ?? departamento_id;
         if (resolvedDep === undefined || resolvedDep === null || Number.isNaN(Number(resolvedDep))) {
@@ -427,7 +545,14 @@ const crearIntegrante = async (req, res) => {
 
     let insertedUsuario = null;
     try {
-        insertedUsuario = await insertUsuario({ dni, contrasena, id_rol: roleId, activo: true });
+        insertedUsuario = await insertUsuario({ dni, contrasena, id_rol: primaryRoleId, activo: true });
+
+        const additionalRoles = resolvedRoleIds.filter((roleId) => roleId !== primaryRoleId);
+        if (additionalRoles.length > 0) {
+            await Promise.all(
+                additionalRoles.map((roleId) => assignRoleToUser(insertedUsuario.id_usuario, roleId))
+            );
+        }
 
         if (normalizedTipo === 'profesional') {
             const resolvedDep = Number(profesionId ?? departamento_id);
