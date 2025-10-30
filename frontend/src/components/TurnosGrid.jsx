@@ -12,6 +12,7 @@ import '../styles/Turnos.css'; // Importar los estilos personalizados
 import TurnoModal from './TurnoModal';
 import PagoModal from './PagoModal';
 import PacienteModal from './PacienteModal';
+import NuevoTurnoPanel from './NuevoTurnoPanel';
 
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
@@ -79,6 +80,7 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [turnoForPago, setTurnoForPago] = useState(null);
   const [pacienteParaVer, setPacienteParaVer] = useState(null);
+  const [mostrarNuevoTurno, setMostrarNuevoTurno] = useState(false);
 
   // Datos de turnos
   const fetchTurnos = useCallback(async (date) => {
@@ -96,21 +98,40 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
       }));
       setEvents(formattedEvents);
 
-      if (consultorios.length === 0 && res.data.data.length > 0) {
-        const resources = res.data.data.reduce((acc, turno) => {
-          if (!acc.some(c => c.resourceId === turno.consultorio_id)) {
-            acc.push({ resourceId: turno.consultorio_id, resourceTitle: turno.consultorio_nombre });
-          }
-          return acc;
-        }, []);
-        resources.sort((a, b) => a.resourceId - b.resourceId);
+      const resourcesMap = new Map();
+      res.data.data.forEach((turno) => {
+        if (turno.consultorio_id) {
+          resourcesMap.set(turno.consultorio_id, {
+            resourceId: turno.consultorio_id,
+            resourceTitle: turno.consultorio_nombre || `Consultorio ${turno.consultorio_id}`,
+          });
+        }
+      });
+
+      const resources = Array.from(resourcesMap.values()).sort((a, b) => {
+        if (a.resourceId === null) return 1;
+        if (b.resourceId === null) return -1;
+        return a.resourceId - b.resourceId;
+      });
+
+      if (
+        resources.length !== consultorios.length ||
+        resources.some((resource, index) => {
+          const current = consultorios[index];
+          if (!current) return true;
+          return (
+            current.resourceId !== resource.resourceId ||
+            current.resourceTitle !== resource.resourceTitle
+          );
+        })
+      ) {
         setConsultorios(resources);
       }
 
     } catch (error) {
       console.error("Error fetching turnos:", error);
     }
-  }, [consultorios.length]);
+  }, [consultorios]);
 
   useEffect(() => {
     fetchTurnos(currentDate);
@@ -177,6 +198,19 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
   const handleClosePacienteModal = () => {
     setPacienteParaVer(null);
   };
+
+  const handleOpenNuevoTurno = () => {
+    setMostrarNuevoTurno(true);
+  };
+
+  const handleCloseNuevoTurno = () => {
+    setMostrarNuevoTurno(false);
+  };
+
+  const handleTurnoCreado = useCallback(() => {
+    fetchTurnos(currentDate);
+    setMostrarNuevoTurno(false);
+  }, [currentDate, fetchTurnos]);
 
   const isEventDraggable = useCallback((event) => {
     return event.data.profesional_ids?.split(',').includes(String(loggedInProfesionalId));
@@ -247,6 +281,20 @@ export default function TurnosGrid({ loggedInProfesionalId }) {
           onClose={handleClosePacienteModal}
         />
       )}
+      <button
+        type="button"
+        className="floating-create-turno-btn"
+        onClick={handleOpenNuevoTurno}
+      >
+        + Nuevo turno
+      </button>
+      <NuevoTurnoPanel
+        isOpen={mostrarNuevoTurno}
+        onClose={handleCloseNuevoTurno}
+        onCreated={handleTurnoCreado}
+        defaultDate={currentDate}
+        loggedInProfesionalId={loggedInProfesionalId}
+      />
     </div>
   );
 }

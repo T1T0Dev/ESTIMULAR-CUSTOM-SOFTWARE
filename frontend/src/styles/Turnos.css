@@ -5,6 +5,7 @@
   height: 90vh; /* Ocupa casi toda la altura de la pantalla */
   padding: 0; /* Padding eliminado para una vista más compacta */
   background-color: #fcfdff; /* Un fondo muy claro */
+  position: relative;
 }
 
 /* Estilo para los eventos (turnos) */
@@ -107,3 +108,33 @@
 .legend-color-box.status-pendiente { background-color: #78909c; }
 .legend-color-box.status-cancelado { background-color: #bdbdbd; }
 .legend-color-box.status-no_presento { background-color: var(--color-naranja1); }
+
+.floating-create-turno-btn {
+  position: absolute;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background-color: var(--color-accent-blue, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.85rem 1.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.floating-create-turno-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 36px rgba(99, 102, 241, 0.42);
+}
+
+.floating-create-turno-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+}
+
+.floating-create-turno-btn:active {
+  transform: translateY(1px);
+}

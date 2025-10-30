@@ -1,4 +1,5 @@
 const supabase = require('../config/db');
+const { formatNinoDetails } = require('../utils/ninoFormatter');
 
 function buildDayRange(dateString) {
   const start = new Date(`${dateString}T00:00:00.000Z`);
@@ -47,91 +48,7 @@ function formatProfesionales(profesionales = []) {
   };
 }
 
-function formatResponsables(responsables = []) {
-  return responsables
-    .map((relacion) => {
-      const responsable = relacion?.responsable || {};
-      const nombre = responsable.nombre ?? responsable.nombre_responsable ?? null;
-      const apellido = responsable.apellido ?? responsable.apellido_responsable ?? null;
-
-      return {
-        id_responsable: responsable.id_responsable ?? null,
-        nombre,
-        apellido,
-        telefono: responsable.telefono ?? null,
-        email: responsable.email ?? null,
-        parentesco: relacion?.parentesco ?? null,
-        es_principal: relacion?.es_principal ?? false,
-      };
-    })
-    .filter((item) => item.id_responsable || item.nombre || item.apellido);
-}
-
-function formatNinoDetails(nino) {
-  if (!nino) {
-    return {
-      paciente_id: null,
-      paciente_nombre: null,
-      paciente_apellido: null,
-      paciente_fecha_nacimiento: null,
-      paciente_dni: null,
-      paciente_certificado_discapacidad: null,
-      paciente_tipo: null,
-      paciente_activo: null,
-      paciente_foto_perfil: null,
-      paciente_obra_social_id: null,
-      paciente_obra_social: null,
-      paciente_cud: null,
-      paciente_responsables: [],
-      paciente_titular_id: null,
-      paciente_titular_nombre: null,
-      paciente_titular_parentesco: null,
-      paciente_titular_es_principal: null,
-      paciente_email: null,
-      paciente_telefono: null,
-      telefono: null,
-      email: null,
-      titular_nombre: null,
-      obra_social: null,
-      cud: null,
-    };
-  }
-
-  const obraSocialNombre = nino.obra_social?.nombre ?? nino.obra_social?.nombre_obra_social ?? null;
-  const responsables = formatResponsables(nino.responsables);
-  const principal = responsables.find((rel) => rel.es_principal) || responsables[0] || null;
-  const titularNombre = principal
-    ? [principal.nombre, principal.apellido].filter(Boolean).join(' ').trim() || null
-    : null;
-  const cudLabel = nino.certificado_discapacidad ? 'Sí' : 'No posee';
-
-  return {
-    paciente_id: nino.id_nino ?? null,
-    paciente_nombre: nino.nombre ?? null,
-    paciente_apellido: nino.apellido ?? null,
-    paciente_fecha_nacimiento: nino.fecha_nacimiento ?? null,
-    paciente_dni: nino.dni ?? null,
-    paciente_certificado_discapacidad: Boolean(nino.certificado_discapacidad),
-    paciente_tipo: nino.tipo ?? null,
-    paciente_activo: nino.activo ?? null,
-    paciente_foto_perfil: nino.foto_perfil ?? null,
-    paciente_obra_social_id: nino.obra_social?.id_obra_social ?? nino.id_obra_social ?? null,
-    paciente_obra_social: obraSocialNombre,
-    paciente_cud: cudLabel,
-    paciente_responsables: responsables,
-    paciente_titular_id: principal?.id_responsable ?? null,
-    paciente_titular_nombre: titularNombre,
-    paciente_titular_parentesco: principal?.parentesco ?? null,
-    paciente_titular_es_principal: principal?.es_principal ?? null,
-    paciente_email: principal?.email ?? null,
-    paciente_telefono: principal?.telefono ?? null,
-    telefono: principal?.telefono ?? null,
-    email: principal?.email ?? null,
-    titular_nombre: titularNombre,
-    obra_social: obraSocialNombre,
-    cud: cudLabel,
-  };
-}
+// formatNinoDetails imported from utils
 
 async function getTurnosByDate(date) {
   const { start, end } = buildDayRange(date);
@@ -309,8 +226,143 @@ async function getTurnoById(turnoId) {
   };
 }
 
+async function getTurnoFormData() {
+  const [departamentosResult, consultoriosResult, profesionalesResult] = await Promise.all([
+    supabase
+      .from('profesiones')
+      .select('id_departamento, nombre, duracion_default_min, descripcion, responsable_id')
+      .order('nombre', { ascending: true }),
+    supabase
+      .from('consultorios')
+      .select('id, nombre, ubicacion')
+      .order('nombre', { ascending: true }),
+    supabase
+      .from('profesionales')
+      .select('id_profesional, nombre, apellido, telefono, email, id_departamento')
+      .order('nombre', { ascending: true }),
+  ]);
+
+  if (departamentosResult.error) throw departamentosResult.error;
+  if (consultoriosResult.error) throw consultoriosResult.error;
+  if (profesionalesResult.error) throw profesionalesResult.error;
+
+  const profesionales = (profesionalesResult.data || []).map((prof) => ({
+    ...prof,
+    nombre_completo: [prof.nombre, prof.apellido].filter(Boolean).join(' ').trim(),
+  }));
+
+  return {
+    departamentos: departamentosResult.data || [],
+    consultorios: consultoriosResult.data || [],
+    profesionales,
+  };
+}
+
+async function createTurno({
+  departamento_id,
+  inicio,
+  duracion_min = 30,
+  consultorio_id = null,
+  notas = null,
+  nino_id,
+  creado_por = null,
+  estado = 'pendiente',
+  profesional_ids = [],
+  precio = null,
+  moneda = 'ARS',
+  metodo_pago = 'efectivo',
+}) {
+  if (!departamento_id || !inicio || !nino_id) {
+    throw new Error('Los campos departamento_id, inicio y nino_id son obligatorios.');
+  }
+
+  const start = new Date(inicio);
+  if (Number.isNaN(start.getTime())) {
+    throw new Error('La fecha de inicio del turno es inválida.');
+  }
+
+  const duration = Math.max(parseInt(duracion_min, 10) || 30, 5);
+  const end = new Date(start.getTime() + duration * 60000);
+
+  let turnoId = null;
+
+  try {
+    const { data: turnoInserted, error: turnoError } = await supabase
+      .from('turnos')
+      .insert({
+        departamento_id,
+        inicio: start.toISOString(),
+        fin: end.toISOString(),
+        duracion_min: duration,
+        consultorio_id,
+        notas: notas || null,
+        creado_por,
+        nino_id,
+        estado,
+      })
+      .select('id')
+      .single();
+
+    if (turnoError) throw turnoError;
+
+    turnoId = turnoInserted.id;
+
+    const uniqueProfesionales = Array.from(
+      new Set(
+        (Array.isArray(profesional_ids) ? profesional_ids : [])
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !Number.isNaN(id))
+      )
+    );
+
+    if (uniqueProfesionales.length > 0) {
+      const { error: profesionalesError } = await supabase
+        .from('turno_profesionales')
+        .insert(
+          uniqueProfesionales.map((profId) => ({
+            turno_id: turnoId,
+            profesional_id: profId,
+            rol_en_turno: 'responsable',
+          }))
+        );
+
+      if (profesionalesError) throw profesionalesError;
+    }
+
+    const montoNumerico = precio === null || precio === undefined ? null : Number(precio);
+
+    if (montoNumerico !== null && !Number.isNaN(montoNumerico) && montoNumerico > 0) {
+      const { error: pagoError } = await supabase
+        .from('pagos')
+        .insert({
+          turno_id: turnoId,
+          monto: montoNumerico,
+          moneda: moneda || 'ARS',
+          metodo: metodo_pago || 'efectivo',
+          estado: 'pendiente',
+          nino_id,
+        });
+
+      if (pagoError) {
+        throw pagoError;
+      }
+    }
+
+    return await getTurnoById(turnoId);
+  } catch (error) {
+    if (turnoId) {
+      await supabase.from('pagos').delete().eq('turno_id', turnoId);
+      await supabase.from('turno_profesionales').delete().eq('turno_id', turnoId);
+      await supabase.from('turnos').delete().eq('id', turnoId);
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   getTurnosByDate,
   updateTurno,
   getTurnoById,
+  createTurno,
+  getTurnoFormData,
 };

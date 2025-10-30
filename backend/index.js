@@ -5,6 +5,7 @@ const contactosRoutes = require('./src/routes/contactoRoutes');
 const entrevistaRoutes = require('./src/routes/entrevistaRoutes');
 const obrasSocRoutes = require ('./src/routes/obrasSocRoutes');
 const candidatosRoutes = require('./src/routes/candidatosRoutes');
+const ninoRoutes = require('./src/routes/ninoRoutes');
 
 const turnoRoutes = require('./src/routes/turnoRoutes');
 const pagoRoutes = require('./src/routes/pagoRoutes');
@@ -23,6 +24,7 @@ app.use('/api/contact', contactosRoutes);
 app.use('/api/entrevista', entrevistaRoutes);
 app.use('/api/obras-sociales', obrasSocRoutes);
 app.use('/api/candidatos', candidatosRoutes);
+app.use('/api', ninoRoutes);
 app.use('/api', turnoRoutes);
 app.use('/api', pagoRoutes);
 app.use('/api', notificacionRoutes);

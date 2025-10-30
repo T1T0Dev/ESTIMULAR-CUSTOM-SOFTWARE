@@ -20,6 +20,66 @@ async function handleGetTurnos(req, res) {
   }
 }
 
+async function handleGetTurnoFormData(req, res) {
+  try {
+    const data = await turnoModel.getTurnoFormData();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error al obtener datos de formulario de turno:', error);
+    res.status(500).json({ success: false, message: 'No se pudo cargar la información necesaria.' });
+  }
+}
+
+async function handleCreateTurno(req, res) {
+  const loggedInUserId = req.headers['x-user-id']
+    ? parseInt(req.headers['x-user-id'], 10)
+    : null;
+
+  const {
+    departamento_id,
+    consultorio_id,
+    inicio,
+    duracion_min,
+    nino_id,
+    notas,
+    profesional_ids,
+    precio,
+    moneda,
+    metodo_pago,
+    estado,
+  } = req.body || {};
+
+  if (!departamento_id || !inicio || !nino_id) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'Los campos departamento_id, inicio y nino_id son obligatorios para crear un turno.',
+    });
+  }
+
+  try {
+    const nuevoTurno = await turnoModel.createTurno({
+      departamento_id,
+      consultorio_id,
+      inicio,
+      duracion_min,
+      nino_id,
+      notas,
+      profesional_ids,
+      precio,
+      moneda,
+      metodo_pago,
+      estado,
+      creado_por: loggedInUserId,
+    });
+
+    res.status(201).json({ success: true, data: nuevoTurno });
+  } catch (error) {
+    console.error('Error al crear el turno:', error);
+    res.status(500).json({ success: false, message: 'No se pudo crear el turno.' });
+  }
+}
+
 
 
 
@@ -89,5 +149,7 @@ async function handleUpdateTurno(req, res) {
 
 module.exports = {
   handleGetTurnos,
+  handleGetTurnoFormData,
+  handleCreateTurno,
   handleUpdateTurno,
 };
