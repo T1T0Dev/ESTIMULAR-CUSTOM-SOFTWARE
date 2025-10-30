@@ -11,6 +11,7 @@ import {
 import useAuthStore from "../store/useAuthStore";
 import "../styles/MainDashboard.css";
 import API_BASE_URL from "../constants/api";
+import { parseNinosResponse } from "../utils/ninoResponse";
 
 const DATE_FULL_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "full",
@@ -70,6 +71,26 @@ function capitalize(word) {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+function resolveArrayData(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload)) return payload;
+  if (payload.data && Array.isArray(payload.data.data)) {
+    return payload.data.data;
+  }
+  return [];
+}
+
+function resolveTotalCount(payload, fallbackLength = 0) {
+  if (!payload || typeof payload !== "object") return fallbackLength;
+  if (typeof payload.total === "number") return payload.total;
+  if (typeof payload.count === "number") return payload.count;
+  if (typeof payload.data?.total === "number") return payload.data.total;
+  return fallbackLength;
+}
+
 export default function MainDashboard() {
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
@@ -119,40 +140,82 @@ export default function MainDashboard() {
     setError(null);
 
     try {
-      const [equipoRes, ninosRes, obrasRes, turnosRes, profesionesRes] =
-        await Promise.all([
-          axios.get(`${API_BASE_URL}/api/equipo`, {
-            params: { page: 1, pageSize: 4, activo: true },
-          }),
-          axios.get(`${API_BASE_URL}/api/ninos`, {
-            params: { page: 1, pageSize: 4 },
-          }),
-          axios.get(`${API_BASE_URL}/api/obras-sociales`, {
-            params: { page: 1, pageSize: 4 },
-          }),
-          axios.get(`${API_BASE_URL}/api/turnos`, {
-            params: { estado: "pendiente", limit: 8 },
-          }),
-          axios.get(`${API_BASE_URL}/api/profesiones`),
-        ]);
+      const [
+        equipoResult,
+        ninosResult,
+        obrasResult,
+        turnosResult,
+        profesionesResult,
+      ] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/api/equipo`, {
+          params: { page: 1, pageSize: 4, activo: true },
+        }),
+        axios.get(`${API_BASE_URL}/api/ninos`, {
+          params: { page: 1, pageSize: 4 },
+        }),
+        axios.get(`${API_BASE_URL}/api/obras-sociales`, {
+          params: { page: 1, pageSize: 4 },
+        }),
+        axios.get(`${API_BASE_URL}/api/turnos`, {
+          params: { estado: "pendiente", limit: 8 },
+        }),
+        axios.get(`${API_BASE_URL}/api/profesiones`),
+      ]);
 
       if (!activeRef.current) return;
 
-      const profesionalesListado = Array.isArray(equipoRes?.data?.data)
-        ? equipoRes.data.data
-        : [];
-      const ninosListado = Array.isArray(ninosRes?.data?.data)
-        ? ninosRes.data.data
-        : [];
-      const obrasListado = Array.isArray(obrasRes?.data?.data)
-        ? obrasRes.data.data
-        : [];
-      const turnosListado = Array.isArray(turnosRes?.data?.data)
-        ? turnosRes.data.data
-        : [];
-      const profesionesListado = Array.isArray(profesionesRes?.data?.data)
-        ? profesionesRes.data.data
-        : [];
+      const errors = [];
+
+      let profesionalesListado = [];
+      let professionalsTotal = 0;
+      if (equipoResult.status === "fulfilled") {
+        const payload = equipoResult.value?.data ?? {};
+        profesionalesListado = resolveArrayData(payload);
+        professionalsTotal = resolveTotalCount(
+          payload,
+          profesionalesListado.length
+        );
+      } else {
+        errors.push("equipo");
+      }
+
+      let ninosListado = [];
+      let childrenTotal = 0;
+      if (ninosResult.status === "fulfilled") {
+        const parsed = parseNinosResponse(ninosResult.value?.data);
+        ninosListado = parsed.list;
+        childrenTotal = parsed.total;
+      } else {
+        errors.push("niños");
+      }
+
+      let obrasListado = [];
+      let obrasTotal = 0;
+      if (obrasResult.status === "fulfilled") {
+        const payload = obrasResult.value?.data ?? {};
+        obrasListado = resolveArrayData(payload);
+        obrasTotal = resolveTotalCount(payload, obrasListado.length);
+      } else {
+        errors.push("obras sociales");
+      }
+
+      let turnosListado = [];
+      let turnosTotal = 0;
+      if (turnosResult.status === "fulfilled") {
+        const payload = turnosResult.value?.data ?? {};
+        turnosListado = resolveArrayData(payload);
+        turnosTotal = resolveTotalCount(payload, turnosListado.length);
+      } else {
+        errors.push("turnos");
+      }
+
+      let profesionesListado = [];
+      if (profesionesResult.status === "fulfilled") {
+        const payload = profesionesResult.value?.data ?? {};
+        profesionesListado = resolveArrayData(payload);
+      } else {
+        errors.push("profesiones");
+      }
 
       const profesionesDictionary = profesionesListado.reduce(
         (acc, profesion) => {
@@ -176,14 +239,19 @@ export default function MainDashboard() {
       if (activeRef.current) {
         setProfesionesMap(profesionesDictionary);
         setSummary({
-          professionals: Number(equipoRes?.data?.total) || 0,
-          children: Number(ninosRes?.data?.total) || 0,
-          obras: Number(obrasRes?.data?.total) || obrasListado.length || 0,
-          turnosPendientes: Number(turnosRes?.data?.total) || 0,
+          professionals: professionalsTotal,
+          children: childrenTotal,
+          obras: obrasTotal,
+          turnosPendientes: turnosTotal,
         });
         setLatestProfessionals(profesionalesListado.slice(0, 4));
         setLatestChildren(ninosListado.slice(0, 4));
         setUpcomingTurnos(upcoming);
+        setError(
+          errors.length
+            ? `No se pudieron cargar algunos datos (${errors.join(", ")}).`
+            : null
+        );
       }
     } catch (err) {
       if (activeRef.current) {

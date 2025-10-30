@@ -7,55 +7,7 @@ import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import { formatDateDMY } from "../utils/date";
 import API_BASE_URL from "../constants/api";
-
-function normalizeNinoRow(raw = {}) {
-  const obraSocialSource =
-    raw.obra_social && typeof raw.obra_social === "object"
-      ? raw.obra_social
-      : null;
-
-  const obraSocialNombre = obraSocialSource?.nombre_obra_social
-    ?? obraSocialSource?.nombre
-    ?? raw.paciente_obra_social
-    ?? null;
-
-  const idObraSocial =
-    raw.id_obra_social
-    ?? raw.paciente_obra_social_id
-    ?? obraSocialSource?.id_obra_social
-    ?? null;
-
-  const certifiedValue =
-    raw.certificado_discapacidad ?? raw.paciente_certificado_discapacidad;
-
-  return {
-    ...raw,
-    id_nino: raw.id_nino ?? raw.paciente_id ?? raw.id ?? null,
-    nombre: raw.nombre ?? raw.paciente_nombre ?? null,
-    apellido: raw.apellido ?? raw.paciente_apellido ?? null,
-    dni: raw.dni ?? raw.paciente_dni ?? null,
-    fecha_nacimiento:
-      raw.fecha_nacimiento ?? raw.paciente_fecha_nacimiento ?? null,
-    certificado_discapacidad: Boolean(certifiedValue),
-    tipo: raw.tipo ?? raw.paciente_tipo ?? null,
-    id_obra_social: idObraSocial,
-    obra_social:
-      obraSocialSource ||
-      (obraSocialNombre
-        ? { id_obra_social: idObraSocial, nombre_obra_social: obraSocialNombre }
-        : null),
-  };
-}
-
-function extractNinosPayload(payload) {
-  if (!payload) return [];
-  if (Array.isArray(payload.data)) return payload.data;
-  if (Array.isArray(payload.results)) return payload.results;
-  if (Array.isArray(payload.items)) return payload.items;
-  if (Array.isArray(payload)) return payload;
-  if (payload.data && Array.isArray(payload.data.data)) return payload.data.data;
-  return [];
-}
+import { parseNinosResponse } from "../utils/ninoResponse";
 
 function calcularEdad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
@@ -116,17 +68,9 @@ export default function Ninos() {
         const res = await axios.get(`${API_BASE_URL}/api/ninos`, {
           params: { search, page: pageNum, pageSize, tipo: tipoSel },
         });
-        const payload = res?.data ?? {};
-        const rawList = extractNinosPayload(payload);
-        const normalized = rawList.map((row) => normalizeNinoRow(row));
-        const computedTotal =
-          typeof payload.total === "number"
-            ? payload.total
-            : typeof payload.count === "number"
-            ? payload.count
-            : typeof payload.data?.total === "number"
-            ? payload.data.total
-            : normalized.length;
+        const { list: normalized, total: computedTotal } = parseNinosResponse(
+          res?.data
+        );
         setItems(normalized);
         setTotal(computedTotal);
         setError(null);
