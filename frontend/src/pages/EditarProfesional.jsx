@@ -4,6 +4,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import useAuthStore from "../store/useAuthStore";
 import "../styles/EditarProfesional.css";
+import API_BASE_URL from "../constants/api";
 
 const initialState = {
   nombre: "",
@@ -68,7 +69,7 @@ export default function EditarProfesional() {
     async function hydrate() {
       try {
         const [profRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/profesiones"),
+          axios.get(`${API_BASE_URL}/api/profesiones`),
         ]);
         setProfesiones(profRes?.data?.data || []);
       } catch (err) {
@@ -247,7 +248,7 @@ export default function EditarProfesional() {
           didOpen: () => Swal.showLoading(),
         });
         const { data } = await axios.put(
-          "http://localhost:5000/api/login/perfil",
+          `${API_BASE_URL}/api/login/perfil`,
           payload
         );
 

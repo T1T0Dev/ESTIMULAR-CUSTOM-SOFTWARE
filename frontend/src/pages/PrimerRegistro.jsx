@@ -5,6 +5,7 @@ import "../styles/Login.css";
 import useAuthStore from "../store/useAuthStore";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import logoEstimular from "../assets/logo_estimular.png";
+import API_BASE_URL from "../constants/api";
 
 export default function PrimerRegistro() {
   const [form, setForm] = useState({
@@ -58,7 +59,7 @@ export default function PrimerRegistro() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/profesiones");
+  const res = await axios.get(`${API_BASE_URL}/api/profesiones`);
         setProfesiones(res?.data?.data || []);
       } catch (e) {
         console.error("No se pudieron cargar profesiones", e);
@@ -122,7 +123,7 @@ export default function PrimerRegistro() {
           ? Number(form.profesionId)
           : null;
       const response = await axios.post(
-        "http://localhost:5000/api/login/primer-registro",
+        `${API_BASE_URL}/api/login/primer-registro`,
         {
           nombre: form.nombre,
           apellido: form.apellido,

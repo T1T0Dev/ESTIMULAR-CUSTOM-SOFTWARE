@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/CrearObraSocial.css";
 
@@ -21,7 +22,7 @@ export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      await axios.post("http://localhost:5000/api/obras-sociales", {
+  await axios.post(`${API_BASE_URL}/api/obras-sociales`, {
         nombre_obra_social: nombre.trim(),
         estado,
       });

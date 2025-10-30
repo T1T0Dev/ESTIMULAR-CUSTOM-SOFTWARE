@@ -14,6 +14,7 @@ import "../styles/EquipoEstimular.css";
 import CrearIntegrante from "../components/CrearIntegrante";
 import ReestablecerContraseña from "../components/ReestablecerContraseña";
 import useAuthStore from "../store/useAuthStore";
+import API_BASE_URL from "../constants/api";
 
 // Custom hook to debounce a value (defined at module scope to follow Rules of Hooks)
 function useDebounce(value, delay) {
@@ -77,7 +78,7 @@ export default function EquipoEstimular() {
     (async () => {
       try {
         const { data } = await axios.get(
-          "http://localhost:5000/api/profesiones"
+          `${API_BASE_URL}/api/profesiones`
         );
         if (!active) return;
         const listado = Array.isArray(data?.data) ? data.data : [];
@@ -177,7 +178,7 @@ export default function EquipoEstimular() {
           }
         }
         params.tipo = tipoValue;
-        const { data } = await axios.get("http://localhost:5000/api/equipo", {
+  const { data } = await axios.get(`${API_BASE_URL}/api/equipo`, {
           params,
         });
         setItems(data?.data || []);
@@ -622,8 +623,8 @@ export default function EquipoEstimular() {
 
                                       const url =
                                         p.tipo === "secretario"
-                                          ? `http://localhost:5000/api/equipo/secretarios/${endpointId}`
-                                          : `http://localhost:5000/api/equipo/${endpointId}`;
+                                          ? `${API_BASE_URL}/api/equipo/secretarios/${endpointId}`
+                                          : `${API_BASE_URL}/api/equipo/${endpointId}`;
                                       Swal.fire({
                                         title: "Guardando...",
                                         allowOutsideClick: false,
@@ -721,7 +722,7 @@ export default function EquipoEstimular() {
                                         didOpen: () => Swal.showLoading(),
                                       });
                                       await axios.delete(
-                                        `http://localhost:5000/api/equipo/${endpointId}`
+                                        `${API_BASE_URL}/api/equipo/${endpointId}`
                                       );
                                       await fetchEquipo(
                                         busqueda,

@@ -10,6 +10,7 @@ import {
 } from "react-icons/md";
 import useAuthStore from "../store/useAuthStore";
 import "../styles/MainDashboard.css";
+import API_BASE_URL from "../constants/api";
 
 const DATE_FULL_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "full",
@@ -120,19 +121,19 @@ export default function MainDashboard() {
     try {
       const [equipoRes, ninosRes, obrasRes, turnosRes, profesionesRes] =
         await Promise.all([
-          axios.get("http://localhost:5000/api/equipo", {
+          axios.get(`${API_BASE_URL}/api/equipo`, {
             params: { page: 1, pageSize: 4, activo: true },
           }),
-          axios.get("http://localhost:5000/api/ninos", {
+          axios.get(`${API_BASE_URL}/api/ninos`, {
             params: { page: 1, pageSize: 4 },
           }),
-          axios.get("http://localhost:5000/api/obras-sociales", {
+          axios.get(`${API_BASE_URL}/api/obras-sociales`, {
             params: { page: 1, pageSize: 4 },
           }),
-          axios.get("http://localhost:5000/api/turnos", {
+          axios.get(`${API_BASE_URL}/api/turnos`, {
             params: { estado: "pendiente", limit: 8 },
           }),
-          axios.get("http://localhost:5000/api/profesiones"),
+          axios.get(`${API_BASE_URL}/api/profesiones`),
         ]);
 
       if (!activeRef.current) return;

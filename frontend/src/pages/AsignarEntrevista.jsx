@@ -3,6 +3,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import { MdEventAvailable, MdChangeCircle, MdDelete } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
+import API_BASE_URL from "../constants/api";
 import "../styles/NinosPage.css"; // reutilizamos estilos base
 import "../styles/AsignarEntrevista.css";
 
@@ -51,7 +52,7 @@ export default function AsignarEntrevista() {
     async (search = "", pageNum = 1) => {
       setLoading(true);
       try {
-        const res = await axios.get("http://localhost:5000/api/ninos", {
+  const res = await axios.get(`${API_BASE_URL}/api/ninos`, {
           params: { search, page: pageNum, pageSize, tipo: "candidato" },
         });
         const rows = res?.data?.data || [];
@@ -63,7 +64,7 @@ export default function AsignarEntrevista() {
         await Promise.all(
           rows.map(async (c) => {
             try {
-              const r = await axios.get("http://localhost:5000/api/turnos", {
+              const r = await axios.get(`${API_BASE_URL}/api/turnos`, {
                 params: { nino_id: c.id_nino, limit: 1 },
               });
               asigns[c.id_nino] = (r?.data?.data || [])[0] || null;
@@ -106,7 +107,7 @@ export default function AsignarEntrevista() {
     setModalOpen(true);
     setLoadingTurnos(true);
     try {
-      const r = await axios.get("http://localhost:5000/api/turnos", {
+  const r = await axios.get(`${API_BASE_URL}/api/turnos`, {
         params: { disponible: true, estado: "pendiente", limit: 50 },
       });
       setTurnosDisp(r?.data?.data || []);
@@ -125,11 +126,11 @@ export default function AsignarEntrevista() {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      await axios.put(`http://localhost:5000/api/turnos/${turnoId}`, {
+  await axios.put(`${API_BASE_URL}/api/turnos/${turnoId}`, {
         nino_id: ninoId,
       });
       // refrescar asignación del niño
-      const r = await axios.get("http://localhost:5000/api/turnos", {
+  const r = await axios.get(`${API_BASE_URL}/api/turnos`, {
         params: { nino_id: ninoId, limit: 1 },
       });
       setAsignaciones((prev) => ({
@@ -171,7 +172,7 @@ export default function AsignarEntrevista() {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      await axios.put(`http://localhost:5000/api/turnos/${turnoId}`, {
+  await axios.put(`${API_BASE_URL}/api/turnos/${turnoId}`, {
         nino_id: null,
       });
       setAsignaciones((prev) => ({ ...prev, [ninoId]: null }));

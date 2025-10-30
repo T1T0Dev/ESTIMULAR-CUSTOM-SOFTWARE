@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import { FaInfoCircle } from "react-icons/fa";
 import { MdEdit, MdDelete, MdCheck, MdClose } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
+import API_BASE_URL from "../constants/api";
 
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -34,7 +35,7 @@ export default function Responsables() {
     async (search = "", pageNum = 1) => {
       setLoading(true);
       try {
-        const res = await axios.get("http://localhost:5000/api/responsables", {
+  const res = await axios.get(`${API_BASE_URL}/api/responsables`, {
           params: { search, page: pageNum, pageSize },
         });
         setItems(res.data.data || []);
@@ -78,7 +79,7 @@ export default function Responsables() {
       setModalData({ ...resp, cargando: true, ninos: [] });
       setModalOpen(true);
       const res = await axios.get(
-        `http://localhost:5000/api/responsables/${resp.id_responsable}/ninos`
+        `${API_BASE_URL}/api/responsables/${resp.id_responsable}/ninos`
       );
       const relaciones = res?.data?.data || [];
       // Ordenar principales primero
@@ -104,7 +105,7 @@ export default function Responsables() {
       let createdId = null;
       if (!rel.id_nino_responsable) {
         const resCreate = await axios.post(
-          `http://localhost:5000/api/ninos/${rel.nino?.id_nino}/responsables`,
+          `${API_BASE_URL}/api/ninos/${rel.nino?.id_nino}/responsables`,
           {
             id_responsable: modalData.id_responsable,
             parentesco: rel.parentesco ?? "responsable",
@@ -114,7 +115,7 @@ export default function Responsables() {
         createdId = resCreate?.data?.data?.id_nino_responsable || null;
       } else {
         await axios.put(
-          `http://localhost:5000/api/ninos/${rel.nino?.id_nino}/responsables/${rel.id_nino_responsable}`,
+          `${API_BASE_URL}/api/ninos/${rel.nino?.id_nino}/responsables/${rel.id_nino_responsable}`,
           { es_principal: nuevo }
         );
       }
@@ -168,7 +169,7 @@ export default function Responsables() {
       ["nombre", "apellido", "telefono", "email", "dni"].forEach((k) => {
         if (editDraft[k] !== undefined) payload[k] = editDraft[k];
       });
-      await axios.put(`http://localhost:5000/api/responsables/${id}`, payload);
+  await axios.put(`${API_BASE_URL}/api/responsables/${id}`, payload);
       // update local state
       setItems((prev) =>
         prev.map((it) =>
@@ -200,7 +201,7 @@ export default function Responsables() {
     if (!res.isConfirmed) return;
     try {
       await axios.delete(
-        `http://localhost:5000/api/responsables/${r.id_responsable}`
+        `${API_BASE_URL}/api/responsables/${r.id_responsable}`
       );
       setItems((prev) =>
         prev.filter((it) => it.id_responsable !== r.id_responsable)

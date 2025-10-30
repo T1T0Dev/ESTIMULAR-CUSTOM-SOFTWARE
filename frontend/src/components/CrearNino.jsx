@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/CrearNino.css";
 
@@ -34,7 +35,7 @@ export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
     const t = setTimeout(async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/responsables?dni=${responsable.dni}`
+          `${API_BASE_URL}/api/responsables?dni=${responsable.dni}`
         );
         const items = res?.data?.data || [];
         if (items.length > 0) {
@@ -98,7 +99,7 @@ export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
           dni: responsable.dni || null,
         },
       };
-      const res = await axios.post("http://localhost:5000/api/ninos", payload);
+  const res = await axios.post(`${API_BASE_URL}/api/ninos`, payload);
       if (res?.data?.success) {
         Swal.fire({
           icon: "success",

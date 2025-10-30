@@ -6,6 +6,7 @@ import Swal from "sweetalert2";
 import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import { formatDateDMY } from "../utils/date";
+import API_BASE_URL from "../constants/api";
 
 function calcularEdad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
@@ -49,7 +50,7 @@ export default function Ninos() {
     let mounted = true;
     (async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/obras-sociales");
+  const res = await axios.get(`${API_BASE_URL}/api/obras-sociales`);
         if (mounted) setObrasSociales(res?.data?.data || []);
       } catch (e) {
         // Evitar fallo silencioso y ayudar en debug si la petición falla
@@ -63,7 +64,7 @@ export default function Ninos() {
     async (search = "", pageNum = 1, tipoSel = "todos") => {
       setLoading(true);
       try {
-        const res = await axios.get("http://localhost:5000/api/ninos", {
+  const res = await axios.get(`${API_BASE_URL}/api/ninos`, {
           params: { search, page: pageNum, pageSize, tipo: tipoSel },
         });
         setItems(res.data.data || []);
@@ -452,7 +453,7 @@ export default function Ninos() {
                                         payload.tipo = editData.tipo;
                                       }
                                       await axios.put(
-                                        `http://localhost:5000/api/ninos/${c.id_nino}`,
+                                        `${API_BASE_URL}/api/ninos/${c.id_nino}`,
                                         payload
                                       );
                                       setEditId(null);
@@ -536,7 +537,7 @@ export default function Ninos() {
                                           didOpen: () => Swal.showLoading(),
                                         });
                                         await axios.delete(
-                                          `http://localhost:5000/api/ninos/${c.id_nino}`
+                                          `${API_BASE_URL}/api/ninos/${c.id_nino}`
                                         );
                                         await fetchNinos(busqueda, page, tipo);
                                         Swal.close();

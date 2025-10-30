@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/ReestablecerContraseña.css";
 
@@ -74,7 +75,7 @@ export default function ReestablecerContraseña({
     try {
       setSubmitting(true);
       await axios.post(
-        `http://localhost:5000/api/equipo/${miembro.id_usuario}/reset-password`,
+        `${API_BASE_URL}/api/equipo/${miembro.id_usuario}/reset-password`,
         {
           nuevaContrasena: password,
         }

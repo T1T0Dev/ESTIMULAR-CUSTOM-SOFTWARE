@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/CrearCandidato.css";
 
@@ -42,7 +43,7 @@ export default function CrearCandidato({
     const t = setTimeout(async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/responsables?dni=${responsable.dni}`
+          `${API_BASE_URL}/api/responsables?dni=${responsable.dni}`
         );
         const items = res?.data?.data || [];
         if (items.length > 0) {
@@ -126,7 +127,7 @@ export default function CrearCandidato({
       };
 
       const res = await axios.post(
-        "http://localhost:5000/api/entrevista/crear-candidato",
+        `${API_BASE_URL}/api/entrevista/crear-candidato`,
         payload
       );
       if (res?.data?.success) {

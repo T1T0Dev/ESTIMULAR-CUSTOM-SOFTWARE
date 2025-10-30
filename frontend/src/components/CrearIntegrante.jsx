@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import axios from "axios";
+import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/FormularioEntrevista.css";
 
@@ -72,7 +73,7 @@ export default function CrearIntegrante({ onClose, onCreated }) {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      await axios.post("http://localhost:5000/api/equipo", data);
+  await axios.post(`${API_BASE_URL}/api/equipo`, data);
       Swal.close();
       Swal.fire({
         icon: "success",

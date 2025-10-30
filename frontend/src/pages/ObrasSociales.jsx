@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import CrearObraSocial from "../components/CrearObraSocial";
+import API_BASE_URL from "../constants/api";
 
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -36,7 +37,7 @@ export default function ObrasSociales() {
   const fetchEstados = useCallback(async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/obras-sociales/estados"
+        `${API_BASE_URL}/api/obras-sociales/estados`
       );
       const arr = res?.data?.data || [];
       setEstados(["todos", ...arr]);
@@ -50,7 +51,7 @@ export default function ObrasSociales() {
       setLoading(true);
       try {
         const res = await axios.get(
-          "http://localhost:5000/api/obras-sociales",
+          `${API_BASE_URL}/api/obras-sociales`,
           {
             params: { search, page: pageNum, pageSize, estado: estadoSel },
           }
@@ -269,7 +270,7 @@ export default function ObrasSociales() {
                                         payload.estado = editData.estado;
                                       }
                                       await axios.put(
-                                        `http://localhost:5000/api/obras-sociales/${o.id_obra_social}`,
+                                        `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`,
                                         payload
                                       );
                                       setEditId(null);
@@ -342,7 +343,7 @@ export default function ObrasSociales() {
                                           didOpen: () => Swal.showLoading(),
                                         });
                                         await axios.delete(
-                                          `http://localhost:5000/api/obras-sociales/${o.id_obra_social}`
+                                          `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`
                                         );
                                         await fetchObras(
                                           busqueda,
