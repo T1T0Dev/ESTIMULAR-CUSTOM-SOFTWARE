@@ -5,11 +5,6 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(229, 0, 125, 0.28),
-    rgba(233, 30, 99, 0.2)
-  );
   backdrop-filter: blur(6px);
   z-index: 1000;
   display: flex;

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import "../styles/NinosPage.css";
 import Swal from "sweetalert2";
-import { FaInfoCircle, FaStar, FaUserPlus, FaUnlink } from "react-icons/fa";
+import { FaChild, FaStar, FaUserPlus, FaUnlink } from "react-icons/fa";
 import { MdEdit, MdDelete, MdCheck, MdClose } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
 
@@ -464,8 +464,7 @@ export default function Responsables() {
                 <thead>
                   <tr>
                     <th className="col-dni">DNI</th>
-                    <th className="col-name">Nombre</th>
-                    <th className="col-last">Apellido</th>
+                    <th className="col-name">Nombre completo</th>
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th className="col-actions">Acciones</th>
@@ -474,6 +473,13 @@ export default function Responsables() {
                 <tbody>
                   {items.map((r) => {
                     const isEditing = editId === r.id_responsable;
+                    const nombreCompleto = `${r.nombre || ""} ${
+                      r.apellido || ""
+                    }`
+                      .replace(/\s+/g, " ")
+                      .trim();
+                    const nombreDisplay =
+                      nombreCompleto || r.nombre || r.apellido || "—";
                     return (
                       <tr key={r.id_responsable}>
                         <td className="col-dni" data-label="DNI">
@@ -493,38 +499,42 @@ export default function Responsables() {
                             r.dni || "—"
                           )}
                         </td>
-                        <td className="col-name" data-label="Nombre">
+                        <td className="col-name" data-label="Nombre completo">
                           {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.nombre ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  nombre: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <input
+                                type="text"
+                                value={editDraft.nombre ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    nombre: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                                placeholder="Nombre"
+                              />
+                              <input
+                                type="text"
+                                value={editDraft.apellido ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    apellido: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                                placeholder="Apellido"
+                              />
+                            </div>
                           ) : (
-                            r.nombre || "—"
-                          )}
-                        </td>
-                        <td className="col-last" data-label="Apellido">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.apellido ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  apellido: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
-                          ) : (
-                            r.apellido || "—"
+                            nombreDisplay
                           )}
                         </td>
                         <td data-label="Teléfono">
@@ -584,10 +594,10 @@ export default function Responsables() {
                               <>
                                 <button
                                   className="icon-btn info"
-                                  title="Niños a cargo"
+                                  title="Niños asociados"
                                   onClick={() => abrirInfo(r)}
                                 >
-                                  <FaInfoCircle size={20} />
+                                  <FaChild size={20} />
                                 </button>
                                 <button
                                   className="icon-btn edit"

@@ -119,12 +119,6 @@ export default function Login() {
             </button>
           </div>
 
-          <div className="login-actions">
-            <label className="remember">
-              <input type="checkbox" /> Recordarme
-            </label>
-          </div>
-
           <button className="btn-primary" type="submit" disabled={loading}>
             {loading ? "Ingresando…" : "Ingresar"}
           </button>

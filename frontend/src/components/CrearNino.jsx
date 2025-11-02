@@ -30,6 +30,15 @@ const PARENTESCO_OPTIONS = [
   { value: "otro", label: "Otro" },
 ];
 
+const normalizeObraName = (value) =>
+  value
+    ? String(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+    : "";
+
 export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -74,26 +83,58 @@ export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
     });
   }, [obrasSociales]);
 
-  const selectedObraId = String(nino.id_obra_social || "");
+  const matchedObra = useMemo(() => {
+    if (!nino.id_obra_social) return null;
+    const targetId = String(nino.id_obra_social);
+    return (
+      obrasActivas.find((obra) => {
+        const obraId = obra?.id_obra_social ?? obra?.id ?? obra?.uuid;
+        return obraId !== undefined && obraId !== null && String(obraId) === targetId;
+      }) || null
+    );
+  }, [nino.id_obra_social, obrasActivas]);
 
-  const handleSelectObra = (obraId) => {
-    const normalizedId = obraId ? String(obraId) : "";
-    setNino((prev) => {
-      const sameSelection = String(prev.id_obra_social || "") === normalizedId;
-      return {
+  const obraInputValue = useMemo(() => {
+    if (matchedObra?.nombre_obra_social) return matchedObra.nombre_obra_social;
+    return nino.obra_social_texto || "";
+  }, [matchedObra, nino.obra_social_texto]);
+
+  const handleObraInputChange = (value) => {
+    const normalizedValue = normalizeObraName(value);
+    if (!normalizedValue) {
+      setNino((prev) => ({
         ...prev,
-        id_obra_social: sameSelection ? "" : normalizedId,
+        id_obra_social: "",
         obra_social_texto: "",
-      };
+      }));
+      return;
+    }
+
+    const match = obrasActivas.find((obra) => {
+      const obraName = normalizeObraName(obra?.nombre_obra_social || "");
+      return obraName && obraName === normalizedValue;
     });
+
+    if (match) {
+      const obraId = match.id_obra_social ?? match.id ?? match.uuid ?? "";
+      setNino((prev) => ({
+        ...prev,
+        id_obra_social: obraId ? String(obraId) : "",
+        obra_social_texto: "",
+      }));
+    } else {
+      setNino((prev) => ({
+        ...prev,
+        id_obra_social: "",
+        obra_social_texto: value,
+      }));
+    }
   };
 
-  const handleClearObra = () => {
-    setNino((prev) => ({
-      ...prev,
-      id_obra_social: "",
-    }));
-  };
+  const obraManualNombre = useMemo(
+    () => (nino.id_obra_social ? "" : (nino.obra_social_texto || "").trim()),
+    [nino.id_obra_social, nino.obra_social_texto]
+  );
 
   useEffect(() => {
     const dni = (responsable.dni || "").trim();
@@ -202,14 +243,22 @@ export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
 
     setLoading(true);
     try {
+      const obraIdParsed = nino.id_obra_social
+        ? Number.parseInt(nino.id_obra_social, 10)
+        : null;
+      const obraTexto = !nino.id_obra_social
+        ? (nino.obra_social_texto || "").trim() || null
+        : null;
+
       const payload = {
         nombre: nino.nombre,
         apellido: nino.apellido,
         dni: nino.dni || null,
         fecha_nacimiento: nino.fecha_nacimiento || null,
         certificado_discapacidad: !!nino.certificado_discapacidad,
-        id_obra_social: nino.id_obra_social || null,
-        obra_social_texto: nino.obra_social_texto || null,
+        id_obra_social:
+          obraIdParsed !== null && !Number.isNaN(obraIdParsed) ? obraIdParsed : null,
+        obra_social_texto: obraTexto,
         tipo: nino.tipo,
         responsable: {
           nombre: foundResponsable?.nombre || responsable.nombre,
@@ -348,70 +397,47 @@ export default function CrearNino({ onClose, onCreated, obrasSociales = [] }) {
               </label>
             </div>
             <label>
-              Obra social activa
-              {obrasActivas.length > 0 ? (
-                <div className="obras-selector">
-                  <div
-                    className="obras-scroll"
-                    role="listbox"
-                    aria-label="Obras sociales activas"
-                  >
-                    {obrasActivas.map((obra) => {
-                      const obraId = String(
-                        obra.id_obra_social ?? obra.id ?? obra.uuid ?? ""
-                      );
-                      if (!obraId) return null;
-                      const selected = selectedObraId === obraId;
-                      return (
-                        <button
-                          key={obraId}
-                          type="button"
-                          className={`obra-pill${selected ? " selected" : ""}`}
-                          role="option"
-                          aria-selected={selected}
-                          onClick={() => handleSelectObra(obraId)}
-                        >
-                          {obra.nombre_obra_social || "Sin nombre"}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      className={`obra-pill clear${selectedObraId ? "" : " selected"}`}
-                      role="option"
-                      aria-selected={!selectedObraId}
-                      onClick={handleClearObra}
-                    >
-                      Sin obra social
-                    </button>
-                  </div>
-                  <span className="muted">
-                    Podés seleccionar una de las obras sociales activas o dejar sin selección para escribir una manualmente.
-                  </span>
-                </div>
-              ) : (
+              Obra social
+              <input
+                type="text"
+                value={obraInputValue}
+                onChange={(e) => handleObraInputChange(e.target.value)}
+                onBlur={(e) => {
+                  const trimmed = e.target.value.trim();
+                  setNino((prev) => {
+                    if (prev.id_obra_social) return prev;
+                    if ((prev.obra_social_texto || "").trim() === trimmed) {
+                      return prev;
+                    }
+                    return {
+                      ...prev,
+                      obra_social_texto: trimmed,
+                    };
+                  });
+                }}
+                list="obras-sociales-activas"
+                placeholder="Buscá o escribí una obra social"
+              />
+              <datalist id="obras-sociales-activas">
+                {obrasActivas
+                  .filter((obra) => (obra?.nombre_obra_social || "").trim().length > 0)
+                  .map((obra) => {
+                    const nombre = (obra?.nombre_obra_social || "").trim();
+                    const optionKey = String(
+                      obra?.id_obra_social ?? obra?.id ?? obra?.uuid ?? nombre
+                    );
+                    return <option key={optionKey} value={nombre} />;
+                  })}
+              </datalist>
+              <span className="muted">
+                Seleccioná una obra social activa o escribí una nueva. Las nuevas se crearán en estado pendiente.
+              </span>
+              {!nino.id_obra_social && obraManualNombre ? (
                 <span className="muted">
-                  No hay obras sociales activas disponibles. Podés escribirla manualmente.
+                  Se registrará "{obraManualNombre}" como pendiente.
                 </span>
-              )}
+              ) : null}
             </label>
-            {!nino.id_obra_social && (
-              <label>
-                Obra social (texto libre)
-                <input
-                  value={nino.obra_social_texto}
-                  onChange={(e) =>
-                    setNino({
-                      ...nino,
-                      obra_social_texto: e.target.value,
-                      id_obra_social: "",
-                    })
-                  }
-                  type="text"
-                  placeholder="Si no está en la lista, escribe el nombre"
-                />
-              </label>
-            )}
             <div className="crear-actions">
               <button
                 className="btn outline"
