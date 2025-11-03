@@ -1,19 +1,94 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
 import "../styles/CrearObraSocial.css";
 
+const sanitizeNombreObra = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFC")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const canonicalNombreObra = (value) =>
+  sanitizeNombreObra(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s/g, "");
+
 export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
   const [nombre, setNombre] = useState("");
-  const estadoOptions = (estados.length ? estados : ["pendiente"]).filter(
-    (e) => e !== "todos"
-  );
+  const [obrasRegistradas, setObrasRegistradas] = useState([]);
+
+  const estadoOptions = useMemo(() => {
+    const allowed = ["activa", "pendiente"];
+    const mapa = estados
+      .filter((e) => typeof e === "string" && e.toLowerCase() !== "todos")
+      .reduce((acc, current) => {
+        acc[current.toLowerCase()] = current;
+        return acc;
+      }, {});
+
+    return allowed
+      .map((estado) => mapa[estado] ?? estado)
+      .filter((value, index, self) => self.indexOf(value) === index);
+  }, [estados]);
+
   const [estado, setEstado] = useState(estadoOptions[0] || "pendiente");
 
+  useEffect(() => {
+    setEstado((prev) => {
+      if (estadoOptions.length === 0) return "pendiente";
+      if (estadoOptions.includes(prev)) return prev;
+      return estadoOptions[0];
+    });
+  }, [estadoOptions]);
+
+  useEffect(() => {
+    let cancelado = false;
+    const cargarObras = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/obras-sociales`, {
+          params: { page: 1, pageSize: 500, estado: "todos" },
+        });
+        if (cancelado) return;
+        const existentes = (res?.data?.data || [])
+          .map((obra) => canonicalNombreObra(obra?.nombre_obra_social))
+          .filter(Boolean);
+        setObrasRegistradas(existentes);
+      } catch (error) {
+        console.error("No se pudieron cargar las obras sociales existentes", error);
+      }
+    };
+
+    cargarObras();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const manejarCambioNombre = (valor) => {
+    const normalizado = valor ? String(valor).toUpperCase() : "";
+    setNombre(normalizado);
+  };
+
   const handleSave = async () => {
-    if (!nombre.trim()) {
+    const nombreSanitizado = sanitizeNombreObra(nombre);
+    if (!nombreSanitizado) {
       Swal.fire({ icon: "warning", title: "Completa el nombre" });
+      return;
+    }
+
+    const nombreCanonico = canonicalNombreObra(nombreSanitizado);
+    if (nombreCanonico && obrasRegistradas.includes(nombreCanonico)) {
+      Swal.fire({
+        icon: "error",
+        title: "Duplicado",
+        text: "Ya existe una obra social registrada con ese nombre.",
+      });
       return;
     }
     try {
@@ -22,8 +97,8 @@ export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-  await axios.post(`${API_BASE_URL}/api/obras-sociales`, {
-        nombre_obra_social: nombre.trim(),
+      await axios.post(`${API_BASE_URL}/api/obras-sociales`, {
+        nombre_obra_social: nombreSanitizado,
         estado,
       });
       Swal.close();
@@ -33,6 +108,10 @@ export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
         timer: 1200,
         showConfirmButton: false,
       });
+      setObrasRegistradas((prev) =>
+        nombreCanonico ? [...prev, nombreCanonico] : prev
+      );
+      setNombre("");
       if (typeof onCreated === "function") onCreated();
     } catch (err) {
       Swal.close();
@@ -64,7 +143,7 @@ export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
                 type="text"
                 placeholder="Nombre de la obra social"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => manejarCambioNombre(e.target.value)}
               />
             </div>
           </div>
@@ -79,7 +158,7 @@ export default function CrearObraSocial({ onClose, estados = [], onCreated }) {
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
               >
-                {estadoOptions.map((es) => (
+                {(estadoOptions.length ? estadoOptions : ["activa", "pendiente"]).map((es) => (
                   <option key={es} value={es}>
                     {es}
                   </option>

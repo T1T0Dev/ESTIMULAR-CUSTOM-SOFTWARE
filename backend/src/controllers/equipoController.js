@@ -1,847 +1,993 @@
-const { supabaseAdmin } = require('../config/db');
-const { upsertWithIdentityOverride } = require('../utils/upsertWithIdentityOverride');
-const { resolveStorageAsset } = require('../utils/storage');
 const bcrypt = require('bcrypt');
+const { supabaseAdmin } = require('../config/db');
+const {
+	resolveStorageAsset,
+	uploadProfileImageIfNeeded,
+	deleteStorageAsset,
+	isHttpUrl,
+} = require('../utils/storage');
 
-function sanitize(text = '') {
-    return String(text).replace(/[%']/g, '').trim();
+const DEFAULT_PASSWORD = process.env.DEFAULT_PASSWORD_LOGIN || 'estimular_2025';
+const MIN_PASSWORD_LENGTH = 8;
+const RECEPCION_ROLE_NAMES = ['Recepción', 'Recepcion', 'Recepcionista', 'Secretario', 'Secretaria'];
+const PROFESSIONAL_ROLE_NAMES = ['Profesional', 'PROFESIONAL'];
+const PASSWORD_FORBIDDEN_PATTERNS = [/("|'|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
+
+function normalize(value) {
+	if (value === undefined || value === null) return '';
+	return String(value)
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.trim();
 }
 
-function isValidDateYYYYMMDD(s) {
-    if (!s || typeof s !== 'string') return false;
-    const m = s.match(/^\d{4}-\d{2}-\d{2}$/);
-    if (!m) return false;
-    const d = new Date(s);
-    return !isNaN(d.getTime());
+function normalizeTipo(value) {
+	const normalized = normalize(value);
+	if (!normalized || normalized === 'todos') return 'todos';
+	if (normalized.startsWith('recepcion') || normalized.startsWith('secretar')) {
+		return 'recepcion';
+	}
+	return 'profesional';
+}
+
+function isValidDni(dni) {
+	if (dni === undefined || dni === null) return false;
+	const text = String(dni).trim();
+	return /^\d{7,15}$/.test(text);
+}
+
+function isValidDate(value) {
+	if (!value) return false;
+	const date = new Date(value);
+	return !Number.isNaN(date.getTime());
 }
 
 function isSafePassword(pwd) {
-    const forbidden = [/('|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
-    return (
-        typeof pwd === 'string'
-        && pwd.length >= 8
-        && !forbidden.some((regex) => regex.test(pwd))
-    );
+	if (typeof pwd !== 'string') return false;
+	if (pwd.trim().length < MIN_PASSWORD_LENGTH) return false;
+	return !PASSWORD_FORBIDDEN_PATTERNS.some((regex) => regex.test(pwd));
 }
 
-async function resolveRoleIdMaybe(body) {
-    if (!body) return null;
-    const idCandidate = body.id_rol ?? body.rol_id;
-    if (idCandidate !== undefined && idCandidate !== null && !Number.isNaN(Number(idCandidate))) {
-        return Number(idCandidate);
-    }
-    if (body.rolNombre) {
-        const roleName = String(body.rolNombre).trim();
-        if (!roleName) return null;
-        try {
-            const { data, error } = await supabaseAdmin
-                .from('roles')
-                .select('id_rol, nombre_rol')
-                .eq('nombre_rol', roleName)
-                .limit(1)
-                .maybeSingle();
-            if (error) {
-                console.error('resolveRoleIdMaybe roles error:', error);
-                return null;
-            }
-            return data ? Number(data.id_rol) : null;
-        } catch (err) {
-            console.error('resolveRoleIdMaybe exception:', err);
-            return null;
-        }
-    }
-    return null;
+function normalizeEmail(email) {
+	if (email === undefined || email === null) return null;
+	const trimmed = String(email).trim();
+	return trimmed ? trimmed.toLowerCase() : null;
 }
 
-async function assignRoleToUser(usuarioId, rolId) {
-    if (!usuarioId || !rolId) return;
-    try {
-        // Usar conflicto compuesto; si falla por constraint ausente, intentar insert y omitir duplicados
-        let { error } = await supabaseAdmin
-            .from('usuario_roles')
-            .upsert(
-                [{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }],
-                { onConflict: 'usuario_id,rol_id' }
-            );
-        if (error) {
-            const ins = await supabaseAdmin
-                .from('usuario_roles')
-                .insert([{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }]);
-            if (ins.error && ins.error.code !== '23505') {
-                console.error('assignRoleToUser error:', ins.error);
-            }
-        }
-    } catch (err) {
-        console.error('assignRoleToUser exception:', err);
-    }
+function normalizePhone(phone) {
+	if (phone === undefined || phone === null) return null;
+	const trimmed = String(phone).trim();
+	return trimmed || null;
 }
 
-async function fetchRolesForUsers(userIds = []) {
-    const uniqueIds = Array.from(new Set((userIds || []).map((id) => Number(id)).filter((id) => !Number.isNaN(id))));
-    if (uniqueIds.length === 0) return {};
-    try {
-        const { data, error } = await supabaseAdmin
-            .from('usuario_roles')
-            .select(`
-                usuario_id,
-                rol_id,
-                rol:roles ( id_rol, nombre_rol )
-            `)
-            .in('usuario_id', uniqueIds);
-        if (error) {
-            console.error('fetchRolesForUsers error:', error);
-            return {};
-        }
-        const map = {};
-        for (const row of data || []) {
-            if (!row) continue;
-            const usuarioId = Number(row.usuario_id);
-            if (Number.isNaN(usuarioId)) continue;
-            if (!map[usuarioId]) {
-                map[usuarioId] = [];
-            }
-            map[usuarioId].push({
-                id: row.rol_id ?? row.rol?.id_rol ?? null,
-                nombre: row.rol?.nombre_rol ?? null,
-            });
-        }
-        return map;
-    } catch (err) {
-        console.error('fetchRolesForUsers exception:', err);
-        return {};
-    }
+async function ensureDniAvailable(dni, excludeUserId) {
+	const parsed = Number(dni);
+	if (Number.isNaN(parsed)) return false;
+	const query = supabaseAdmin
+		.from('usuarios')
+		.select('id_usuario')
+		.eq('dni', parsed)
+		.limit(1);
+
+	if (excludeUserId) {
+		query.neq('id_usuario', Number(excludeUserId));
+	}
+
+	const { data, error } = await query.maybeSingle();
+	if (error && error.code !== 'PGRST116') {
+		throw error;
+	}
+	return !data;
 }
 
-async function insertUsuario({ dni, contrasena, id_rol, activo = true }) {
-    const hash = await bcrypt.hash(String(contrasena), 12);
-    const basePayload = { dni: Number(dni), password_hash: hash, activo: !!activo };
+async function ensureEmailAvailable(email, excludePersonaId) {
+	if (!email) return true;
+	const query = supabaseAdmin
+		.from('personas')
+		.select('id')
+		.eq('email', email)
+		.limit(1);
 
-    let insertData = null;
-    let insertErr = null;
+	if (excludePersonaId) {
+		query.neq('id', Number(excludePersonaId));
+	}
 
-    ({ data: insertData, error: insertErr } = await supabaseAdmin
-        .from('usuarios')
-        .insert([basePayload])
-        .select('id_usuario, dni, activo')
-        .maybeSingle());
-
-    if (insertErr) throw insertErr;
-
-    await assignRoleToUser(insertData.id_usuario, id_rol);
-    return insertData;
+	const { data, error } = await query.maybeSingle();
+	if (error && error.code !== 'PGRST116') {
+		throw error;
+	}
+	return !data;
 }
 
-function mapProfesionalRow(row) {
-    if (!row) return row;
-    const departamento = row.departamento || null;
-    return {
-        ...row,
-        profesion: departamento?.nombre || null,
-        profesion_id: departamento?.id_departamento ?? row.id_departamento ?? null,
-    };
+async function fetchRolesCatalog() {
+	const { data, error } = await supabaseAdmin
+		.from('roles')
+		.select('id_rol, nombre_rol');
+	if (error) {
+		throw error;
+	}
+	return (data || []).map((role) => ({
+		id: Number(role.id_rol),
+		nombre: role.nombre_rol,
+		key: normalize(role.nombre_rol),
+	}));
 }
 
-async function mapProfesionalRowWithStorage(row) {
-    if (!row) return row;
-    const base = mapProfesionalRow(row);
-    const foto = await resolveStorageAsset(base?.foto_perfil);
-    return {
-        ...base,
-        foto_perfil: foto.signedUrl || base?.foto_perfil || null,
-        foto_perfil_url: foto.signedUrl || null,
-        foto_perfil_path: foto.path,
-    };
+async function resolveRoleIdsFromInputs(inputs = []) {
+	const numeric = new Set();
+	const names = new Set();
+
+	inputs.forEach((entry) => {
+		if (entry === undefined || entry === null) return;
+		if (typeof entry === 'number') {
+			if (!Number.isNaN(entry)) numeric.add(Number(entry));
+			return;
+		}
+		if (typeof entry === 'string') {
+			const trimmed = entry.trim();
+			if (!trimmed) return;
+			if (/^\d+$/.test(trimmed)) {
+				numeric.add(Number(trimmed));
+			} else {
+				names.add(trimmed);
+			}
+			return;
+		}
+		if (typeof entry === 'object') {
+			if (entry.id !== undefined) numeric.add(Number(entry.id));
+			if (entry.id_rol !== undefined) numeric.add(Number(entry.id_rol));
+			if (entry.rol_id !== undefined) numeric.add(Number(entry.rol_id));
+			if (entry.nombre !== undefined) names.add(entry.nombre);
+			if (entry.nombre_rol !== undefined) names.add(entry.nombre_rol);
+			if (entry.rolNombre !== undefined) names.add(entry.rolNombre);
+		}
+	});
+
+	const resolved = new Set(Array.from(numeric).filter((n) => Number.isInteger(n)));
+
+	if (names.size === 0) {
+		return Array.from(resolved);
+	}
+
+	let catalog = [];
+	try {
+		catalog = await fetchRolesCatalog();
+	} catch (err) {
+		console.warn('resolveRoleIdsFromInputs catalog error:', err);
+		return Array.from(resolved);
+	}
+
+	names.forEach((raw) => {
+		const key = normalize(raw);
+		const match =
+			catalog.find((item) => item.key === key) ||
+			catalog.find((item) => item.key.includes(key) || key.includes(item.key));
+		if (match) {
+			resolved.add(match.id);
+		} else {
+			console.warn('resolveRoleIdsFromInputs: rol no encontrado', raw);
+		}
+	});
+
+	return Array.from(resolved);
 }
 
-async function mapSecretarioRowWithStorage(row) {
-    if (!row) return row;
-    const foto = await resolveStorageAsset(row.foto_perfil);
-    return {
-        ...row,
-        foto_perfil: foto.signedUrl || row.foto_perfil || null,
-        foto_perfil_url: foto.signedUrl || null,
-        foto_perfil_path: foto.path,
-    };
+async function assignRoles(usuarioId, roleIds = []) {
+	if (!usuarioId || !Array.isArray(roleIds) || roleIds.length === 0) return;
+	await Promise.all(
+		roleIds.map(async (roleId) => {
+			if (!roleId) return;
+			try {
+				const { error } = await supabaseAdmin
+					.from('usuario_roles')
+					.upsert(
+						[{ usuario_id: Number(usuarioId), rol_id: Number(roleId) }],
+						{ onConflict: 'usuario_id,rol_id' },
+					);
+				if (error && error.code !== '23505') {
+					console.error('assignRoles upsert error:', error);
+				}
+			} catch (err) {
+				console.error('assignRoles exception:', err);
+			}
+		}),
+	);
 }
 
-// GET /api/equipo
-const listEquipo = async (req, res) => {
-    const {
-        search = '',
-        page = 1,
-        pageSize = 10,
-        activo = 'true',
-        profesion = '',
-        tipo = 'todos',
-        departamentoId: departamentoIdParam,
-        departamento: departamentoParam,
-    } = req.query || {};
+async function setPersonaProfession(personaId, departamentoId) {
+	if (!personaId) return;
+	try {
+		const { error } = await supabaseAdmin
+			.from('profesional_departamentos')
+			.delete()
+			.eq('profesional_id', Number(personaId));
+		if (error && error.code !== 'PGRST116') {
+			console.warn('setPersonaProfession delete warn:', error);
+		}
+	} catch (err) {
+		console.warn('setPersonaProfession delete exception:', err);
+	}
 
-    const departamentoRaw = departamentoIdParam ?? departamentoParam ?? '';
-    const departamentoId = Number.parseInt(departamentoRaw, 10);
-    const filterByDepartamento = departamentoRaw !== '' && !Number.isNaN(departamentoId);
+	if (departamentoId === undefined || departamentoId === null || departamentoId === '') {
+		return;
+	}
 
-    const pageNum = Math.max(Number.parseInt(page, 10) || 1, 1);
-    const size = Math.max(Number.parseInt(pageSize, 10) || 10, 1);
-    const tipoFiltro = String(tipo || 'todos').toLowerCase();
-    const includeProfesionales = tipoFiltro === 'profesional' || tipoFiltro === 'todos' || filterByDepartamento;
-    const includeSecretarios = tipoFiltro === 'secretario' || tipoFiltro === 'todos';
+	const parsed = Number(departamentoId);
+	if (Number.isNaN(parsed)) return;
 
-    const searchRaw = typeof search === 'string' ? search.trim() : '';
-    const profesionRaw = typeof profesion === 'string' ? profesion.trim() : '';
-    const searchLower = searchRaw.toLowerCase();
-    const searchDigits = searchRaw.replace(/\D/g, '');
-    const profesionLower = profesionRaw.toLowerCase();
-    const activoOnly = String(activo) !== 'false';
+	try {
+		const { error } = await supabaseAdmin
+			.from('profesional_departamentos')
+			.upsert(
+				[{ profesional_id: Number(personaId), departamento_id: parsed }],
+				{ onConflict: 'profesional_id,departamento_id' },
+			);
+		if (error && error.code !== '23505') {
+			console.warn('setPersonaProfession upsert warn:', error);
+		}
+	} catch (err) {
+		console.error('setPersonaProfession upsert exception:', err);
+	}
+}
 
-    try {
-        const miembros = [];
-        const userIds = new Set();
+async function processProfilePhoto(usuarioId, incoming, previousPath) {
+	if (incoming === undefined) {
+		return previousPath || null;
+	}
 
-        let profesionalesData = [];
-        if (includeProfesionales) {
-            const { data, error } = await supabaseAdmin
-                .from('profesionales')
-                .select(`
-                    id_profesional,
-                    nombre,
-                    apellido,
-                    telefono,
-                    email,
-                    fecha_nacimiento,
-                    foto_perfil,
-                    id_departamento,
-                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
-                    usuario:usuarios ( id_usuario, dni, activo, password_hash )
-                `)
-                .order('apellido', { ascending: true });
-            if (error) throw error;
-            profesionalesData = await Promise.all((data || []).map((row) => mapProfesionalRowWithStorage(row)));
-        }
+	if (!incoming) {
+		if (previousPath) {
+			await deleteStorageAsset(previousPath);
+		}
+		return null;
+	}
 
-        let secretariosData = [];
-        if (includeSecretarios) {
-            let secretariosResult = await supabaseAdmin
-                .from('secretarios')
-                .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                .order('apellido', { ascending: true });
+	if (typeof incoming === 'string' && incoming.startsWith('data:image')) {
+		const upload = await uploadProfileImageIfNeeded(usuarioId, incoming, { previousPath });
+		return upload?.path || previousPath || null;
+	}
 
-            if (secretariosResult.error && secretariosResult.error.code === '42703') {
-                secretariosResult = await supabaseAdmin
-                    .from('secretarios')
-                    .select('id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                    .order('apellido', { ascending: true });
-            }
+	if (typeof incoming === 'string') {
+		const trimmed = incoming.trim();
+		if (!trimmed) {
+			if (previousPath) {
+				await deleteStorageAsset(previousPath);
+			}
+			return null;
+		}
+		if (isHttpUrl(trimmed)) {
+			if (previousPath && previousPath !== trimmed) {
+				await deleteStorageAsset(previousPath);
+			}
+			return trimmed;
+		}
+		if (previousPath && previousPath !== trimmed) {
+			await deleteStorageAsset(previousPath);
+		}
+		return trimmed;
+	}
 
-            if (secretariosResult.error) throw secretariosResult.error;
-            const secretariosRaw = secretariosResult.data || [];
-            secretariosData = await Promise.all(secretariosRaw.map((row) => mapSecretarioRowWithStorage(row)));
-        }
+	return previousPath || null;
+}
 
-        const secretarioUserIds = secretariosData
-            .map((row) => Number(row.usuario_id ?? row.id))
-            .filter((id) => !Number.isNaN(id));
+async function fetchRolesMap(userIds = []) {
+	if (!Array.isArray(userIds) || userIds.length === 0) {
+		return new Map();
+	}
 
-        let usuariosSecretarios = [];
-        if (secretarioUserIds.length > 0) {
-            const { data, error } = await supabaseAdmin
-                .from('usuarios')
-                .select('id_usuario, dni, activo, password_hash')
-                .in('id_usuario', secretarioUserIds);
-            if (error) throw error;
-            usuariosSecretarios = data || [];
-        }
-        const usuariosMap = new Map();
-        usuariosSecretarios.forEach((user) => {
-            if (!user) return;
-            usuariosMap.set(Number(user.id_usuario), user);
-        });
+	const { data, error } = await supabaseAdmin
+		.from('usuario_roles')
+		.select('usuario_id, rol:roles(id_rol, nombre_rol)')
+		.in('usuario_id', userIds);
 
-        profesionalesData.forEach((row) => {
-            const user = row.usuario || {};
-            const userId = Number(user.id_usuario ?? row.id_profesional);
-            if (!userId || Number.isNaN(userId)) {
-                return;
-            }
-            userIds.add(userId);
-            miembros.push({
-                tipo: 'profesional',
-                id_usuario: userId,
-                id_profesional: row.id_profesional,
-                nombre: row.nombre || null,
-                apellido: row.apellido || null,
-                telefono: row.telefono === null || row.telefono === undefined ? null : String(row.telefono),
-                email: row.email || null,
-                fecha_nacimiento: row.fecha_nacimiento || null,
-                foto_perfil: row.foto_perfil || null,
-                foto_perfil_url: row.foto_perfil_url || row.foto_perfil || null,
-                foto_perfil_path: row.foto_perfil_path || null,
-                profesion: row.profesion || null,
-                profesion_id: row.profesion_id ?? null,
-                dni: user?.dni ?? null,
-                password_hash: user?.password_hash ?? null,
-                usuario_activo: user?.activo ?? null,
-            });
-        });
+	if (error) {
+		console.error('fetchRolesMap error:', error);
+		return new Map();
+	}
 
-        secretariosData.forEach((row) => {
-            const userId = Number(row.usuario_id ?? row.id);
-            if (!userId || Number.isNaN(userId)) {
-                return;
-            }
-            const user = usuariosMap.get(userId) || {};
-            userIds.add(userId);
-            miembros.push({
-                tipo: 'secretario',
-                id_usuario: userId,
-                id_secretario: row.id,
-                nombre: row.nombre || null,
-                apellido: row.apellido || null,
-                telefono: row.telefono === null || row.telefono === undefined ? null : String(row.telefono),
-                email: row.email || null,
-                fecha_nacimiento: row.fecha_nacimiento || null,
-                foto_perfil: row.foto_perfil || null,
-                foto_perfil_url: row.foto_perfil_url || row.foto_perfil || null,
-                foto_perfil_path: row.foto_perfil_path || null,
-                profesion: null,
-                profesion_id: null,
-                dni: user?.dni ?? null,
-                password_hash: user?.password_hash ?? null,
-                usuario_activo: user?.activo ?? null,
-            });
-        });
+	const map = new Map();
+	(data || []).forEach((row) => {
+		const usuarioId = Number(row.usuario_id);
+		if (Number.isNaN(usuarioId)) return;
+		const current = map.get(usuarioId) || [];
+		current.push({
+			id: row.rol?.id_rol ?? null,
+			nombre: row.rol?.nombre_rol ?? null,
+		});
+		map.set(usuarioId, current);
+	});
+	return map;
+}
 
-        const rolesMap = await fetchRolesForUsers(Array.from(userIds));
-        miembros.forEach((member) => {
-            const memberRoles = rolesMap[member.id_usuario] || [];
-            member.roles = memberRoles;
-            member.rol_principal = memberRoles[0]?.nombre
-                || (member.tipo === 'profesional'
-                    ? (member.profesion || 'Profesional')
-                    : 'Secretario/a');
-        });
+async function fetchProfessionMap(personaIds = []) {
+	if (!Array.isArray(personaIds) || personaIds.length === 0) {
+		return new Map();
+	}
 
-        const filtered = miembros.filter((member) => {
-            if (activoOnly && member.usuario_activo === false) return false;
+	const { data, error } = await supabaseAdmin
+		.from('profesional_departamentos')
+		.select('profesional_id, departamento:profesiones(id_departamento, nombre)')
+		.in('profesional_id', personaIds);
 
-            if (filterByDepartamento) {
-                if (member.tipo !== 'profesional') return false;
-                const memberDepartamentoId = Number.parseInt(
-                    member.profesion_id ?? member.id_departamento ?? member.departamento_id ?? null,
-                    10
-                );
-                if (Number.isNaN(memberDepartamentoId) || memberDepartamentoId !== departamentoId) {
-                    return false;
-                }
-            }
+	if (error) {
+		console.error('fetchProfessionMap error:', error);
+		return new Map();
+	}
 
-            if (profesionLower) {
-                const rolText = (member.rol_principal || '').toLowerCase();
-                const profText = (member.profesion || '').toLowerCase();
-                if (!rolText.includes(profesionLower) && !profText.includes(profesionLower)) {
-                    return false;
-                }
-            }
+	const map = new Map();
+	(data || []).forEach((row) => {
+		const personaId = Number(row.profesional_id);
+		if (Number.isNaN(personaId)) return;
+		map.set(personaId, row.departamento || null);
+	});
+	return map;
+}
 
-            if (searchLower) {
-                const values = [
-                    member.nombre,
-                    member.apellido,
-                    member.email,
-                    member.telefono,
-                    member.dni ? String(member.dni) : '',
-                    member.rol_principal,
-                    member.profesion,
-                ]
-                    .filter(Boolean)
-                    .map((v) => String(v).toLowerCase());
+async function mapMembers(rows = []) {
+	if (!Array.isArray(rows) || rows.length === 0) return [];
 
-                let matches = values.some((value) => value.includes(searchLower));
-                if (!matches && searchDigits) {
-                    const dniValue = member.dni ? String(member.dni) : '';
-                    matches = dniValue.includes(searchDigits);
-                }
+	const personaIds = rows
+		.map((row) => row.persona?.id ?? row.persona_id)
+		.filter((value) => value !== undefined && value !== null);
+	const userIds = rows
+		.map((row) => row.id_usuario)
+		.filter((value) => value !== undefined && value !== null);
 
-                if (!matches) return false;
-            }
+	const [roleMap, professionMap] = await Promise.all([
+		fetchRolesMap(userIds),
+		fetchProfessionMap(personaIds),
+	]);
 
-            return true;
-        });
+	return Promise.all(
+		rows.map(async (row) => {
+			const persona = row.persona || {};
+			const personaId = persona.id || row.persona_id || null;
+			const roles = roleMap.get(Number(row.id_usuario)) || [];
+			const profession = professionMap.get(Number(personaId)) || null;
+			const foto = await resolveStorageAsset(persona.foto_perfil);
 
-        filtered.sort((a, b) => {
-            const apellidoA = (a.apellido || '').toLowerCase();
-            const apellidoB = (b.apellido || '').toLowerCase();
-            if (apellidoA !== apellidoB) return apellidoA.localeCompare(apellidoB, 'es');
-            const nombreA = (a.nombre || '').toLowerCase();
-            const nombreB = (b.nombre || '').toLowerCase();
-            return nombreA.localeCompare(nombreB, 'es');
-        });
+			const hasRecepcionRole = roles.some((role) => {
+				const roleKey = normalize(role.nombre);
+				return roleKey.startsWith('recepcion') || roleKey.startsWith('secretar');
+			});
+			const tipo = hasRecepcionRole ? 'recepcion' : 'profesional';
 
-        const total = filtered.length;
-        const start = (pageNum - 1) * size;
-        const paginated = filtered.slice(start, start + size);
+			return {
+				tipo,
+				id_usuario: row.id_usuario,
+				persona_id: personaId,
+				id_profesional: personaId,
+				nombre: persona.nombre ?? null,
+				apellido: persona.apellido ?? null,
+				telefono: persona.telefono ?? null,
+				email: persona.email ?? null,
+				fecha_nacimiento: persona.fecha_nacimiento ?? null,
+				foto_perfil: persona.foto_perfil ?? null,
+				foto_perfil_url: foto.signedUrl || null,
+				foto_perfil_path: persona.foto_perfil || null,
+				profesion: profession?.nombre || (tipo === 'recepcion' ? 'Recepción' : null),
+				profesion_id: profession?.id_departamento ?? null,
+				dni: row.dni ?? null,
+				usuario_activo: row.activo,
+				roles,
+			};
+		}),
+	);
+}
 
-        return res.json({ success: true, data: paginated, total });
-    } catch (err) {
-        console.error('listEquipo error:', err);
-        return res.status(500).json({ success: false, message: 'Error al obtener equipo', error: err.message });
-    }
+function applyFilters(members, filters) {
+	const {
+		activoOnly,
+		tipoFiltro,
+		filterByDepartamento,
+		departamentoId,
+		profesionLower,
+		searchLower,
+		searchDigits,
+	} = filters;
+
+	return members.filter((member) => {
+		if (activoOnly && member.usuario_activo === false) return false;
+		if (tipoFiltro === 'profesional' && member.tipo !== 'profesional') return false;
+		if (tipoFiltro === 'recepcion' && member.tipo !== 'recepcion') return false;
+
+		if (filterByDepartamento) {
+			if (member.tipo !== 'profesional') return false;
+			const memberDept = Number(member.profesion_id ?? NaN);
+			if (Number.isNaN(memberDept) || memberDept !== departamentoId) return false;
+		}
+
+		if (profesionLower) {
+			const professionMatches =
+				(member.profesion || '').toLowerCase().includes(profesionLower) ||
+				(member.roles || []).some((role) => (role.nombre || '').toLowerCase().includes(profesionLower));
+			if (!professionMatches) return false;
+		}
+
+		if (searchLower) {
+			const values = [
+				member.nombre,
+				member.apellido,
+				member.email,
+				member.telefono,
+				member.profesion,
+			]
+				.filter(Boolean)
+				.map((value) => String(value).toLowerCase());
+			let matches = values.some((value) => value.includes(searchLower));
+			if (!matches && searchDigits) {
+				matches = String(member.dni ?? '').includes(searchDigits);
+			}
+			if (!matches) return false;
+		}
+
+		return true;
+	});
+}
+
+async function listEquipo(req, res) {
+	const {
+		search = '',
+		page = 1,
+		pageSize = 10,
+		activo = 'true',
+		profesion = '',
+		tipo = 'todos',
+		departamentoId: departamentoIdParam,
+		departamento: departamentoParam,
+	} = req.query || {};
+
+	const departamentoRaw = departamentoIdParam ?? departamentoParam ?? '';
+	const departamentoId = Number.parseInt(departamentoRaw, 10);
+	const pageNum = Math.max(Number.parseInt(page, 10) || 1, 1);
+	const size = Math.max(Number.parseInt(pageSize, 10) || 10, 1);
+
+	const tipoFiltro = normalizeTipo(tipo || 'todos');
+	const profesionLower = String(profesion || '').toLowerCase().trim();
+	const searchLower = String(search || '').toLowerCase().trim();
+	const searchDigits = searchLower.replace(/\D/g, '');
+	const filterByDepartamento = !Number.isNaN(departamentoId);
+
+	const filters = {
+		activoOnly: String(activo) !== 'false',
+		tipoFiltro,
+		filterByDepartamento,
+		departamentoId,
+		profesionLower,
+		searchLower,
+		searchDigits,
+	};
+
+	try {
+		const { data, error } = await supabaseAdmin
+			.from('usuarios')
+			.select(
+				`id_usuario,dni,activo,persona_id,persona:personas(id,nombre,apellido,telefono,email,fecha_nacimiento,foto_perfil)`,
+			)
+			.order('id_usuario', { ascending: true });
+
+		if (error) throw error;
+
+		const baseRows = (data || []).filter((row) => row.persona_id && row.persona);
+		if (baseRows.length === 0) {
+			return res.json({ success: true, data: [], total: 0 });
+		}
+
+		const members = await mapMembers(baseRows);
+		const filtered = applyFilters(members, filters).sort((a, b) => {
+			const lastName = (value) => (value ? String(value).toLowerCase() : '');
+			const compareLast = lastName(a.apellido).localeCompare(lastName(b.apellido), 'es');
+			if (compareLast !== 0) return compareLast;
+			return lastName(a.nombre).localeCompare(lastName(b.nombre), 'es');
+		});
+
+		const total = filtered.length;
+		const start = (pageNum - 1) * size;
+		const paginated = filtered.slice(start, start + size);
+
+		return res.json({ success: true, data: paginated, total });
+	} catch (err) {
+		console.error('listEquipo error:', err);
+		return res.status(500).json({
+			success: false,
+			message: 'Error al obtener equipo',
+			error: err.message,
+		});
+	}
+}
+
+async function buildRoleIdsFor(tipo, extraRoleInputs, adminFlag) {
+	const roleInputs = [];
+	if (Array.isArray(extraRoleInputs)) {
+		roleInputs.push(...extraRoleInputs);
+	}
+
+	if (tipo === 'recepcion') {
+		roleInputs.push(...RECEPCION_ROLE_NAMES);
+	} else {
+		roleInputs.push(...PROFESSIONAL_ROLE_NAMES);
+	}
+
+	if (adminFlag === true || String(adminFlag).trim().toLowerCase() === 'true') {
+		roleInputs.push('ADMIN');
+	}
+
+	const resolved = await resolveRoleIdsFromInputs(roleInputs);
+	return resolved;
+}
+
+async function crearIntegrante(req, res) {
+	const body = req.body || {};
+	const {
+		tipo = 'profesional',
+		nombre,
+		apellido,
+		telefono,
+		email,
+		fecha_nacimiento,
+		foto_perfil,
+		profesionId,
+		departamento_id,
+		dni,
+		contrasena,
+		rolesSeleccionados,
+		rolNombre,
+		es_admin,
+		esAdmin,
+		admin,
+	} = body;
+
+	if (!nombre || !apellido || !dni || !contrasena || !fecha_nacimiento) {
+		return res.status(400).json({
+			success: false,
+			message: 'Faltan datos obligatorios (nombre, apellido, dni, contrasena, fecha_nacimiento)',
+		});
+	}
+
+	if (!isValidDni(dni)) {
+		return res.status(400).json({ success: false, message: 'DNI inválido. Debe tener entre 7 y 15 números.' });
+	}
+
+	if (!isSafePassword(contrasena)) {
+		return res.status(400).json({ success: false, message: 'Contraseña inválida o insegura.' });
+	}
+
+	if (!isValidDate(fecha_nacimiento)) {
+		return res.status(400).json({ success: false, message: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
+	}
+
+	const normalizedTipo = normalizeTipo(tipo) === 'todos' ? 'profesional' : normalizeTipo(tipo);
+	const adminFlag = es_admin ?? esAdmin ?? admin ?? false;
+
+	if (
+		normalizedTipo === 'profesional' &&
+		profesionId === undefined &&
+		departamento_id === undefined
+	) {
+		return res.status(400).json({
+			success: false,
+			message: 'profesionId es obligatorio para profesionales',
+		});
+	}
+
+	let persona = null;
+	let usuario = null;
+
+	try {
+		const dniAvailable = await ensureDniAvailable(dni);
+		if (!dniAvailable) {
+			return res.status(409).json({ success: false, message: 'El DNI ingresado ya está en uso' });
+		}
+
+		const emailNormalized = normalizeEmail(email);
+		if (emailNormalized) {
+			const emailAvailable = await ensureEmailAvailable(emailNormalized);
+			if (!emailAvailable) {
+				return res.status(409).json({ success: false, message: 'El email ingresado ya está en uso' });
+			}
+		}
+
+		const personaPayload = {
+			nombre: String(nombre).trim(),
+			apellido: String(apellido).trim(),
+			telefono: normalizePhone(telefono),
+			email: normalizeEmail(email),
+			fecha_nacimiento: new Date(fecha_nacimiento).toISOString().slice(0, 10),
+			foto_perfil: null,
+		};
+
+		const personaInsert = await supabaseAdmin
+			.from('personas')
+			.insert([personaPayload])
+			.select('id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
+			.maybeSingle();
+
+		if (personaInsert.error) {
+			if (personaInsert.error.code === '23505') {
+				return res.status(409).json({ success: false, message: 'El email ingresado ya está en uso' });
+			}
+			throw personaInsert.error;
+		}
+
+		persona = personaInsert.data;
+
+		const hash = await bcrypt.hash(String(contrasena), 12);
+		const usuarioInsert = await supabaseAdmin
+			.from('usuarios')
+			.insert([
+				{
+					dni: Number(dni),
+					password_hash: hash,
+					activo: true,
+					persona_id: persona.id,
+				},
+			])
+			.select('id_usuario, dni, activo, persona_id')
+			.maybeSingle();
+
+		if (usuarioInsert.error) {
+			if (usuarioInsert.error.code === '23505') {
+				return res.status(409).json({ success: false, message: 'El DNI ingresado ya está en uso' });
+			}
+			throw usuarioInsert.error;
+		}
+
+		usuario = usuarioInsert.data;
+
+		if (foto_perfil) {
+			try {
+				const fotoPath = await processProfilePhoto(usuario.id_usuario, foto_perfil, null);
+				if (fotoPath !== null) {
+					await supabaseAdmin.from('personas').update({ foto_perfil: fotoPath }).eq('id', persona.id);
+					persona.foto_perfil = fotoPath;
+				}
+			} catch (fotoErr) {
+				console.warn('crearIntegrante foto error:', fotoErr);
+			}
+		}
+
+		const roleInputs = [...(Array.isArray(rolesSeleccionados) ? rolesSeleccionados : [])];
+		if (rolNombre) roleInputs.push(rolNombre);
+
+		const roleIds = await buildRoleIdsFor(normalizedTipo, roleInputs, adminFlag);
+		if (!roleIds.length) {
+			await supabaseAdmin.from('usuarios').delete().eq('id_usuario', usuario.id_usuario);
+			await supabaseAdmin.from('personas').delete().eq('id', persona.id);
+			return res.status(400).json({ success: false, message: 'No se pudieron asignar roles al integrante.' });
+		}
+
+		// limpiar roles previos en caso de residuos y asignar los nuevos
+		await supabaseAdmin.from('usuario_roles').delete().eq('usuario_id', usuario.id_usuario);
+		await assignRoles(usuario.id_usuario, roleIds);
+
+		if (normalizedTipo === 'profesional') {
+			const departamento = Number(profesionId ?? departamento_id);
+			await setPersonaProfession(persona.id, Number.isNaN(departamento) ? null : departamento);
+		} else {
+			await setPersonaProfession(persona.id, null);
+		}
+
+		const [member] = await mapMembers([
+			{
+				id_usuario: usuario.id_usuario,
+				dni: usuario.dni,
+				activo: usuario.activo,
+				persona_id: persona.id,
+				persona,
+			},
+		]);
+
+		return res.status(201).json({ success: true, data: member || null });
+	} catch (err) {
+		console.error('crearIntegrante error:', err);
+		if (usuario?.id_usuario) {
+			await supabaseAdmin.from('usuarios').delete().eq('id_usuario', usuario.id_usuario);
+		}
+		if (persona?.id) {
+			await supabaseAdmin.from('personas').delete().eq('id', persona.id);
+		}
+		return res.status(500).json({
+			success: false,
+			message: 'Error al crear integrante',
+			error: err.message,
+		});
+	}
+}
+
+async function updateMemberCore(userId, body, { forceRecepcion = false } = {}) {
+	const idValue = Number(userId);
+	if (Number.isNaN(idValue)) {
+		return { status: 400, message: 'Identificador inválido' };
+	}
+
+	const { data: usuarioRow, error: usuarioErr } = await supabaseAdmin
+		.from('usuarios')
+		.select(
+			`id_usuario,dni,activo,persona_id,persona:personas(id,nombre,apellido,telefono,email,fecha_nacimiento,foto_perfil)`,
+		)
+		.eq('id_usuario', idValue)
+		.maybeSingle();
+
+	if (usuarioErr) {
+		return { status: 500, message: usuarioErr.message || 'Error al obtener usuario' };
+	}
+	if (!usuarioRow) {
+		return { status: 404, message: 'Integrante no encontrado' };
+	}
+
+	const personaId = usuarioRow.persona?.id || usuarioRow.persona_id;
+	if (!personaId) {
+		return { status: 500, message: 'Integrante sin persona asociada' };
+	}
+
+	const personaPayload = {};
+	const {
+		nombre,
+		apellido,
+		telefono,
+		email,
+		fecha_nacimiento,
+		foto_perfil,
+		removeFoto,
+		profesionId,
+		profesion_id,
+		tipo,
+		tipoUsuario,
+		usuario: usuarioPayload = {},
+		nuevaContrasena,
+		dni,
+		activo,
+		rolesSeleccionados,
+		rolNombre,
+		es_admin,
+		esAdmin,
+		admin,
+	} = body || {};
+
+	if (nombre !== undefined) personaPayload.nombre = String(nombre).trim();
+	if (apellido !== undefined) personaPayload.apellido = String(apellido).trim();
+	if (telefono !== undefined) personaPayload.telefono = normalizePhone(telefono);
+	if (email !== undefined) personaPayload.email = normalizeEmail(email);
+
+	if (fecha_nacimiento !== undefined) {
+		if (!fecha_nacimiento) {
+			personaPayload.fecha_nacimiento = null;
+		} else if (!isValidDate(fecha_nacimiento)) {
+			return { status: 400, message: 'fecha_nacimiento debe tener formato YYYY-MM-DD' };
+		} else {
+			personaPayload.fecha_nacimiento = new Date(fecha_nacimiento).toISOString().slice(0, 10);
+		}
+	}
+
+	const previousPhotoPath = usuarioRow.persona?.foto_perfil || null;
+	if (removeFoto === true) {
+		personaPayload.foto_perfil = await processProfilePhoto(idValue, null, previousPhotoPath);
+	} else if (foto_perfil !== undefined) {
+		personaPayload.foto_perfil = await processProfilePhoto(idValue, foto_perfil, previousPhotoPath);
+	}
+
+	if (
+		personaPayload.email !== undefined &&
+		personaPayload.email !== usuarioRow.persona?.email
+	) {
+		const emailAvailable = await ensureEmailAvailable(personaPayload.email, personaId);
+		if (!emailAvailable) {
+			return { status: 409, message: 'El email ingresado ya está en uso' };
+		}
+	}
+
+	if (Object.keys(personaPayload).length > 0) {
+		const { error: personaUpdateErr } = await supabaseAdmin
+			.from('personas')
+			.update(personaPayload)
+			.eq('id', Number(personaId));
+		if (personaUpdateErr) {
+			return {
+				status: 500,
+				message: personaUpdateErr.message || 'No se pudo actualizar la persona',
+			};
+		}
+	}
+
+	let resolvedTipo = forceRecepcion ? 'recepcion' : null;
+	if (!resolvedTipo) {
+		resolvedTipo = normalizeTipo(tipo ?? tipoUsuario) || 'profesional';
+		if (resolvedTipo === 'todos') {
+			resolvedTipo = 'profesional';
+		}
+	}
+
+	let profesionValue = profesionId;
+	if (profesionValue === undefined && profesion_id !== undefined) {
+		profesionValue = profesion_id;
+	}
+
+	if (resolvedTipo === 'recepcion' || forceRecepcion) {
+		profesionValue = null;
+	}
+
+	if (profesionValue !== undefined) {
+		if (profesionValue === null || profesionValue === '' || Number.isNaN(Number(profesionValue))) {
+			await setPersonaProfession(personaId, null);
+		} else {
+			const parsed = Number(profesionValue);
+			if (Number.isNaN(parsed)) {
+				return { status: 400, message: 'profesionId inválido' };
+			}
+			await setPersonaProfession(personaId, parsed);
+		}
+	}
+
+	const userUpdatePayload = {};
+	const dniValue = usuarioPayload.dni ?? dni;
+	if (dniValue !== undefined) {
+		if (!isValidDni(dniValue)) {
+			return { status: 400, message: 'DNI inválido. Debe tener entre 7 y 15 números.' };
+		}
+		const dniAvailable = await ensureDniAvailable(dniValue, idValue);
+		if (!dniAvailable) {
+			return { status: 409, message: 'El DNI ingresado ya está en uso' };
+		}
+		userUpdatePayload.dni = Number(dniValue);
+	}
+
+	const activoValue = usuarioPayload.activo ?? activo;
+	if (activoValue !== undefined) {
+		userUpdatePayload.activo = Boolean(activoValue);
+	}
+
+	const passwordValue = usuarioPayload.contrasena ?? nuevaContrasena;
+	if (passwordValue) {
+		if (!isSafePassword(passwordValue)) {
+			return { status: 400, message: 'Contraseña inválida o insegura' };
+		}
+		if (String(passwordValue) === DEFAULT_PASSWORD) {
+			return { status: 400, message: 'Elegí una contraseña distinta a la genérica' };
+		}
+		userUpdatePayload.password_hash = await bcrypt.hash(String(passwordValue), 12);
+	}
+
+	if (Object.keys(userUpdatePayload).length > 0) {
+		const { error: usuarioUpdateErr } = await supabaseAdmin
+			.from('usuarios')
+			.update(userUpdatePayload)
+			.eq('id_usuario', idValue);
+		if (usuarioUpdateErr) {
+			return {
+				status: 500,
+				message: usuarioUpdateErr.message || 'No se pudieron actualizar las credenciales',
+			};
+		}
+	}
+
+	const roleInputs = [...(Array.isArray(rolesSeleccionados) ? rolesSeleccionados : [])];
+	if (rolNombre) roleInputs.push(rolNombre);
+	const adminFlag = es_admin ?? esAdmin ?? admin ?? false;
+
+	const roleIds = await buildRoleIdsFor(forceRecepcion ? 'recepcion' : resolvedTipo, roleInputs, adminFlag);
+	if (roleIds.length) {
+		await supabaseAdmin.from('usuario_roles').delete().eq('usuario_id', idValue);
+		await assignRoles(idValue, roleIds);
+	}
+
+	const { data: freshRow, error: freshErr } = await supabaseAdmin
+		.from('usuarios')
+		.select(
+			`id_usuario,dni,activo,persona_id,persona:personas(id,nombre,apellido,telefono,email,fecha_nacimiento,foto_perfil)`,
+		)
+		.eq('id_usuario', idValue)
+		.maybeSingle();
+
+	if (freshErr) {
+		return { status: 500, message: freshErr.message || 'No se pudo recuperar el integrante actualizado' };
+	}
+
+	const members = await mapMembers([freshRow]);
+	return { status: 200, data: members[0] || null };
+}
+
+async function editarIntegrante(req, res) {
+	const { id_profesional } = req.params;
+	const result = await updateMemberCore(id_profesional, req.body || {}, {});
+	if (result.status !== 200) {
+		return res.status(result.status).json({ success: false, message: result.message });
+	}
+	return res.json({ success: true, data: result.data });
+}
+
+async function editarRecepcion(req, res) {
+	const { id_recepcion } = req.params;
+	const result = await updateMemberCore(id_recepcion, req.body || {}, { forceRecepcion: true });
+	if (result.status !== 200) {
+		return res.status(result.status).json({ success: false, message: result.message });
+	}
+	return res.json({ success: true, data: result.data });
+}
+
+async function borrarIntegrante(req, res) {
+	const { id_profesional } = req.params;
+	const parsedId = Number(id_profesional);
+	if (Number.isNaN(parsedId)) {
+		return res.status(400).json({ success: false, message: 'Falta id_profesional' });
+	}
+
+	try {
+		const { data, error } = await supabaseAdmin
+			.from('usuarios')
+			.update({ activo: false })
+			.eq('id_usuario', parsedId)
+			.select('id_usuario, activo')
+			.maybeSingle();
+		if (error) throw error;
+		if (!data) {
+			return res.status(404).json({ success: false, message: 'Integrante no encontrado' });
+		}
+		return res.json({ success: true, data });
+	} catch (err) {
+		console.error('borrarIntegrante error:', err);
+		return res.status(500).json({
+			success: false,
+			message: 'Error al eliminar integrante',
+			error: err.message,
+		});
+	}
+}
+
+async function restablecerContrasena(req, res) {
+	const { id_usuario } = req.params;
+	const { nuevaContrasena, contrasena, password } = req.body || {};
+	const userId = Number(id_usuario);
+
+	if (Number.isNaN(userId)) {
+		return res.status(400).json({ success: false, message: 'id_usuario inválido' });
+	}
+
+	const nueva = nuevaContrasena ?? contrasena ?? password ?? DEFAULT_PASSWORD;
+	if (!isSafePassword(nueva)) {
+		return res.status(400).json({
+			success: false,
+			message: 'Contraseña inválida. Debe tener al menos 8 caracteres y no contener patrones prohibidos.',
+		});
+	}
+	if (String(nueva) === DEFAULT_PASSWORD) {
+		return res.status(400).json({ success: false, message: 'Elegí una contraseña distinta a la genérica' });
+	}
+
+	try {
+		const { data: existingUser, error: fetchErr } = await supabaseAdmin
+			.from('usuarios')
+			.select('id_usuario')
+			.eq('id_usuario', userId)
+			.maybeSingle();
+		if (fetchErr) throw fetchErr;
+		if (!existingUser) {
+			return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+		}
+
+		const hash = await bcrypt.hash(String(nueva), 12);
+		const { error: updateErr } = await supabaseAdmin
+			.from('usuarios')
+			.update({ password_hash: hash })
+			.eq('id_usuario', userId);
+		if (updateErr) throw updateErr;
+
+		return res.json({ success: true, message: 'Contraseña restablecida' });
+	} catch (err) {
+		console.error('restablecerContrasena error:', err);
+		return res.status(500).json({
+			success: false,
+			message: 'Error al restablecer la contraseña',
+			error: err.message,
+		});
+	}
+}
+
+module.exports = {
+	listEquipo,
+	crearIntegrante,
+	editarIntegrante,
+	editarRecepcion,
+	borrarIntegrante,
+	restablecerContrasena,
 };
-
-// POST /api/equipo
-const crearIntegrante = async (req, res) => {
-    const body = req.body || {};
-    const {
-        tipo = 'profesional',
-        nombre,
-        apellido,
-        telefono,
-        email,
-        fecha_nacimiento,
-        foto_perfil,
-        profesionId,
-        departamento_id,
-        dni,
-        contrasena,
-    } = body;
-
-    const roleId = await resolveRoleIdMaybe(body);
-
-    if (!nombre || !apellido || !dni || !contrasena || !fecha_nacimiento) {
-        return res.status(400).json({ success: false, message: 'Faltan datos obligatorios (nombre, apellido, dni, contrasena, fecha_nacimiento)' });
-    }
-    if (!/^\d{7,15}$/.test(String(dni))) {
-        return res.status(400).json({ success: false, message: 'DNI inválido (7-15 dígitos)' });
-    }
-    if (!isValidDateYYYYMMDD(String(fecha_nacimiento))) {
-        return res.status(400).json({ success: false, message: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
-    }
-
-    const normalizedTipo = String(tipo).toLowerCase();
-    if (normalizedTipo === 'profesional') {
-        const resolvedDep = profesionId ?? departamento_id;
-        if (resolvedDep === undefined || resolvedDep === null || Number.isNaN(Number(resolvedDep))) {
-            return res.status(400).json({ success: false, message: 'profesionId es obligatorio para profesionales' });
-        }
-    }
-
-    let insertedUsuario = null;
-    try {
-        insertedUsuario = await insertUsuario({ dni, contrasena, id_rol: roleId, activo: true });
-
-        if (normalizedTipo === 'profesional') {
-            const resolvedDep = Number(profesionId ?? departamento_id);
-            const profesionalPayload = {
-                id_profesional: insertedUsuario.id_usuario,
-                nombre,
-                apellido,
-                telefono: telefono || null,
-                email: email || null,
-                fecha_nacimiento: String(fecha_nacimiento),
-                foto_perfil: foto_perfil || null,
-                id_departamento: resolvedDep,
-            };
-
-            const { data: profesional, error: profesionalErr } = await supabaseAdmin
-                .from('profesionales')
-                .insert([profesionalPayload])
-                .select(`
-          id_profesional,
-          nombre,
-          apellido,
-          telefono,
-          email,
-          fecha_nacimiento,
-          foto_perfil,
-          id_departamento,
-                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
-        `)
-                .maybeSingle();
-            if (profesionalErr) throw profesionalErr;
-
-            await supabaseAdmin
-                .from('profesional_departamentos')
-                .upsert(
-                    [{ profesional_id: insertedUsuario.id_usuario, departamento_id: resolvedDep }],
-                    { onConflict: 'profesional_id,departamento_id' }
-                );
-
-            const mappedProfesional = await mapProfesionalRowWithStorage(profesional);
-            return res.status(201).json({ success: true, data: mappedProfesional });
-        }
-
-        // Secretarios
-        const secretarioPayloadBase = {
-            nombre,
-            apellido,
-            telefono: telefono || null,
-            email: email || null,
-            fecha_nacimiento: String(fecha_nacimiento),
-            foto_perfil: foto_perfil || null,
-        };
-
-        let secretario = null;
-        let secretarioErr = null;
-        let hasUsuarioIdColumn = true;
-
-        ({ data: secretario, error: secretarioErr } = await supabaseAdmin
-            .from('secretarios')
-            .upsert([
-                {
-                    ...secretarioPayloadBase,
-                    usuario_id: insertedUsuario.id_usuario,
-                },
-            ], { onConflict: 'usuario_id', ignoreDuplicates: false })
-            .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-            .maybeSingle());
-
-        if (secretarioErr && secretarioErr.code === '42703') {
-            hasUsuarioIdColumn = false;
-            ({ data: secretario, error: secretarioErr } = await supabaseAdmin
-                .from('secretarios')
-                .upsert([
-                    {
-                        ...secretarioPayloadBase,
-                        id: insertedUsuario.id_usuario,
-                    },
-                ], { onConflict: 'id', ignoreDuplicates: false })
-                .select('id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                .maybeSingle());
-        }
-
-        if (secretarioErr && ['428C9'].includes(secretarioErr.code)) {
-            try {
-                const overridePayload = {
-                    id: insertedUsuario.id_usuario,
-                    nombre,
-                    apellido,
-                    telefono: telefono || null,
-                    email: email || null,
-                    fecha_nacimiento: String(fecha_nacimiento),
-                    foto_perfil: foto_perfil || null,
-                };
-                if (hasUsuarioIdColumn) {
-                    overridePayload.usuario_id = insertedUsuario.id_usuario;
-                }
-
-                secretario = await upsertWithIdentityOverride(
-                    'secretarios',
-                    overridePayload,
-                    { onConflict: 'id' }
-                );
-                secretarioErr = null;
-            } catch (overrideErr) {
-                secretarioErr = overrideErr;
-            }
-        }
-
-        if (secretarioErr) throw secretarioErr;
-
-        const mappedSecretario = await mapSecretarioRowWithStorage(secretario);
-        return res.status(201).json({ success: true, data: mappedSecretario });
-    } catch (err) {
-        if (insertedUsuario) {
-            try {
-                await supabaseAdmin.from('usuarios').delete().eq('id_usuario', insertedUsuario.id_usuario);
-            } catch (rollbackErr) {
-                console.error('rollback usuario error:', rollbackErr);
-            }
-        }
-        console.error('crearIntegrante error:', err);
-        return res.status(500).json({ success: false, message: 'Error al crear integrante', error: err.message });
-    }
-};
-
-// PUT /api/equipo/:id_profesional
-const editarIntegrante = async (req, res) => {
-    const { id_profesional } = req.params;
-    if (!id_profesional) return res.status(400).json({ success: false, message: 'Falta id_profesional' });
-    const body = req.body || {};
-    const usuarioUpd = body.usuario || {};
-
-    try {
-        const allowedProfesional = ['nombre', 'apellido', 'telefono', 'email', 'fecha_nacimiento', 'foto_perfil', 'id_departamento', 'profesionId'];
-        const profPayload = {};
-        for (const k of allowedProfesional) {
-            if (body[k] !== undefined) profPayload[k] = body[k];
-        }
-
-        let updatedProfesional = null;
-        if (Object.keys(profPayload).length > 0) {
-            if (profPayload.fecha_nacimiento) {
-                const d = new Date(profPayload.fecha_nacimiento);
-                if (!isNaN(d)) profPayload.fecha_nacimiento = d.toISOString().slice(0, 10);
-            }
-            const depValue = profPayload.profesionId ?? profPayload.id_departamento;
-            if (depValue !== undefined) {
-                profPayload.id_departamento = depValue === null ? null : Number(depValue);
-                delete profPayload.profesionId;
-            }
-
-            const { data, error } = await supabaseAdmin
-                .from('profesionales')
-                .update(profPayload)
-                .eq('id_profesional', Number(id_profesional))
-                .select(`
-          id_profesional,
-          nombre,
-          apellido,
-          telefono,
-          email,
-          fecha_nacimiento,
-          foto_perfil,
-          id_departamento,
-                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
-        `)
-                .maybeSingle();
-            if (error) throw error;
-            updatedProfesional = mapProfesionalRow(data);
-
-            if (profPayload.id_departamento !== undefined && profPayload.id_departamento !== null) {
-                const { error: depErr } = await supabaseAdmin
-                    .from('profesional_departamentos')
-                    .upsert(
-                        [{ profesional_id: Number(id_profesional), departamento_id: profPayload.id_departamento }],
-                        { onConflict: 'profesional_id,departamento_id' }
-                    );
-                if (depErr && depErr.code !== '23505') {
-                    console.warn('editarIntegrante profesional_departamentos warning:', depErr.message);
-                }
-            }
-        }
-
-        let updatedUser = null;
-        if (usuarioUpd && Object.keys(usuarioUpd).length > 0) {
-            const userPayload = {};
-            if (usuarioUpd.dni !== undefined) userPayload.dni = Number(usuarioUpd.dni);
-            if (usuarioUpd.activo !== undefined) userPayload.activo = !!usuarioUpd.activo;
-            if (usuarioUpd.contrasena) {
-                userPayload.password_hash = await bcrypt.hash(String(usuarioUpd.contrasena), 12);
-            }
-
-            if (Object.keys(userPayload).length > 0) {
-                let userUpdateErr = null;
-                ({ data: updatedUser, error: userUpdateErr } = await supabaseAdmin
-                    .from('usuarios')
-                    .update(userPayload)
-                    .eq('id_usuario', Number(id_profesional))
-                    .select('id_usuario, dni, activo')
-                    .maybeSingle());
-
-                if (userUpdateErr) throw userUpdateErr;
-
-                if (usuarioUpd.id_rol !== undefined) {
-                    await assignRoleToUser(Number(id_profesional), Number(usuarioUpd.id_rol));
-                }
-            }
-        }
-
-        if (!updatedProfesional || !updatedUser) {
-            const { data: current, error: currErr } = await supabaseAdmin
-                .from('profesionales')
-                .select(`
-          id_profesional,
-          nombre,
-          apellido,
-          telefono,
-          email,
-          fecha_nacimiento,
-          foto_perfil,
-          id_departamento,
-                    departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre ),
-        usuario:usuarios ( id_usuario, dni, activo )
-        `)
-                .eq('id_profesional', Number(id_profesional))
-                .maybeSingle();
-            if (currErr) throw currErr;
-            const mappedCurrent = await mapProfesionalRowWithStorage(current);
-            return res.json({ success: true, data: mappedCurrent });
-        }
-
-        const mappedUpdate = updatedProfesional
-            ? await mapProfesionalRowWithStorage(updatedProfesional)
-            : null;
-        return res.json({
-            success: true,
-            data: {
-                ...(mappedUpdate || {}),
-                usuario: updatedUser || {},
-            },
-        });
-    } catch (err) {
-        console.error('editarIntegrante error:', err);
-        return res.status(500).json({ success: false, message: 'Error al editar integrante', error: err.message });
-    }
-};
-
-const editarSecretario = async (req, res) => {
-    const { id_secretario } = req.params;
-    const idValue = Number(id_secretario);
-    if (!id_secretario || Number.isNaN(idValue)) {
-        return res.status(400).json({ success: false, message: 'Falta id_secretario válido' });
-    }
-
-    const body = req.body || {};
-    const usuarioUpd = body.usuario || {};
-
-    try {
-        const allowedSecretario = ['nombre', 'apellido', 'telefono', 'email', 'fecha_nacimiento', 'foto_perfil'];
-        const secretarioPayload = {};
-        for (const k of allowedSecretario) {
-            if (body[k] !== undefined) secretarioPayload[k] = body[k];
-        }
-
-        let updatedSecretario = null;
-        if (Object.keys(secretarioPayload).length > 0) {
-            if (secretarioPayload.fecha_nacimiento) {
-                const d = new Date(secretarioPayload.fecha_nacimiento);
-                if (!Number.isNaN(d.getTime())) {
-                    secretarioPayload.fecha_nacimiento = d.toISOString().slice(0, 10);
-                }
-            }
-
-            let updateErr = null;
-            ({ data: updatedSecretario, error: updateErr } = await supabaseAdmin
-                .from('secretarios')
-                .update(secretarioPayload)
-                .eq('usuario_id', idValue)
-                .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                .maybeSingle());
-
-            if (updateErr && updateErr.code === '42703') {
-                ({ data: updatedSecretario, error: updateErr } = await supabaseAdmin
-                    .from('secretarios')
-                    .update(secretarioPayload)
-                    .eq('id', idValue)
-                    .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                    .maybeSingle());
-            }
-
-            if (updateErr) throw updateErr;
-
-            if (!updatedSecretario) {
-                let fetchErr = null;
-                ({ data: updatedSecretario, error: fetchErr } = await supabaseAdmin
-                    .from('secretarios')
-                    .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                    .eq('usuario_id', idValue)
-                    .maybeSingle());
-
-                if (fetchErr && fetchErr.code === '42703') {
-                    ({ data: updatedSecretario, error: fetchErr } = await supabaseAdmin
-                        .from('secretarios')
-                        .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                        .eq('id', idValue)
-                        .maybeSingle());
-                }
-
-                if (fetchErr) throw fetchErr;
-            }
-        } else {
-            let fetchErr = null;
-            ({ data: updatedSecretario, error: fetchErr } = await supabaseAdmin
-                .from('secretarios')
-                .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                .eq('usuario_id', idValue)
-                .maybeSingle());
-
-            if (fetchErr && fetchErr.code === '42703') {
-                ({ data: updatedSecretario, error: fetchErr } = await supabaseAdmin
-                    .from('secretarios')
-                    .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-                    .eq('id', idValue)
-                    .maybeSingle());
-            }
-
-            if (fetchErr) throw fetchErr;
-        }
-
-        let updatedUser = null;
-        if (usuarioUpd && Object.keys(usuarioUpd).length > 0) {
-            const userPayload = {};
-            if (usuarioUpd.dni !== undefined) userPayload.dni = Number(usuarioUpd.dni);
-            if (usuarioUpd.activo !== undefined) userPayload.activo = !!usuarioUpd.activo;
-            if (usuarioUpd.contrasena) {
-                userPayload.password_hash = await bcrypt.hash(String(usuarioUpd.contrasena), 12);
-            }
-
-            if (Object.keys(userPayload).length > 0) {
-                let userUpdateErr = null;
-                ({ data: updatedUser, error: userUpdateErr } = await supabaseAdmin
-                    .from('usuarios')
-                    .update(userPayload)
-                    .eq('id_usuario', idValue)
-                    .select('id_usuario, dni, activo')
-                    .maybeSingle());
-
-                if (userUpdateErr) throw userUpdateErr;
-            }
-        }
-
-        const mappedSecretario = await mapSecretarioRowWithStorage(updatedSecretario);
-        return res.json({ success: true, data: { ...mappedSecretario, usuario: updatedUser || {} } });
-    } catch (err) {
-        console.error('editarSecretario error:', err);
-        return res.status(500).json({ success: false, message: 'Error al editar secretario', error: err.message });
-    }
-};
-
-// DELETE /api/equipo/:id_profesional
-const borrarIntegrante = async (req, res) => {
-    const { id_profesional } = req.params;
-    if (!id_profesional) return res.status(400).json({ success: false, message: 'Falta id_profesional' });
-    try {
-        const { data, error } = await supabaseAdmin
-            .from('usuarios')
-            .update({ activo: false })
-            .eq('id_usuario', Number(id_profesional))
-            .select('id_usuario, activo')
-            .maybeSingle();
-        if (error) throw error;
-        return res.json({ success: true, data });
-    } catch (err) {
-        console.error('borrarIntegrante error:', err);
-        return res.status(500).json({ success: false, message: 'Error al eliminar integrante', error: err.message });
-    }
-};
-
-const restablecerContrasena = async (req, res) => {
-    const { id_usuario } = req.params;
-    const { nuevaContrasena, contrasena, password } = req.body || {};
-
-    const userId = Number(id_usuario);
-    if (!id_usuario || Number.isNaN(userId)) {
-        return res.status(400).json({ success: false, message: 'id_usuario inválido' });
-    }
-
-    const nueva = nuevaContrasena ?? contrasena ?? password;
-    if (!isSafePassword(nueva)) {
-        return res.status(400).json({ success: false, message: 'Contraseña inválida. Debe tener al menos 8 caracteres y no contener patrones prohibidos.' });
-    }
-
-    try {
-        const { data: existingUser, error: fetchErr } = await supabaseAdmin
-            .from('usuarios')
-            .select('id_usuario')
-            .eq('id_usuario', userId)
-            .maybeSingle();
-        if (fetchErr) throw fetchErr;
-        if (!existingUser) {
-            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-        }
-
-        const hash = await bcrypt.hash(String(nueva), 12);
-        const { error: updateErr } = await supabaseAdmin
-            .from('usuarios')
-            .update({ password_hash: hash })
-            .eq('id_usuario', userId);
-        if (updateErr) throw updateErr;
-
-        return res.json({ success: true, message: 'Contraseña restablecida' });
-    } catch (err) {
-        console.error('restablecerContrasena error:', err);
-        return res.status(500).json({ success: false, message: 'Error al restablecer la contraseña', error: err.message });
-    }
-};
-
-module.exports = { listEquipo, crearIntegrante, editarIntegrante, editarSecretario, borrarIntegrante, restablecerContrasena };

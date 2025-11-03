@@ -337,7 +337,7 @@ export default function EditarProfesional() {
         <div>
           <label htmlFor="foto_perfil">Foto de perfil</label>
           <p className="help-text">
-            Se mostrará en el listado de profesionales y secretaría.
+            Se mostrará en el listado de profesionales y recepción.
           </p>
           <input
             id="foto_perfil"
@@ -462,7 +462,7 @@ export default function EditarProfesional() {
               <div className="form-group">
                 <label>Rol</label>
                 <input
-                  value={user?.rol_nombre || "Secretaría"}
+                  value={user?.rol_nombre || "Recepción"}
                   disabled
                   className="readonly"
                 />

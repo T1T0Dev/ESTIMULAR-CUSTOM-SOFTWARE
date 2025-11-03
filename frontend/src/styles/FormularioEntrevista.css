@@ -92,6 +92,7 @@
   align-items: center;
 }
 
+
 .entrevista__form {
   display: flex;
   flex-direction: column;
@@ -145,9 +146,6 @@
 .entrevista__nav .btn-nav[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
-}
-.entrevista__nav .btn-nav:hover:not([disabled]) {
-  filter: brightness(1.08);
 }
 .entrevista__nav .btn-outline:hover:not([disabled]) {
   background: rgba(255, 182, 193, 0.08);
@@ -308,6 +306,9 @@ select.entrevista__input:focus {
   transition: all 0.25s ease;
   min-height: 44px; /* touch target */
 }
+.btn-opcion + .btn-opcion {
+  margin-left: 0.25rem;
+}
 .btn-opcion:hover {
   border-color: var(--color-rosa1);
   color: var(--color-rosa1);
@@ -332,7 +333,6 @@ select.entrevista__input:focus {
   margin-top: 0.15rem;
   color: var(--color-gris-label);
   text-align: right;
-}
 
 /* ===========================
    Términos + Confidencialidad
@@ -477,6 +477,31 @@ select.entrevista__input:focus {
   filter: saturate(0.75);
 }
 
+@media (max-width: 540px) {
+  .entrevista__screen {
+    min-height: auto;
+    height: auto;
+  }
+  .entrevista__form {
+    padding: 0.95rem;
+    gap: 0.65rem;
+  }
+  .entrevista__form fieldset {
+    padding: 0.75rem;
+  }
+  .entrevista__titulo {
+    font-size: clamp(1.4rem, 4.5vw, 2rem);
+  }
+  .entrevista__nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .entrevista__nav .btn-nav {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ===========================
    Checkboxes de Servicios
 =========================== */
@@ -495,33 +520,33 @@ select.entrevista__input:focus {
 .checkbox-item {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.65rem 0.9rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   border: 1.5px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--color-fondo);
   color: var(--color-text);
   cursor: pointer;
   user-select: none;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  min-height: 44px; /* touch target */
+  min-height: 38px; /* mantiene área táctil sin verse sobredimensionado */
 }
 .checkbox-item:hover {
   border-color: var(--color-rosa1);
   box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.18);
 }
 .checkbox-item input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
   border: 1.5px solid var(--color-border);
   background: var(--color-fondo);
   appearance: none;
   outline: none;
   position: relative;
   display: inline-block;
-  flex: 0 0 22px;
+  flex: 0 0 18px;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .checkbox-item input[type="checkbox"]:focus {
@@ -535,7 +560,8 @@ select.entrevista__input:focus {
 .checkbox-item input[type="checkbox"]:checked::after {
   content: "✓";
   color: var(--color-fondo);
-  font-size: 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -543,7 +569,7 @@ select.entrevista__input:focus {
 }
 .checkbox-item > span {
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.15;
 }
 .checkbox-item:has(input[type="checkbox"]:checked) {
   background: rgba(255, 182, 193, 0.08);
@@ -600,4 +626,5 @@ select.entrevista__input:focus {
     animation: none !important;
     transition: none !important;
   }
+}
 }

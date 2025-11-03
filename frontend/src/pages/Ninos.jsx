@@ -4,7 +4,14 @@ import "../styles/NinosPage.css";
 import CrearNino from "../components/CrearNino";
 import Swal from "sweetalert2";
 import { MdEdit, MdDelete } from "react-icons/md";
-import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
+import {
+  FaCheck,
+  FaTimes,
+  FaInfoCircle,
+  FaStar,
+  FaUserPlus,
+  FaUnlink,
+} from "react-icons/fa";
 import { formatDateDMY } from "../utils/date";
 import API_BASE_URL from "../constants/api";
 import { parseNinosResponse } from "../utils/ninoResponse";
@@ -36,6 +43,13 @@ export default function Ninos() {
   const [modalData, setModalData] = useState(null);
   const [obrasSociales, setObrasSociales] = useState([]);
   const skipPageEffectRef = useRef(false);
+  const [responsablesVinculados, setResponsablesVinculados] = useState([]);
+  const [responsablesLoading, setResponsablesLoading] = useState(false);
+  const [responsablesError, setResponsablesError] = useState(null);
+  const [responsableSearch, setResponsableSearch] = useState("");
+  const [responsableResults, setResponsableResults] = useState([]);
+  const [responsableSearchLoading, setResponsableSearchLoading] =
+    useState(false);
 
   function useDebounce(value, delay) {
     const [debounced, setDebounced] = useState(value);
@@ -46,12 +60,15 @@ export default function Ninos() {
     return debounced;
   }
   const debouncedBusqueda = useDebounce(busqueda, 300);
+  const debouncedResponsableSearch = useDebounce(responsableSearch, 300);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-  const res = await axios.get(`${API_BASE_URL}/api/obras-sociales`);
+        const res = await axios.get(`${API_BASE_URL}/api/obras-sociales`, {
+          params: { estado: "activa", pageSize: 500 },
+        });
         if (mounted) setObrasSociales(res?.data?.data || []);
       } catch (e) {
         // Evitar fallo silencioso y ayudar en debug si la petición falla
@@ -105,6 +122,275 @@ export default function Ninos() {
     setPage(1);
     fetchNinos(busqueda, 1, tipo);
   };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalData(null);
+    setResponsablesVinculados([]);
+    setResponsablesError(null);
+    setResponsablesLoading(false);
+    setResponsableSearch("");
+    setResponsableResults([]);
+    setResponsableSearchLoading(false);
+  };
+
+  const cargarResponsables = useCallback(async (idNino) => {
+    if (!idNino) return;
+    setResponsablesLoading(true);
+    setResponsablesError(null);
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/ninos/${idNino}/responsables`
+      );
+      const relaciones = (res?.data?.data || []).map((rel) => ({
+        ...rel,
+        parentescoDraft: rel.parentesco || "",
+      }));
+      relaciones.sort(
+        (a, b) => (b.es_principal === true) - (a.es_principal === true)
+      );
+      setResponsablesVinculados(relaciones);
+    } catch (err) {
+      console.error("Error cargando responsables del niño:", err);
+      setResponsablesError("No se pudieron cargar los responsables");
+      setResponsablesVinculados([]);
+    } finally {
+      setResponsablesLoading(false);
+    }
+  }, []);
+
+  const abrirDetalleNino = (nino) => {
+    setModalData(nino);
+    setModalOpen(true);
+    cargarResponsables(nino.id_nino);
+  };
+
+  useEffect(() => {
+    if (!modalOpen || !modalData) return;
+    const query = debouncedResponsableSearch.trim();
+    if (query.length < 2) {
+      setResponsableResults([]);
+      setResponsableSearchLoading(false);
+      return;
+    }
+
+    let cancelado = false;
+    setResponsableSearchLoading(true);
+    axios
+      .get(`${API_BASE_URL}/api/responsables`, {
+        params: { search: query, page: 1, pageSize: 5 },
+      })
+      .then((res) => {
+        if (cancelado) return;
+        const data = res?.data?.data || [];
+        const filtrados = data.filter(
+          (resp) =>
+            !responsablesVinculados.some(
+              (rel) => rel.responsable?.id_responsable === resp.id_responsable
+            )
+        );
+        setResponsableResults(filtrados);
+      })
+      .catch((err) => {
+        if (cancelado) return;
+        console.error("Error buscando responsables:", err);
+        setResponsableResults([]);
+      })
+      .finally(() => {
+        if (!cancelado) setResponsableSearchLoading(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    debouncedResponsableSearch,
+    modalOpen,
+    modalData,
+    responsablesVinculados,
+  ]);
+
+  const marcarPrincipal = async (relacion) => {
+    if (!modalData || !relacion?.id_nino_responsable) return;
+    const nuevo = !relacion.es_principal;
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/ninos/${modalData.id_nino}/responsables/${relacion.id_nino_responsable}`,
+        { es_principal: nuevo }
+      );
+      setResponsablesVinculados((prev) => {
+        const actualizados = prev.map((rel) => {
+          if (rel.id_nino_responsable === relacion.id_nino_responsable) {
+            return { ...rel, es_principal: nuevo };
+          }
+          return nuevo ? { ...rel, es_principal: false } : rel;
+        });
+        actualizados.sort(
+          (a, b) => (b.es_principal === true) - (a.es_principal === true)
+        );
+        return actualizados;
+      });
+    } catch (err) {
+      console.error("Error actualizando principal:", err);
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo actualizar principal",
+      });
+    }
+  };
+
+  const cambiarParentescoLocal = (relacionId, valor) => {
+    setResponsablesVinculados((prev) =>
+      prev.map((rel) =>
+        rel.id_nino_responsable === relacionId
+          ? { ...rel, parentescoDraft: valor }
+          : rel
+      )
+    );
+  };
+
+  const guardarParentesco = async (relacion) => {
+    if (!modalData || !relacion?.id_nino_responsable) return;
+    const nuevo = (relacion.parentescoDraft || "").trim();
+    const original = relacion.parentesco ? relacion.parentesco : "";
+    if (nuevo === original) return;
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/ninos/${modalData.id_nino}/responsables/${relacion.id_nino_responsable}`,
+        { parentesco: nuevo || null }
+      );
+      setResponsablesVinculados((prev) =>
+        prev.map((rel) =>
+          rel.id_nino_responsable === relacion.id_nino_responsable
+            ? { ...rel, parentesco: nuevo || null, parentescoDraft: nuevo }
+            : rel
+        )
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Parentesco actualizado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error actualizando parentesco:", err);
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo actualizar el parentesco",
+      });
+      setResponsablesVinculados((prev) =>
+        prev.map((rel) =>
+          rel.id_nino_responsable === relacion.id_nino_responsable
+            ? { ...rel, parentescoDraft: original }
+            : rel
+        )
+      );
+    }
+  };
+
+  const quitarResponsable = async (relacion) => {
+    if (!modalData || !relacion?.id_nino_responsable) return;
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Quitar responsable",
+      text: "Esta relación se eliminará. ¿Continuar?",
+      showCancelButton: true,
+      confirmButtonText: "Sí, quitar",
+      cancelButtonText: "Cancelar",
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/ninos/${modalData.id_nino}/responsables/${relacion.id_nino_responsable}`
+      );
+      setResponsablesVinculados((prev) =>
+        prev.filter(
+          (rel) => rel.id_nino_responsable !== relacion.id_nino_responsable
+        )
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Relación eliminada",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error quitando responsable:", err);
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo eliminar la relación",
+      });
+    }
+  };
+
+  const vincularResponsable = async (responsable) => {
+    if (!modalData) return;
+    const { value: formValues } = await Swal.fire({
+      title: `Vincular a ${responsable.nombre ?? "Responsable"}`,
+      html: `
+        <div class="swal-form">
+          <label for="parentesco-input" class="swal2-label">Parentesco (opcional)</label>
+          <input id="parentesco-input" class="swal2-input" placeholder="Ej: madre, tutor" />
+          <label class="swal2-checkbox" style="justify-content:flex-start;gap:0.5rem;margin-top:0.5rem;">
+            <input id="principal-input" type="checkbox" />
+            <span>Marcar como responsable principal</span>
+          </label>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Vincular",
+      cancelButtonText: "Cancelar",
+      focusConfirm: false,
+      preConfirm: () => {
+        const parentescoValue = document
+          .getElementById("parentesco-input")
+          ?.value?.trim();
+        const esPrincipalValue =
+          document.getElementById("principal-input")?.checked;
+        return {
+          parentesco: parentescoValue || "",
+          esPrincipal: !!esPrincipalValue,
+        };
+      },
+    });
+
+    if (!formValues) return;
+
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/ninos/${modalData.id_nino}/responsables`,
+        {
+          id_responsable: responsable.id_responsable,
+          parentesco: formValues.parentesco || null,
+          es_principal: formValues.esPrincipal,
+        }
+      );
+      await cargarResponsables(modalData.id_nino);
+      setResponsableResults((prev) =>
+        prev.filter((r) => r.id_responsable !== responsable.id_responsable)
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Responsable vinculado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error vinculando responsable:", err);
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo vincular",
+        text: err?.response?.data?.message || "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!modalOpen) {
+      setResponsableSearch("");
+      setResponsableResults([]);
+    }
+  }, [modalOpen]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -202,7 +488,7 @@ export default function Ninos() {
                       c.obra_social?.nombre_obra_social || null;
                     return (
                       <tr key={c.id_nino}>
-                        <td className="col-dni">
+                        <td className="col-dni" data-label="DNI">
                           {isEditing ? (
                             <input
                               className="edit-input"
@@ -219,7 +505,7 @@ export default function Ninos() {
                             c.dni || "—"
                           )}
                         </td>
-                        <td className="col-name">
+                        <td className="col-name" data-label="Nombre">
                           {isEditing ? (
                             <input
                               className="edit-input"
@@ -236,7 +522,7 @@ export default function Ninos() {
                             c.nombre || "—"
                           )}
                         </td>
-                        <td className="col-last">
+                        <td className="col-last" data-label="Apellido">
                           {isEditing ? (
                             <input
                               className="edit-input"
@@ -253,7 +539,7 @@ export default function Ninos() {
                             c.apellido || "—"
                           )}
                         </td>
-                        <td className="col-dniNac">
+                        <td className="col-dniNac" data-label="Edad">
                           {isEditing ? (
                             <input
                               type="date"
@@ -280,7 +566,7 @@ export default function Ninos() {
                             "—"
                           )}
                         </td>
-                        <td className="col-cert">
+                        <td className="col-cert" data-label="Certificado">
                           {isEditing ? (
                             <select
                               className="edit-select"
@@ -307,7 +593,7 @@ export default function Ninos() {
                             "NO"
                           )}
                         </td>
-                        <td className="col-os">
+                        <td className="col-os" data-label="Obra social">
                           {isEditing ? (
                             <select
                               className="edit-select"
@@ -342,7 +628,7 @@ export default function Ninos() {
                           )}
                         </td>
 
-                        <td>
+                        <td data-label="Tipo">
                           {isEditing ? (
                             <select
                               value={editData.tipo ?? c.tipo ?? "candidato"}
@@ -360,15 +646,12 @@ export default function Ninos() {
                             c.tipo
                           )}
                         </td>
-                        <td className="col-actions">
+                        <td className="col-actions" data-label="Acciones">
                           <div className="row-actions">
                             <button
                               className="icon-btn info"
                               title="Información"
-                              onClick={() => {
-                                setModalData(c);
-                                setModalOpen(true);
-                              }}
+                              onClick={() => abrirDetalleNino(c)}
                             >
                               <FaInfoCircle size={20} />
                             </button>
@@ -603,9 +886,9 @@ export default function Ninos() {
       </div>
 
       {modalOpen && modalData && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-info" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setModalOpen(false)}>
+            <button className="modal-close" onClick={closeModal}>
               &times;
             </button>
             <h2>Información del niño</h2>
@@ -641,16 +924,167 @@ export default function Ninos() {
                 {modalData.obra_social?.nombre_obra_social || "—"}
               </div>
             </div>
+
+            <div className="modal-section">
+              <h3>Responsables a cargo</h3>
+              <p className="section-help">
+                Visualiza, agrega y gestiona los responsables asociados a este
+                niño. El responsable principal se destaca con un ícono.
+              </p>
+
+              <div className="relationship-search">
+                <label htmlFor="buscar-responsable" className="sr-only">
+                  Buscar responsable
+                </label>
+                <input
+                  id="buscar-responsable"
+                  type="text"
+                  value={responsableSearch}
+                  onChange={(e) => setResponsableSearch(e.target.value)}
+                  placeholder="Buscar responsable por nombre, apellido o DNI"
+                />
+                {responsableSearchLoading && (
+                  <div className="inline-loader">Buscando…</div>
+                )}
+                {!responsableSearchLoading && responsableResults.length > 0 && (
+                  <ul className="search-results">
+                    {responsableResults.map((resp) => (
+                      <li key={resp.id_responsable}>
+                        <div className="result-info">
+                          <strong>
+                            {resp.nombre} {resp.apellido}
+                          </strong>
+                          <span>
+                            DNI: {resp.dni || "—"} · Tel: {resp.telefono || "—"}
+                          </span>
+                        </div>
+                        <button
+                          className="btn small"
+                          onClick={() => vincularResponsable(resp)}
+                        >
+                          <FaUserPlus size={14} /> Vincular
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!responsableSearchLoading &&
+                  responsableSearch.trim().length >= 2 &&
+                  responsableResults.length === 0 && (
+                    <div className="search-empty">
+                      Sin coincidencias disponibles o ya vinculadas.
+                    </div>
+                  )}
+              </div>
+
+              <div className="relationship-list">
+                {responsablesLoading ? (
+                  <div className="loader">Cargando responsables…</div>
+                ) : responsablesError ? (
+                  <div className="error">{responsablesError}</div>
+                ) : responsablesVinculados.length === 0 ? (
+                  <div className="empty">
+                    No hay responsables asociados todavía. Usa la búsqueda para
+                    vincular uno existente.
+                  </div>
+                ) : (
+                  <div className="dashboard-table-wrapper">
+                    <table
+                      className="table"
+                      aria-label="Responsables asociados"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Nombre</th>
+                          <th>DNI</th>
+                          <th>Contacto</th>
+                          <th>Parentesco</th>
+                          <th>Principal</th>
+                          <th className="col-actions">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {responsablesVinculados.map((rel) => (
+                          <tr
+                            key={rel.id_nino_responsable}
+                            className={rel.es_principal ? "row-principal" : ""}
+                          >
+                            <td data-label="Nombre">
+                              <div className="cell-stack">
+                                <span className="cell-strong">
+                                  {rel.responsable?.nombre || "—"}{" "}
+                                  {rel.responsable?.apellido || ""}
+                                </span>
+                                {rel.es_principal && (
+                                  <span className="tag principal">
+                                    <FaStar size={12} /> Principal
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td data-label="DNI">
+                              {rel.responsable?.dni || "—"}
+                            </td>
+                            <td className="cell-stack" data-label="Contacto">
+                              <span>{rel.responsable?.telefono || "—"}</span>
+                              <span className="muted-text">
+                                {rel.responsable?.email || "—"}
+                              </span>
+                            </td>
+                            <td data-label="Parentesco">
+                              <input
+                                className="table-input"
+                                value={rel.parentescoDraft ?? ""}
+                                onChange={(e) =>
+                                  cambiarParentescoLocal(
+                                    rel.id_nino_responsable,
+                                    e.target.value
+                                  )
+                                }
+                                onBlur={() => guardarParentesco(rel)}
+                                placeholder="Ej: madre"
+                              />
+                            </td>
+                            <td data-label="Principal">
+                              <label className="inline-check">
+                                <input
+                                  type="checkbox"
+                                  checked={!!rel.es_principal}
+                                  onChange={() => marcarPrincipal(rel)}
+                                  aria-label="Marcar como principal"
+                                />
+                                {rel.es_principal ? "Sí" : "No"}
+                              </label>
+                            </td>
+                            <td className="col-actions" data-label="Acciones">
+                              <div className="row-actions">
+                                <button
+                                  className="icon-btn danger"
+                                  title="Quitar responsable"
+                                  onClick={() => quitarResponsable(rel)}
+                                >
+                                  <FaUnlink size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {modalOpen && !modalData && (
         <CrearNino
-          onClose={() => setModalOpen(false)}
+          onClose={closeModal}
           obrasSociales={obrasSociales}
           onCreated={async () => {
-            setModalOpen(false);
+            closeModal();
             await fetchNinos(busqueda, page, tipo);
           }}
         />

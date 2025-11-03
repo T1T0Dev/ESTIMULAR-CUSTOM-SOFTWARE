@@ -28,29 +28,42 @@ function useDebounce(value, delay) {
 
 function formatDateDMY(dateStr) {
   if (!dateStr) return "";
-  const parsed = new Date(dateStr);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const yyyy = parsed.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  const normalized = String(dateStr).slice(0, 10);
+  const [yyyy, mm, dd] = normalized.split("-");
+  if (!yyyy || !mm || !dd) return "";
+  return `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yyyy}`;
 }
+
+const toTitleCase = (value) =>
+  value
+    ? String(value)
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(
+          (word) =>
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(" ")
+    : "";
 
 function formatRole(member) {
   const raw = (member?.rol_principal || member?.profesion || "").trim();
+  const tipo = String(member?.tipo || "").toLowerCase();
   const normalized = raw.toLowerCase();
   if (!raw) {
-    return member?.tipo === "secretario" ? "Secretario/a" : "Profesional";
+    if (["recepcion", "recepción", "secretario", "secretaria"].includes(tipo)) {
+      return "Recepción";
+    }
+    return "Profesional";
   }
-  if (normalized.includes("secret")) {
-    return "Secretario/a";
+  if (
+    normalized.includes("recepcion") ||
+    normalized.includes("recepción") ||
+    normalized.includes("secretar")
+  ) {
+    return "Recepción";
   }
-  return raw
-    .split(" ")
-    .map((word) =>
-      word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word
-    )
-    .join(" ");
+  return toTitleCase(raw);
 }
 
 export default function EquipoEstimular() {
@@ -123,7 +136,7 @@ export default function EquipoEstimular() {
         label: opt.label,
       })),
     ];
-    base.push({ value: "secretario", label: "Secretaría" });
+    base.push({ value: "recepcion", label: "Recepción" });
     return base;
   }, [departamentoOptions]);
 
@@ -163,9 +176,15 @@ export default function EquipoEstimular() {
           pageSize,
           activo: true,
         };
+        const normalizedFiltro = String(filtroSel).toLowerCase();
         let tipoValue = "todos";
-        if (filtroSel === "secretario") {
-          tipoValue = "secretario";
+        if (
+          normalizedFiltro === "recepcion" ||
+          normalizedFiltro === "recepción" ||
+          normalizedFiltro === "secretario" ||
+          normalizedFiltro === "secretaria"
+        ) {
+          tipoValue = "recepcion";
         } else if (
           typeof filtroSel === "string" &&
           filtroSel.startsWith("dept:")
@@ -248,7 +267,7 @@ export default function EquipoEstimular() {
                 setPage(1);
               }}
               className="btn outline-pink"
-              title="Filtrar por departamento o secretaría"
+              title="Filtrar por departamento o recepción"
             >
               {filtroOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -301,15 +320,18 @@ export default function EquipoEstimular() {
                 </thead>
                 <tbody>
                   {items.map((p) => {
+                    const tipoNormalized = String(p.tipo || "").toLowerCase();
                     const rowKey =
                       p.id_profesional ??
+                      p.id_recepcion ??
                       p.id_secretario ??
                       p.id_usuario ??
-                      `${p.tipo}-${p.dni ?? ""}-${p.nombre ?? ""}`;
-                    const isProfesional = p.tipo === "profesional";
+                      `${tipoNormalized}-${p.dni ?? ""}-${p.nombre ?? ""}`;
+                    const isProfesional = tipoNormalized === "profesional";
                     const memberKey =
                       p.id_usuario ??
                       p.id_profesional ??
+                      p.id_recepcion ??
                       p.id_secretario ??
                       rowKey;
                     const canEdit = isAdmin;
@@ -327,30 +349,47 @@ export default function EquipoEstimular() {
                         null
                       : p.profesion_id ?? null;
                     const departamentoLabel = (() => {
-                      if (p.tipo !== "profesional") return null;
-                      const depIdRaw =
-                        p.profesion_id ?? p.id_departamento ?? null;
-                      const depId =
-                        depIdRaw !== null && depIdRaw !== undefined
-                          ? Number(depIdRaw)
-                          : null;
-                      if (depId === null || Number.isNaN(depId)) return null;
-                      return departamentoMap.get(depId)?.label ?? null;
+                      const idCandidates = [
+                        p.profesion_id,
+                        p.id_departamento,
+                        p.departamento_id,
+                      ];
+                      for (const candidate of idCandidates) {
+                        if (candidate === null || candidate === undefined) {
+                          continue;
+                        }
+                        const parsed = Number.parseInt(candidate, 10);
+                        if (Number.isNaN(parsed)) continue;
+                        const found = departamentoMap.get(parsed)?.label;
+                        if (found) return toTitleCase(found);
+                      }
+                      const textFallback = [
+                        p.departamento_nombre,
+                        p.nombre_departamento,
+                        p.profesion_nombre,
+                        p.profesion,
+                      ].find((value) =>
+                        value && String(value).trim().length > 0
+                      );
+                      return textFallback ? toTitleCase(textFallback) : null;
                     })();
                     const roleDisplay = departamentoLabel || formatRole(p);
                     const endpointId =
                       p.id_usuario ??
                       p.id_profesional ??
+                      p.id_recepcion ??
                       p.id_secretario ??
                       null;
+                    const fotoSrc = p.foto_perfil_url || p.foto_perfil || null;
 
                     return (
                       <tr key={rowKey}>
                         <td>
                           <div className="equipo-avatar">
-                            {p.foto_perfil ? (
+                            {fotoSrc ? (
                               <img
-                                src={p.foto_perfil}
+                                src={fotoSrc}
+                                loading="lazy"
                                 alt={nombreCompleto || "Foto de perfil"}
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
@@ -362,7 +401,7 @@ export default function EquipoEstimular() {
                             <div
                               className="equipo-avatar-fallback"
                               style={{
-                                display: p.foto_perfil ? "none" : "grid",
+                                display: fotoSrc ? "none" : "grid",
                               }}
                             >
                               {`${(p.nombre?.[0] || "").toUpperCase()}${(
@@ -439,18 +478,11 @@ export default function EquipoEstimular() {
                                 flexDirection: "column",
                               }}
                             >
-                              <span>{nombreCompleto || "—"}</span>
-                              {roleDisplay ? (
-                                <span
-                                  className="meta"
-                                  style={{
-                                    color: "var(--muted)",
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  {roleDisplay}
-                                </span>
-                              ) : null}
+                              <span>
+                                {roleDisplay
+                                  ? `${nombreCompleto || "—"} / ${roleDisplay}`
+                                  : nombreCompleto || "—"}
+                              </span>
                             </div>
                           )}
                         </td>
@@ -621,9 +653,13 @@ export default function EquipoEstimular() {
                                         );
                                       }
 
+                                      const tipoForUpdate = String(
+                                        p.tipo || ""
+                                      ).toLowerCase();
                                       const url =
-                                        p.tipo === "secretario"
-                                          ? `${API_BASE_URL}/api/equipo/secretarios/${endpointId}`
+                                        tipoForUpdate === "recepcion" ||
+                                        tipoForUpdate === "secretario"
+                                          ? `${API_BASE_URL}/api/equipo/recepcion/${endpointId}`
                                           : `${API_BASE_URL}/api/equipo/${endpointId}`;
                                       Swal.fire({
                                         title: "Guardando...",

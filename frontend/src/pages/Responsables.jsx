@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import "../styles/NinosPage.css";
 import Swal from "sweetalert2";
-import { FaInfoCircle } from "react-icons/fa";
+import { FaChild, FaStar, FaUserPlus, FaUnlink } from "react-icons/fa";
 import { MdEdit, MdDelete, MdCheck, MdClose } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
 import API_BASE_URL from "../constants/api";
@@ -27,9 +27,16 @@ export default function Responsables() {
   const [modalData, setModalData] = useState(null); // responsable seleccionado
   const [editId, setEditId] = useState(null);
   const [editDraft, setEditDraft] = useState({});
+  const [ninosVinculados, setNinosVinculados] = useState([]);
+  const [ninosLoading, setNinosLoading] = useState(false);
+  const [ninosError, setNinosError] = useState(null);
+  const [ninoSearch, setNinoSearch] = useState("");
+  const [ninoResults, setNinoResults] = useState([]);
+  const [ninoSearchLoading, setNinoSearchLoading] = useState(false);
   const pageSize = 10;
   const skipPageEffectRef = useRef(false);
   const debouncedBusqueda = useDebounce(busqueda, 300);
+  const debouncedNinoSearch = useDebounce(ninoSearch, 300);
 
   const fetchResponsables = useCallback(
     async (search = "", pageNum = 1) => {
@@ -74,78 +81,282 @@ export default function Responsables() {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  const abrirInfo = async (resp) => {
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalData(null);
+    setNinosVinculados([]);
+    setNinosLoading(false);
+    setNinosError(null);
+    setNinoSearch("");
+    setNinoResults([]);
+    setNinoSearchLoading(false);
+  };
+
+  const cargarNinosDeResponsable = useCallback(async (idResponsable) => {
+    if (!idResponsable) return;
+    setNinosLoading(true);
+    setNinosError(null);
     try {
-      setModalData({ ...resp, cargando: true, ninos: [] });
-      setModalOpen(true);
       const res = await axios.get(
-        `${API_BASE_URL}/api/responsables/${resp.id_responsable}/ninos`
+        `${API_BASE_URL}/api/responsables/${idResponsable}/ninos`
       );
-      const relaciones = res?.data?.data || [];
-      // Ordenar principales primero
+      const relaciones = (res?.data?.data || []).map((rel) => ({
+        ...rel,
+        parentescoDraft: rel.parentesco || "",
+      }));
       relaciones.sort(
         (a, b) => (b.es_principal === true) - (a.es_principal === true)
       );
-      setModalData({ ...resp, ninos: relaciones, cargando: false });
+      setNinosVinculados(relaciones);
     } catch (e) {
-      console.error(e);
-      setModalData({ ...resp, ninos: [], cargando: false });
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "No se pudo cargar el detalle.",
-      });
+      console.error("Error cargando niños del responsable:", e);
+      setNinosError("No se pudieron cargar los niños asociados");
+      setNinosVinculados([]);
+    } finally {
+      setNinosLoading(false);
     }
+  }, []);
+
+  const abrirInfo = (resp) => {
+    setModalData(resp);
+    setModalOpen(true);
+    setNinoSearch("");
+    setNinoResults([]);
+    cargarNinosDeResponsable(resp.id_responsable);
   };
 
   const togglePrincipal = async (rel) => {
+    if (!modalData?.id_responsable || !rel?.nino?.id_nino) return;
+    const nuevo = !rel.es_principal;
     try {
-      const nuevo = !rel.es_principal;
-      // Si no existe relación en la tabla puente (legacy), crearla primero
-      let createdId = null;
-      if (!rel.id_nino_responsable) {
+      let relationId = rel.id_nino_responsable ?? null;
+      if (!relationId) {
         const resCreate = await axios.post(
-          `${API_BASE_URL}/api/ninos/${rel.nino?.id_nino}/responsables`,
+          `${API_BASE_URL}/api/ninos/${rel.nino.id_nino}/responsables`,
           {
             id_responsable: modalData.id_responsable,
             parentesco: rel.parentesco ?? "responsable",
             es_principal: nuevo,
           }
         );
-        createdId = resCreate?.data?.data?.id_nino_responsable || null;
+        relationId =
+          resCreate?.data?.data?.id_nino_responsable ?? relationId;
       } else {
         await axios.put(
-          `${API_BASE_URL}/api/ninos/${rel.nino?.id_nino}/responsables/${rel.id_nino_responsable}`,
+          `${API_BASE_URL}/api/ninos/${rel.nino.id_nino}/responsables/${relationId}`,
           { es_principal: nuevo }
         );
       }
-      // Update local modal state
-      setModalData((prev) => {
-        if (!prev) return prev;
-        const updated = (prev.ninos || []).map((r) => {
-          if (
-            r.id_nino_responsable === rel.id_nino_responsable ||
-            (!rel.id_nino_responsable && r.nino?.id_nino === rel.nino?.id_nino)
-          ) {
+
+      setNinosVinculados((prev) => {
+        const actualizados = prev.map((item) => {
+          if (relationId && item.id_nino_responsable === relationId) {
+            return { ...item, es_principal: nuevo };
+          }
+          if (!relationId && item.nino?.id_nino === rel.nino.id_nino) {
             return {
-              ...r,
+              ...item,
               es_principal: nuevo,
-              id_nino_responsable: r.id_nino_responsable || createdId,
+              id_nino_responsable: relationId,
             };
           }
-          return r;
+          return nuevo ? { ...item, es_principal: false } : item;
         });
-        // Principal first again
-        updated.sort(
+        actualizados.sort(
           (a, b) => (b.es_principal === true) - (a.es_principal === true)
         );
-        return { ...prev, ninos: updated };
+        return actualizados;
       });
     } catch (e) {
       console.error(e);
       Swal.fire({ icon: "error", title: "No se pudo actualizar principal" });
     }
   };
+
+  const cambiarParentescoLocal = (relacionId, valor) => {
+    setNinosVinculados((prev) =>
+      prev.map((rel) =>
+        rel.id_nino_responsable === relacionId
+          ? { ...rel, parentescoDraft: valor }
+          : rel
+      )
+    );
+  };
+
+  const guardarParentesco = async (rel) => {
+    if (!rel?.id_nino_responsable || !rel?.nino?.id_nino) return;
+    const nuevo = (rel.parentescoDraft || "").trim();
+    const original = rel.parentesco ? rel.parentesco : "";
+    if (nuevo === original) return;
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/ninos/${rel.nino.id_nino}/responsables/${rel.id_nino_responsable}`,
+        { parentesco: nuevo || null }
+      );
+      setNinosVinculados((prev) =>
+        prev.map((item) =>
+          item.id_nino_responsable === rel.id_nino_responsable
+            ? { ...item, parentesco: nuevo || null, parentescoDraft: nuevo }
+            : item
+        )
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Parentesco actualizado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({ icon: "error", title: "No se pudo actualizar parentesco" });
+      setNinosVinculados((prev) =>
+        prev.map((item) =>
+          item.id_nino_responsable === rel.id_nino_responsable
+            ? { ...item, parentescoDraft: original }
+            : item
+        )
+      );
+    }
+  };
+
+  const quitarNino = async (rel) => {
+    if (!rel?.id_nino_responsable || !rel?.nino?.id_nino) return;
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Quitar niño",
+      text: "Esta relación se eliminará. ¿Continuar?",
+      showCancelButton: true,
+      confirmButtonText: "Sí, quitar",
+      cancelButtonText: "Cancelar",
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/ninos/${rel.nino.id_nino}/responsables/${rel.id_nino_responsable}`
+      );
+      setNinosVinculados((prev) =>
+        prev.filter(
+          (item) => item.id_nino_responsable !== rel.id_nino_responsable
+        )
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Relación eliminada",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({ icon: "error", title: "No se pudo eliminar la relación" });
+    }
+  };
+
+  const vincularNino = async (nino) => {
+    if (!modalData) return;
+    const { value: formValues } = await Swal.fire({
+      title: `Vincular a ${nino.nombre ?? "Niño"}`,
+      html: `
+        <div class="swal-form">
+          <label for="parentesco-nino" class="swal2-label">Parentesco (opcional)</label>
+          <input id="parentesco-nino" class="swal2-input" placeholder="Ej: hijo" />
+          <label class="swal2-checkbox" style="justify-content:flex-start;gap:0.5rem;margin-top:0.5rem;">
+            <input id="principal-nino" type="checkbox" />
+            <span>Marcar como responsable principal</span>
+          </label>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Vincular",
+      cancelButtonText: "Cancelar",
+      focusConfirm: false,
+      preConfirm: () => {
+        const parentescoValue = document
+          .getElementById("parentesco-nino")
+          ?.value?.trim();
+        const principalValue =
+          document.getElementById("principal-nino")?.checked;
+        return {
+          parentesco: parentescoValue || "",
+          esPrincipal: !!principalValue,
+        };
+      },
+    });
+
+    if (!formValues) return;
+
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/ninos/${nino.id_nino}/responsables`,
+        {
+          id_responsable: modalData.id_responsable,
+          parentesco: formValues.parentesco || null,
+          es_principal: formValues.esPrincipal,
+        }
+      );
+      await cargarNinosDeResponsable(modalData.id_responsable);
+      setNinoResults((prev) =>
+        prev.filter((item) => item.id_nino !== nino.id_nino)
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Niño vinculado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo vincular",
+        text: e?.response?.data?.message || "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!modalOpen || !modalData) return;
+    const term = debouncedNinoSearch.trim();
+    if (term.length < 2) {
+      setNinoResults([]);
+      setNinoSearchLoading(false);
+      return;
+    }
+
+    let cancelado = false;
+    setNinoSearchLoading(true);
+    axios
+      .get(`${API_BASE_URL}/api/ninos`, {
+        params: { search: term, page: 1, pageSize: 5, tipo: "todos" },
+      })
+      .then((res) => {
+        if (cancelado) return;
+        const data = res?.data?.data || [];
+        const filtrados = data.filter(
+          (nino) =>
+            !ninosVinculados.some((rel) => rel.nino?.id_nino === nino.id_nino)
+        );
+        setNinoResults(filtrados);
+      })
+      .catch((e) => {
+        if (cancelado) return;
+        console.error("Error buscando niños:", e);
+        setNinoResults([]);
+      })
+      .finally(() => {
+        if (!cancelado) setNinoSearchLoading(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [debouncedNinoSearch, modalOpen, modalData, ninosVinculados]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      setNinoSearch("");
+      setNinoResults([]);
+    }
+  }, [modalOpen]);
 
   const startEdit = (r) => {
     setEditId(r.id_responsable);
@@ -222,7 +433,7 @@ export default function Responsables() {
   return (
     <section className="ninos-page">
       <div className="ninos-top">
-        <h1 className="ninos-title">Responsables</h1>
+        <h1 className="ninos-title">Padres, Madres y Tutores</h1>
         <div className="ninos-controls">
           <form
             className="busqueda-form"
@@ -277,8 +488,7 @@ export default function Responsables() {
                 <thead>
                   <tr>
                     <th className="col-dni">DNI</th>
-                    <th className="col-name">Nombre</th>
-                    <th className="col-last">Apellido</th>
+                    <th className="col-name">Nombre completo</th>
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th className="col-actions">Acciones</th>
@@ -287,9 +497,16 @@ export default function Responsables() {
                 <tbody>
                   {items.map((r) => {
                     const isEditing = editId === r.id_responsable;
+                    const nombreCompleto = `${r.nombre || ""} ${
+                      r.apellido || ""
+                    }`
+                      .replace(/\s+/g, " ")
+                      .trim();
+                    const nombreDisplay =
+                      nombreCompleto || r.nombre || r.apellido || "—";
                     return (
                       <tr key={r.id_responsable}>
-                        <td className="col-dni">
+                        <td className="col-dni" data-label="DNI">
                           {isEditing ? (
                             <input
                               type="text"
@@ -306,41 +523,45 @@ export default function Responsables() {
                             r.dni || "—"
                           )}
                         </td>
-                        <td className="col-name">
+                        <td className="col-name" data-label="Nombre completo">
                           {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.nombre ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  nombre: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <input
+                                type="text"
+                                value={editDraft.nombre ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    nombre: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                                placeholder="Nombre"
+                              />
+                              <input
+                                type="text"
+                                value={editDraft.apellido ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    apellido: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                                placeholder="Apellido"
+                              />
+                            </div>
                           ) : (
-                            r.nombre || "—"
+                            nombreDisplay
                           )}
                         </td>
-                        <td className="col-last">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.apellido ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  apellido: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
-                          ) : (
-                            r.apellido || "—"
-                          )}
-                        </td>
-                        <td>
+                        <td data-label="Teléfono">
                           {isEditing ? (
                             <input
                               type="text"
@@ -357,7 +578,7 @@ export default function Responsables() {
                             r.telefono || "—"
                           )}
                         </td>
-                        <td>
+                        <td data-label="Email">
                           {isEditing ? (
                             <input
                               type="email"
@@ -374,7 +595,7 @@ export default function Responsables() {
                             r.email || "—"
                           )}
                         </td>
-                        <td className="col-actions">
+                        <td className="col-actions" data-label="Acciones">
                           <div className="row-actions">
                             {isEditing ? (
                               <>
@@ -397,10 +618,10 @@ export default function Responsables() {
                               <>
                                 <button
                                   className="icon-btn info"
-                                  title="Niños a cargo"
+                                  title="Niños asociados"
                                   onClick={() => abrirInfo(r)}
                                 >
-                                  <FaInfoCircle size={20} />
+                                  <FaChild size={20} />
                                 </button>
                                 <button
                                   className="icon-btn edit"
@@ -454,68 +675,178 @@ export default function Responsables() {
       </div>
 
       {modalOpen && modalData && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-info" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setModalOpen(false)}>
+            <button className="modal-close" onClick={closeModal}>
               &times;
             </button>
             <h2>Niños a cargo</h2>
+
             <div className="modal-section">
-              <h3>Listado</h3>
-              {modalData.cargando ? (
-                <div className="loader">Cargando…</div>
-              ) : modalData.ninos?.length ? (
-                <div className="dashboard-table-wrapper">
-                  <table
-                    className="table"
-                    role="table"
-                    aria-label="Niños asociados"
-                  >
-                    <thead>
-                      <tr>
-                        <th>Nombre</th>
-                        <th>Apellido</th>
-                        <th>DNI</th>
-                        <th>Parentesco</th>
-                        <th>Principal</th>
-                        <th>Fecha nacimiento</th>
-                        <th>Tipo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {modalData.ninos.map((rel) => (
-                        <tr key={rel.id_nino_responsable}>
-                          <td>{rel.nino?.nombre || "—"}</td>
-                          <td>{rel.nino?.apellido || "—"}</td>
-                          <td>{rel.nino?.dni || "—"}</td>
-                          <td>{rel.parentesco || "—"}</td>
-                          <td>
-                            <label className="inline-check">
-                              <input
-                                type="checkbox"
-                                checked={!!rel.es_principal}
-                                onChange={() => togglePrincipal(rel)}
-                                aria-label={`Marcar principal a ${
-                                  rel.nino?.nombre || ""
-                                } ${rel.nino?.apellido || ""}`}
-                              />
-                              {rel.es_principal ? "Sí" : "No"}
-                            </label>
-                          </td>
-                          <td>
-                            {rel.nino?.fecha_nacimiento
-                              ? formatDateDMY(rel.nino.fecha_nacimiento)
-                              : "—"}
-                          </td>
-                          <td>{rel.nino?.tipo || "—"}</td>
+              <h3>Responsable</h3>
+              <div className="modal-row">
+                <span>Nombre completo:</span>
+                <strong>
+                  {modalData.nombre} {modalData.apellido}
+                </strong>
+              </div>
+              <div className="modal-row">
+                <span>DNI:</span> {modalData.dni || "—"}
+              </div>
+              <div className="modal-row">
+                <span>Contacto:</span>
+                <span className="cell-stack">
+                  {modalData.telefono || "—"}
+                  <span className="muted-text">{modalData.email || "—"}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-section">
+              <h3>Niños asignados</h3>
+              <p className="section-help">
+                Controla qué niños están vinculados a este responsable. Puedes
+                asignar nuevos niños con la búsqueda en tiempo real.
+              </p>
+
+              <div className="relationship-search">
+                <label htmlFor="buscar-nino" className="sr-only">
+                  Buscar niño
+                </label>
+                <input
+                  id="buscar-nino"
+                  type="text"
+                  value={ninoSearch}
+                  onChange={(e) => setNinoSearch(e.target.value)}
+                  placeholder="Buscar niño por nombre, apellido o DNI"
+                />
+                {ninoSearchLoading && (
+                  <div className="inline-loader">Buscando…</div>
+                )}
+                {!ninoSearchLoading && ninoResults.length > 0 && (
+                  <ul className="search-results">
+                    {ninoResults.map((nino) => (
+                      <li key={nino.id_nino}>
+                        <div className="result-info">
+                          <strong>
+                            {nino.nombre} {nino.apellido}
+                          </strong>
+                          <span>
+                            DNI: {nino.dni || "—"} · {nino.tipo || "—"}
+                          </span>
+                        </div>
+                        <button
+                          className="btn small"
+                          onClick={() => vincularNino(nino)}
+                        >
+                          <FaUserPlus size={14} /> Vincular
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!ninoSearchLoading &&
+                  ninoSearch.trim().length >= 2 &&
+                  ninoResults.length === 0 && (
+                    <div className="search-empty">
+                      Sin coincidencias disponibles o ya vinculadas.
+                    </div>
+                  )}
+              </div>
+
+              <div className="relationship-list">
+                {ninosLoading ? (
+                  <div className="loader">Cargando niños…</div>
+                ) : ninosError ? (
+                  <div className="error">{ninosError}</div>
+                ) : ninosVinculados.length === 0 ? (
+                  <div className="empty">
+                    No tiene niños asociados. Utiliza la búsqueda para vincular
+                    uno existente.
+                  </div>
+                ) : (
+                  <div className="dashboard-table-wrapper">
+                    <table className="table" aria-label="Niños asociados">
+                      <thead>
+                        <tr>
+                          <th>Nombre</th>
+                          <th>DNI</th>
+                          <th>Parentesco</th>
+                          <th>Principal</th>
+                          <th>Fecha nacimiento</th>
+                          <th>Tipo</th>
+                          <th className="col-actions">Acciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="empty">No tiene niños asociados.</div>
-              )}
+                      </thead>
+                      <tbody>
+                        {ninosVinculados.map((rel) => (
+                          <tr
+                            key={rel.id_nino_responsable}
+                            className={rel.es_principal ? "row-principal" : ""}
+                          >
+                            <td data-label="Nombre">
+                              <div className="cell-stack">
+                                <span className="cell-strong">
+                                  {rel.nino?.nombre || "—"}{" "}
+                                  {rel.nino?.apellido || ""}
+                                </span>
+                                {rel.es_principal && (
+                                  <span className="tag principal">
+                                    <FaStar size={12} /> Principal
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td data-label="DNI">{rel.nino?.dni || "—"}</td>
+                            <td data-label="Parentesco">
+                              <input
+                                className="table-input"
+                                value={rel.parentescoDraft ?? ""}
+                                onChange={(e) =>
+                                  cambiarParentescoLocal(
+                                    rel.id_nino_responsable,
+                                    e.target.value
+                                  )
+                                }
+                                onBlur={() => guardarParentesco(rel)}
+                                placeholder="Ej: hijo"
+                              />
+                            </td>
+                            <td data-label="Principal">
+                              <label className="inline-check">
+                                <input
+                                  type="checkbox"
+                                  checked={!!rel.es_principal}
+                                  onChange={() => togglePrincipal(rel)}
+                                  aria-label="Marcar como principal"
+                                />
+                                {rel.es_principal ? "Sí" : "No"}
+                              </label>
+                            </td>
+                            <td data-label="Fecha nacimiento">
+                              {rel.nino?.fecha_nacimiento
+                                ? formatDateDMY(rel.nino.fecha_nacimiento)
+                                : "—"}
+                            </td>
+                            <td data-label="Tipo">{rel.nino?.tipo || "—"}</td>
+                            <td className="col-actions" data-label="Acciones">
+                              <div className="row-actions">
+                                <button
+                                  className="icon-btn danger"
+                                  title="Quitar niño"
+                                  onClick={() => quitarNino(rel)}
+                                >
+                                  <FaUnlink size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -34,18 +34,46 @@ export default function SidebarDashboard() {
     if (profile?.departamento?.nombre) return profile.departamento.nombre;
     if (profile?.tipo) {
       const normalizedTipo = String(profile.tipo).toLowerCase();
-      if (normalizedTipo === "secretario" || normalizedTipo === "secretaria") {
-        return "Secretaría";
+      if (
+        ["recepcion", "recepción", "secretario", "secretaria"].includes(
+          normalizedTipo
+        )
+      ) {
+        return "Recepción";
       }
       if (normalizedTipo === "profesional" && profile?.departamento?.nombre) {
         return profile.departamento.nombre;
       }
     }
     // 2) Rol asignado desde backend (string plano)
-    if (user?.rol_nombre) return user.rol_nombre;
+    if (user?.rol_nombre) {
+      const normalized = String(user.rol_nombre).toLowerCase();
+      if (
+        normalized.includes("recepcion") ||
+        normalized.includes("recepción") ||
+        normalized.includes("secretar")
+      ) {
+        return "Recepción";
+      }
+      return user.rol_nombre;
+    }
     // 3) Roles múltiples (si existen)
     if (Array.isArray(user?.roles) && user.roles.length > 0) {
-      const names = user.roles.map((r) => r?.nombre).filter(Boolean);
+      const names = user.roles
+        .map((r) => {
+          const raw = r?.nombre;
+          if (!raw) return null;
+          const normalized = String(raw).toLowerCase();
+          if (
+            normalized.includes("recepcion") ||
+            normalized.includes("recepción") ||
+            normalized.includes("secretar")
+          ) {
+            return "Recepción";
+          }
+          return raw;
+        })
+        .filter(Boolean);
       if (names.length) return names.join(", ");
     }
     return null;

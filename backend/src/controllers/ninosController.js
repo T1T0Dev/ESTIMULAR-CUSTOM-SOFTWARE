@@ -1,23 +1,72 @@
 const { supabaseAdmin } = require('../config/db');
 
-// GET /api/ninos?search=&page=1&pageSize=10&tipo=
+const mapNinoRow = (row) => {
+    if (!row || typeof row !== 'object') return row;
+    const departamentosOrigen = Array.isArray(row.nino_departamentos) ? row.nino_departamentos : [];
+    const departamentos = departamentosOrigen.map((item) => ({
+        id_relacion: item.id ?? item.id_nino_departamentos ?? null,
+        departamento_id: item.departamento_id ?? item.departamento?.id_departamento ?? null,
+        estado: item.estado ?? null,
+        nombre: item.departamento?.nombre ?? null,
+    }));
+    return {
+        ...row,
+        nino_departamentos: departamentosOrigen,
+        departamentos,
+    };
+};
+
+// GET /api/ninos?search=&page=1&pageSize=10&tipo=&dni=&departamentoId=
 const getNinos = async (req, res) => {
     const { search = '', page = 1, pageSize = 10, tipo } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(pageSize);
+    const dniRaw = req.query.dni;
+    const departamentoParam = req.query.departamentoId || req.query.departamento_id || req.query.departamentos;
+    const offset = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
+
     try {
         const searchSafe = String(search || '').replace(/[%']/g, '').trim();
+        const dniFilter = dniRaw !== undefined && dniRaw !== null ? String(dniRaw).trim() : '';
+
+        let departamentoIds = [];
+        if (departamentoParam !== undefined && departamentoParam !== null) {
+            const values = Array.isArray(departamentoParam)
+                ? departamentoParam
+                : String(departamentoParam).split(',');
+            departamentoIds = values
+                .map((value) => Number.parseInt(String(value).trim(), 10))
+                .filter((value) => !Number.isNaN(value));
+        }
+
+        let filterNinoIds = null;
+        if (departamentoIds.length > 0) {
+            const { data: rels, error: relErr } = await supabaseAdmin
+                .from('nino_departamentos')
+                .select('nino_id')
+                .in('departamento_id', departamentoIds);
+            if (relErr) throw relErr;
+            const ids = Array.from(new Set((rels || []).map((row) => row.nino_id).filter(Boolean)));
+            if (ids.length === 0) {
+                return res.json({ success: true, data: [], total: 0 });
+            }
+            filterNinoIds = ids;
+        }
+
+        const selectColumns = `id_nino, nombre, apellido, fecha_nacimiento, dni, certificado_discapacidad, tipo, id_obra_social, motivo_consulta,
+            obra_social:obras_sociales (id_obra_social, nombre_obra_social),
+            nino_departamentos:nino_departamentos ( id, departamento_id, estado, departamento:profesiones ( id_departamento, nombre ) )`;
 
         let q = supabaseAdmin
             .from('ninos')
-            .select(
-                `id_nino, nombre, apellido, fecha_nacimiento, dni, certificado_discapacidad, tipo, id_obra_social,
-         obra_social:obras_sociales (id_obra_social, nombre_obra_social)`,
-                { count: 'exact' }
-            )
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(pageSize) - 1);
+            .select(selectColumns, { count: 'exact' })
+            .order('created_at', { ascending: false });
 
-        if (searchSafe) {
+        if (filterNinoIds) {
+            q = q.in('id_nino', filterNinoIds);
+        }
+
+        if (dniFilter) {
+            q = q.eq('dni', dniFilter);
+        } else if (searchSafe) {
             const pattern = `%${searchSafe}%`;
             q = q.or(`nombre.ilike.${pattern},apellido.ilike.${pattern},dni.ilike.${pattern}`);
         }
@@ -26,9 +75,12 @@ const getNinos = async (req, res) => {
             q = q.eq('tipo', tipo);
         }
 
+        q = q.range(offset, offset + parseInt(pageSize, 10) - 1);
+
         const { data, error, count } = await q;
         if (error) throw error;
-        res.json({ success: true, data: data || [], total: count || 0 });
+        const normalized = (data || []).map(mapNinoRow);
+        res.json({ success: true, data: normalized, total: count || 0 });
     } catch (err) {
         console.error('getNinos failed:', err);
         res.status(500).json({ success: false, message: 'Error al obtener niños', error: err.message, detail: err });
@@ -53,7 +105,7 @@ const getResponsablesDeNino = async (req, res) => {
 };
 
 // POST /api/ninos
-// body: { nombre, apellido, dni, fecha_nacimiento, certificado_discapacidad, id_obra_social, obra_social_texto, tipo, responsable: { ... } }
+// body: { nombre, apellido, dni, fecha_nacimiento, certificado_discapacidad, id_obra_social, obra_social_texto, tipo, responsable: { ... }, servicios: [], departamentos: [] }
 const crearNino = async (req, res) => {
     const body = req.body || {};
     const {
@@ -66,21 +118,55 @@ const crearNino = async (req, res) => {
         obra_social_texto,
         tipo = 'candidato',
         responsable: respBody,
+        servicios,
+        departamentos,
+        motivo_consulta,
     } = body;
 
     if (!nombre || !apellido) {
         return res.status(400).json({ success: false, message: 'Nombre y apellido son obligatorios' });
     }
 
+    const dniTrimmed = dni !== undefined && dni !== null ? String(dni).trim() : '';
+    if (dniTrimmed) {
+        const { data: existingNino, error: existingErr } = await supabaseAdmin
+            .from('ninos')
+            .select('id_nino, nombre, apellido, tipo')
+            .eq('dni', dniTrimmed)
+            .maybeSingle();
+        if (existingErr && existingErr.code !== 'PGRST116') {
+            console.error('crearNino lookup dni error:', existingErr);
+            return res.status(500).json({ success: false, message: 'No se pudo validar el DNI del niño' });
+        }
+        if (existingNino) {
+            return res.status(409).json({ success: false, message: 'Ya existe un niño registrado con ese DNI.' });
+        }
+    }
+
+    const departamentosListado = Array.isArray(departamentos)
+        ? departamentos
+        : Array.isArray(servicios)
+            ? servicios
+            : [];
+    const departamentosIds = Array.from(
+        new Set(
+            departamentosListado
+                .map((value) => Number.parseInt(String(value).trim(), 10))
+                .filter((value) => !Number.isNaN(value))
+        )
+    );
+
     let createdObraId = null;
     let insertedNino = null;
     let insertedResponsable = null;
+
+    const motivoLimpio = typeof motivo_consulta === 'string' ? motivo_consulta.trim() : null;
 
     try {
         // 1) Obra social: si no hay id y hay texto, crearla en pendiente
         let idObra = id_obra_social ?? null;
         if (!idObra && obra_social_texto && obra_social_texto.trim().length > 0) {
-            const nombreOS = obra_social_texto.trim();
+            const nombreOS = obra_social_texto.trim().toUpperCase();
             const { data: obraData, error: obraErr } = await supabaseAdmin
                 .from('obras_sociales')
                 .insert([{ nombre_obra_social: nombreOS, estado: 'pendiente' }])
@@ -95,13 +181,16 @@ const crearNino = async (req, res) => {
         let respId = null;
         if (respBody && (respBody.dni || respBody.nombre || respBody.apellido)) {
             if (respBody.dni) {
-                const { data: respFound } = await supabaseAdmin
-                    .from('responsables')
-                    .select('*')
-                    .eq('dni', Number(respBody.dni))
-                    .limit(1)
-                    .maybeSingle();
-                if (respFound) respId = respFound.id_responsable;
+                const dniResp = Number.parseInt(String(respBody.dni).trim(), 10);
+                if (!Number.isNaN(dniResp)) {
+                    const { data: respFound } = await supabaseAdmin
+                        .from('responsables')
+                        .select('*')
+                        .eq('dni', dniResp)
+                        .limit(1)
+                        .maybeSingle();
+                    if (respFound) respId = respFound.id_responsable;
+                }
             }
             if (!respId) {
                 const { data: respIns, error: respInsErr } = await supabaseAdmin
@@ -125,11 +214,12 @@ const crearNino = async (req, res) => {
         const payload = {
             nombre,
             apellido,
-            dni: dni || null,
+            dni: dniTrimmed || null,
             fecha_nacimiento: fecha_nacimiento || null,
             certificado_discapacidad: !!certificado_discapacidad,
             id_obra_social: idObra,
             tipo,
+            motivo_consulta: motivoLimpio || null,
         };
         const { data: nino, error: ninoErr } = await supabaseAdmin
             .from('ninos')
@@ -146,11 +236,43 @@ const crearNino = async (req, res) => {
                 .insert([{ id_nino: nino.id_nino, id_responsable: respId, parentesco: respBody?.parentesco || 'responsable', es_principal: true }]);
         }
 
-        res.status(201).json({ success: true, data: insertedNino });
+        // 5) Registrar departamentos solicitados
+        if (departamentosIds.length > 0) {
+            const { data: existentes, error: existErr } = await supabaseAdmin
+                .from('nino_departamentos')
+                .select('departamento_id')
+                .eq('nino_id', nino.id_nino);
+            if (existErr) throw existErr;
+            const existentesSet = new Set((existentes || []).map((row) => Number(row.departamento_id)));
+            const paraInsertar = departamentosIds.filter((id) => !existentesSet.has(id));
+            if (paraInsertar.length > 0) {
+                const insertPayload = paraInsertar.map((id) => ({
+                    nino_id: nino.id_nino,
+                    departamento_id: id,
+                    estado: 'pendiente',
+                }));
+                const { error: depsErr } = await supabaseAdmin
+                    .from('nino_departamentos')
+                    .insert(insertPayload);
+                if (depsErr) throw depsErr;
+            }
+        }
+
+        const { data: detalle, error: detalleErr } = await supabaseAdmin
+            .from('ninos')
+            .select(`id_nino, nombre, apellido, fecha_nacimiento, dni, certificado_discapacidad, tipo, id_obra_social, motivo_consulta,
+                obra_social:obras_sociales (id_obra_social, nombre_obra_social),
+                nino_departamentos:nino_departamentos ( id, departamento_id, estado, departamento:profesiones ( id_departamento, nombre ) )`)
+            .eq('id_nino', insertedNino.id_nino)
+            .maybeSingle();
+
+        const responseData = detalle && !detalleErr ? mapNinoRow(detalle) : mapNinoRow(insertedNino);
+        res.status(201).json({ success: true, data: responseData });
     } catch (error) {
         // rollback básicos
         try {
             if (insertedNino) {
+                await supabaseAdmin.from('nino_departamentos').delete().eq('nino_id', insertedNino.id_nino);
                 await supabaseAdmin.from('ninos').delete().eq('id_nino', insertedNino.id_nino);
             }
             if (insertedResponsable) {
@@ -171,10 +293,14 @@ const editarNino = async (req, res) => {
     const updateData = req.body || {};
     if (!id_nino) return res.status(400).json({ success: false, message: 'Falta id_nino' });
 
-    const allowed = ['nombre', 'apellido', 'dni', 'fecha_nacimiento', 'certificado_discapacidad', 'id_obra_social', 'tipo'];
+    const allowed = ['nombre', 'apellido', 'dni', 'fecha_nacimiento', 'certificado_discapacidad', 'id_obra_social', 'tipo', 'motivo_consulta'];
     const payload = {};
     for (const k of allowed) if (k in updateData) payload[k] = updateData[k];
     if ('certificado_discapacidad' in payload) payload.certificado_discapacidad = !!payload.certificado_discapacidad;
+    if ('motivo_consulta' in payload) {
+        const texto = typeof payload.motivo_consulta === 'string' ? payload.motivo_consulta.trim() : null;
+        payload.motivo_consulta = texto && texto.length > 0 ? texto : null;
+    }
     if (payload.fecha_nacimiento) {
         const d = new Date(payload.fecha_nacimiento);
         if (!isNaN(d)) payload.fecha_nacimiento = d.toISOString().slice(0, 10);

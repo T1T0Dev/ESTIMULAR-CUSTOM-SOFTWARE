@@ -1,5 +1,4 @@
 const { supabaseAdmin } = require('../config/db');
-const { upsertWithIdentityOverride } = require('../utils/upsertWithIdentityOverride');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const {
@@ -8,33 +7,103 @@ const {
   uploadProfileImageIfNeeded,
   isHttpUrl,
 } = require('../utils/storage');
+const { upsertWithIdentityOverride } = require('../utils/upsertWithIdentityOverride');
 
 const DEFAULT_PASSWORD = process.env.DEFAULT_PASSWORD_LOGIN || 'estimular_2025';
 
-// Función para validar DNI
 function isValidDni(dni) {
-  return /^\d{7,15}$/.test(dni);
+  if (dni === undefined || dni === null) return false;
+  return /^\d{7,15}$/.test(String(dni).trim());
 }
 
-// Función para validar contraseña
 function isSafePassword(pwd) {
   const forbidden = [/('|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
-  return (
-    typeof pwd === 'string' &&
-    pwd.length >= 8 &&
-    !forbidden.some((regex) => regex.test(pwd))
-  );
+  return typeof pwd === 'string' && pwd.length >= 8 && !forbidden.some((regex) => regex.test(pwd));
 }
 
-function isValidDateYYYYMMDD(s) {
-  if (!s || typeof s !== 'string') return false;
-  const m = s.match(/^\d{4}-\d{2}-\d{2}$/);
-  if (!m) return false;
-  const d = new Date(s);
-  return !isNaN(d.getTime());
+function isValidDateYYYYMMDD(value) {
+  if (typeof value !== 'string') return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime());
 }
 
-// Nota: ya no se usa id_rol en usuarios; los nombres de roles se obtienen desde usuario_roles -> roles
+function normalizeText(text) {
+  if (text === undefined || text === null) return '';
+  return String(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeTipo(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return '';
+  if (
+    normalized.startsWith('recepcion') ||
+    normalized.startsWith('secretar') ||
+    normalized === 'recepcionista' ||
+    normalized === 'recepcionist'
+  ) {
+    return 'recepcion';
+  }
+  if (normalized === 'professional') return 'profesional';
+  return normalized;
+}
+
+function isRecepcionTipo(value) {
+  return normalizeTipo(value) === 'recepcion';
+}
+
+function mapRoleDisplayName(rawName) {
+  const normalized = normalizeText(rawName);
+  if (!normalized) return rawName || null;
+  if (
+    normalized === 'recepcion' ||
+    normalized === 'recepcionista' ||
+    normalized === 'recepcionist' ||
+    normalized === 'secretario' ||
+    normalized === 'secretaria'
+  ) {
+    return 'Recepción';
+  }
+  return rawName;
+}
+
+function determineTipoFromRoles(roles = [], hasProfession = false) {
+  const names = (roles || [])
+    .map((role) => normalizeText(role?.nombre || role?.rolNombre || role?.rol))
+    .filter(Boolean);
+
+  if (names.some((name) => name.startsWith('recepcion') || name.startsWith('secretar'))) {
+    return 'recepcion';
+  }
+  if (hasProfession) return 'profesional';
+  return 'profesional';
+}
+
+function normalizePhoneValue(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function normalizeEmailValue(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed.toLowerCase();
+}
+
+function extractToken(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+function cleanObject(source) {
+  if (!source) return {};
+  return Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined));
+}
 
 async function fetchUserRoles(idUsuario) {
   if (!idUsuario) return [];
@@ -56,159 +125,32 @@ async function fetchUserRoles(idUsuario) {
     return (data || [])
       .map((row) => ({
         id: row.rol_id ?? row.rol?.id_rol ?? null,
-        nombre: row.rol?.nombre_rol ?? null,
+        nombre: mapRoleDisplayName(row.rol?.nombre_rol ?? null),
       }))
-      .filter((r) => r.id || r.nombre);
+      .filter((rol) => rol.id || rol.nombre);
   } catch (err) {
     console.error('fetchUserRoles exception:', err);
     return [];
   }
 }
 
-async function fetchProfessionalProfile(idUsuario) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('profesionales')
-      .select(`
-        id_profesional,
-        nombre,
-        apellido,
-        telefono,
-        email,
-        fecha_nacimiento,
-        foto_perfil,
-        id_departamento,
-        departamento:profesiones!equipo_id_departamento_fkey ( id_departamento, nombre )
-      `)
-      .eq('id_profesional', Number(idUsuario))
-      .maybeSingle();
-    if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('fetchProfessionalProfile error:', error);
-      }
-      return null;
-    }
-    if (!data) return null;
-    const foto = await resolveStorageAsset(data.foto_perfil);
-    return {
-      tipo: 'profesional',
-      id_profesional: data.id_profesional,
-      nombre: data.nombre,
-      apellido: data.apellido,
-      telefono: data.telefono,
-      email: data.email,
-      fecha_nacimiento: data.fecha_nacimiento,
-      foto_perfil: foto.signedUrl || data.foto_perfil,
-      foto_perfil_url: foto.signedUrl || null,
-      foto_perfil_path: foto.path,
-      departamento_id: data.id_departamento || data.departamento?.id_departamento || null,
-      departamento: data.departamento
-        ? {
-          id: data.departamento.id_departamento,
-          nombre: data.departamento.nombre,
-        }
-        : null,
-      profesion: data.departamento?.nombre || null,
-    };
-  } catch (err) {
-    console.error('fetchProfessionalProfile exception:', err);
-    return null;
-  }
-}
-
-async function fetchSecretaryProfile(idUsuario) {
-  try {
-    let data = null;
-    let error = null;
-
-    ({ data, error } = await supabaseAdmin
-      .from('secretarios')
-      .select('id, usuario_id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-      .eq('usuario_id', Number(idUsuario))
-      .maybeSingle());
-
-    if (error && ['42703', 'PGRST204'].includes(error.code)) {
-      ({ data, error } = await supabaseAdmin
-        .from('secretarios')
-        .select('id, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil')
-        .eq('id', Number(idUsuario))
-        .maybeSingle());
-    }
-
-    if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('fetchSecretaryProfile error:', error);
-      }
-      return null;
-    }
-    if (!data) return null;
-    const foto = await resolveStorageAsset(data.foto_perfil);
-    return {
-      tipo: 'secretario',
-      id_secretario: data.usuario_id ?? data.id,
-      nombre: data.nombre,
-      apellido: data.apellido,
-      telefono: data.telefono,
-      email: data.email,
-      fecha_nacimiento: data.fecha_nacimiento,
-      foto_perfil: foto.signedUrl || data.foto_perfil,
-      foto_perfil_url: foto.signedUrl || null,
-      foto_perfil_path: foto.path,
-    };
-  } catch (err) {
-    console.error('fetchSecretaryProfile exception:', err);
-    return null;
-  }
-}
-
-async function fetchUserProfile(idUsuario) {
-  const profesional = await fetchProfessionalProfile(idUsuario);
-  if (profesional) return profesional;
-  const secretario = await fetchSecretaryProfile(idUsuario);
-  if (secretario) return secretario;
-  return null;
-}
-
-function computeNeedsProfile(perfil) {
-  if (!perfil) return true;
-  const required = [
-    perfil.nombre,
-    perfil.apellido,
-    perfil.telefono,
-    perfil.fecha_nacimiento,
-    perfil.email,
-  ];
-  if (required.some((value) => value === null || value === undefined || String(value).trim() === '')) {
-    return true;
-  }
-  if (perfil.tipo === 'profesional') {
-    return !perfil.departamento_id;
-  }
-  return false;
-}
-
-function extractToken(req) {
-  const auth = req.headers.authorization || '';
-  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
-}
-
 async function assignRoleToUser(usuarioId, rolId) {
   if (!usuarioId || !rolId) return;
   try {
-    // Intentar upsert con conflicto en (usuario_id, rol_id); si no hay constraint, fallback a insert simple
-    let { error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('usuario_roles')
       .upsert(
         [{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }],
         { onConflict: 'usuario_id,rol_id' }
       );
+
     if (error) {
-      // Fallback: intentar insert; ignorar duplicados
-      const ins = await supabaseAdmin
+      if (error.code === '23505') return;
+      const fallback = await supabaseAdmin
         .from('usuario_roles')
         .insert([{ usuario_id: Number(usuarioId), rol_id: Number(rolId) }]);
-      if (ins.error && ins.error.code !== '23505') {
-        console.error('assignRoleToUser error:', ins.error);
+      if (fallback.error && fallback.error.code !== '23505') {
+        console.error('assignRoleToUser insert error:', fallback.error);
       }
     }
   } catch (err) {
@@ -216,33 +158,20 @@ async function assignRoleToUser(usuarioId, rolId) {
   }
 }
 
-function normalizeText(text) {
-  if (!text) return '';
-  return String(text)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
 async function fetchRoleIdForTipo(tipo) {
-  const normalizedTipo = normalizeText(tipo);
-  if (!normalizedTipo) return null;
+  const normalized = normalizeTipo(tipo);
+  if (!normalized) return null;
 
-  const candidates = normalizedTipo === 'profesional'
+  const candidates = normalized === 'profesional'
     ? ['profesional', 'professional']
-    : ['secretario', 'secretaria', 'secretario/a', 'secretaria/o'];
+    : ['recepcion', 'recepcionista', 'recepcionist', 'secretario', 'secretaria', 'secretario/a', 'secretaria/o'];
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from('roles')
-      .select('id_rol, nombre_rol');
-
+    const { data, error } = await supabaseAdmin.from('roles').select('id_rol, nombre_rol');
     if (error) {
-      console.error('fetchRoleIdForTipo roles error:', error);
+      console.error('fetchRoleIdForTipo error:', error);
       return null;
     }
-
     for (const row of data || []) {
       const roleName = normalizeText(row?.nombre_rol);
       if (roleName && candidates.some((candidate) => roleName === candidate || roleName.includes(candidate))) {
@@ -252,18 +181,268 @@ async function fetchRoleIdForTipo(tipo) {
   } catch (err) {
     console.error('fetchRoleIdForTipo exception:', err);
   }
-
   return null;
 }
 
-function isProfessionalProfileComplete(row) {
-  if (!row) return false;
-  const required = [row.nombre, row.apellido, row.telefono, row.fecha_nacimiento];
-  if (required.some((v) => v === null || v === undefined || String(v).trim() === '')) {
-    return false;
+async function fetchUserAndPersona(idUsuario) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .select(`
+        id_usuario,
+        dni,
+        activo,
+        persona_id,
+        persona:personas (
+          id,
+          nombre,
+          apellido,
+          telefono,
+          email,
+          fecha_nacimiento,
+          foto_perfil
+        )
+      `)
+      .eq('id_usuario', Number(idUsuario))
+      .maybeSingle();
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error('fetchUserAndPersona error:', error);
+      }
+      return null;
+    }
+    if (!data) return null;
+    const persona = data.persona || null;
+    const personaId = data.persona_id || persona?.id || null;
+    return {
+      user: {
+        id_usuario: data.id_usuario,
+        dni: data.dni,
+        activo: data.activo,
+        persona_id: personaId,
+      },
+      persona,
+      personaId,
+    };
+  } catch (err) {
+    console.error('fetchUserAndPersona exception:', err);
+    return null;
   }
-  if (!row.id_departamento) return false;
-  return true;
+}
+
+async function fetchPersonaProfesion(personaId) {
+  if (!personaId) return null;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profesional_departamentos')
+      .select(`
+        profesional_id,
+        departamento_id,
+        departamento:profesiones ( id_departamento, nombre )
+      `)
+      .eq('profesional_id', Number(personaId))
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error('fetchPersonaProfesion error:', error);
+      }
+      return null;
+    }
+    if (!data) return null;
+    return {
+      id_departamento: data.departamento_id ?? data.departamento?.id_departamento ?? null,
+      nombre: data.departamento?.nombre ?? null,
+    };
+  } catch (err) {
+    console.error('fetchPersonaProfesion exception:', err);
+    return null;
+  }
+}
+
+async function fetchUserProfile(idUsuario, rolesHint = null, prefetchedSnapshot = null) {
+  const snapshot = prefetchedSnapshot || (await fetchUserAndPersona(idUsuario));
+  if (!snapshot) return null;
+
+  const { user, persona, personaId } = snapshot;
+  if (!personaId || !persona) return null;
+
+  const roles = rolesHint || (await fetchUserRoles(idUsuario));
+  const profesion = await fetchPersonaProfesion(personaId);
+  const foto = await resolveStorageAsset(persona.foto_perfil);
+  const tipo = determineTipoFromRoles(roles, !!profesion?.id_departamento);
+
+  return {
+    tipo,
+    id_usuario: user.id_usuario,
+    persona_id: personaId,
+    nombre: persona.nombre ?? null,
+    apellido: persona.apellido ?? null,
+    telefono: persona.telefono ?? null,
+    email: persona.email ?? null,
+    fecha_nacimiento: persona.fecha_nacimiento ?? null,
+    foto_perfil: foto.signedUrl || persona.foto_perfil || null,
+    foto_perfil_url: foto.signedUrl || null,
+    foto_perfil_path: foto.path,
+    profesion: profesion?.nombre ?? (tipo === 'recepcion' ? 'Recepción' : null),
+    profesion_id: profesion?.id_departamento ?? null,
+  };
+}
+
+function computeNeedsProfile(perfil) {
+  if (!perfil) return true;
+  const required = [perfil.nombre, perfil.apellido, perfil.telefono, perfil.email, perfil.fecha_nacimiento];
+  if (required.some((value) => value === null || value === undefined || String(value).trim() === '')) {
+    return true;
+  }
+  if (perfil.tipo === 'profesional' && !perfil.profesion_id) return true;
+  return false;
+}
+
+async function processProfilePhoto(usuarioId, fotoValue, previousPath, { allowHttpFallback = true } = {}) {
+  if (fotoValue === undefined) return previousPath || null;
+  if (fotoValue === null) {
+    await deleteStorageAsset(previousPath);
+    return null;
+  }
+  if (typeof fotoValue === 'string' && fotoValue.trim() === '') {
+    await deleteStorageAsset(previousPath);
+    return null;
+  }
+  if (typeof fotoValue === 'string' && fotoValue.startsWith('data:image')) {
+    const uploadResult = await uploadProfileImageIfNeeded(usuarioId, fotoValue, { previousPath });
+    return uploadResult?.path || previousPath || null;
+  }
+  if (typeof fotoValue === 'string') {
+    const trimmed = fotoValue.trim();
+    if (allowHttpFallback && isHttpUrl(trimmed)) {
+      if (previousPath && previousPath !== trimmed) {
+        await deleteStorageAsset(previousPath);
+      }
+      return trimmed;
+    }
+    if (previousPath && previousPath !== trimmed) {
+      await deleteStorageAsset(previousPath);
+    }
+    return trimmed || null;
+  }
+  return previousPath || null;
+}
+
+async function savePersonaForUser(usuarioId, personaId, payload) {
+  const cleaned = cleanObject(payload);
+  if (personaId) {
+    const { error } = await supabaseAdmin
+      .from('personas')
+      .update(cleaned)
+      .eq('id', Number(personaId));
+    if (error) throw error;
+    return personaId;
+  }
+  if (!cleaned.nombre || !cleaned.apellido) {
+    const err = new Error('Se requieren nombre y apellido para crear la persona');
+    err.status = 400;
+    throw err;
+  }
+  const { data, error } = await supabaseAdmin
+    .from('personas')
+    .insert([cleaned])
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  const newPersonaId = data?.id;
+  if (!newPersonaId) {
+    throw new Error('No se pudo crear la persona');
+  }
+  const { error: linkErr } = await supabaseAdmin
+    .from('usuarios')
+    .update({ persona_id: newPersonaId })
+    .eq('id_usuario', Number(usuarioId));
+  if (linkErr) throw linkErr;
+  return newPersonaId;
+}
+
+async function setPersonaProfession(personaId, profesionId) {
+  if (!personaId) return;
+  try {
+    const { error: delErr } = await supabaseAdmin
+      .from('profesional_departamentos')
+      .delete()
+      .eq('profesional_id', Number(personaId));
+    if (delErr && delErr.code !== 'PGRST116') {
+      console.warn('setPersonaProfession delete warn:', delErr);
+    }
+  } catch (err) {
+    console.warn('setPersonaProfession delete exception:', err);
+  }
+  if (profesionId === undefined || profesionId === null) return;
+  try {
+    const { error: insErr } = await supabaseAdmin
+      .from('profesional_departamentos')
+      .upsert(
+        [{ profesional_id: Number(personaId), departamento_id: Number(profesionId) }],
+        { onConflict: 'profesional_id,departamento_id' }
+      );
+    if (insErr && insErr.code !== '23505') {
+      console.warn('setPersonaProfession insert warn:', insErr);
+    }
+  } catch (err) {
+    console.error('setPersonaProfession insert exception:', err);
+  }
+}
+
+async function syncLegacySecretarioRecord(usuarioId, payload = {}) {
+  const numericUserId = Number(usuarioId);
+  if (!Number.isInteger(numericUserId) || numericUserId <= 0) return;
+
+  const basePayload = {
+    nombre: payload.nombre ?? null,
+    apellido: payload.apellido ?? null,
+    telefono: payload.telefono ?? null,
+    email: payload.email ?? null,
+    fecha_nacimiento: payload.fecha_nacimiento ?? null,
+    foto_perfil: payload.foto_perfil ?? null,
+  };
+
+  const attemptUpsert = async (record, onConflict) => {
+    try {
+      const { error } = await supabaseAdmin
+        .from('secretarios')
+        .upsert([record], { onConflict, ignoreDuplicates: false });
+      return error || null;
+    } catch (err) {
+      return err;
+    }
+  };
+
+  let error = await attemptUpsert({ ...basePayload, usuario_id: numericUserId }, 'usuario_id');
+
+  const missingUsuarioIdCodes = new Set(['42703', 'PGRST204']);
+  if (error && (missingUsuarioIdCodes.has(error.code) || /column "?usuario_id"?/i.test(error.message || ''))) {
+    error = await attemptUpsert({ ...basePayload, id: numericUserId }, 'id');
+  }
+
+  if (error && error.code === '428C9') {
+    try {
+      await upsertWithIdentityOverride(
+        'secretarios',
+        { id: numericUserId, ...basePayload },
+        { onConflict: 'id' }
+      );
+      error = null;
+    } catch (overrideErr) {
+      error = overrideErr;
+    }
+  }
+
+  if (error && error.code === '42P01') {
+    console.warn('syncLegacySecretarioRecord: tabla secretarios inexistente. Se omite sincronización.');
+    return;
+  }
+
+  if (error) {
+    throw error;
+  }
 }
 
 async function resolveRoleIdMaybe(body) {
@@ -272,30 +451,27 @@ async function resolveRoleIdMaybe(body) {
   if (idCandidate !== undefined && idCandidate !== null && !Number.isNaN(Number(idCandidate))) {
     return Number(idCandidate);
   }
-  if (body.rolNombre) {
-    const roleName = String(body.rolNombre).trim();
-    if (!roleName) return null;
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('roles')
-        .select('id_rol, nombre_rol')
-        .eq('nombre_rol', roleName)
-        .limit(1)
-        .maybeSingle();
-      if (error) {
-        console.error('resolveRoleIdMaybe roles error:', error);
-        return null;
-      }
-      return data ? Number(data.id_rol) : null;
-    } catch (err) {
-      console.error('resolveRoleIdMaybe exception:', err);
+  if (!body.rolNombre) return null;
+  const roleName = String(body.rolNombre).trim();
+  if (!roleName) return null;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('roles')
+      .select('id_rol, nombre_rol')
+      .eq('nombre_rol', roleName)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error('resolveRoleIdMaybe roles error:', error);
       return null;
     }
+    return data ? Number(data.id_rol) : null;
+  } catch (err) {
+    console.error('resolveRoleIdMaybe exception:', err);
+    return null;
   }
-  return null;
 }
 
-// Registrar un usuario (requiere rol)
 const registrarUsuario = async (req, res) => {
   try {
     const { dni, contrasena } = req.body || {};
@@ -311,134 +487,117 @@ const registrarUsuario = async (req, res) => {
       return res.status(400).json({ error: 'id_rol/rolNombre es obligatorio' });
     }
 
-    const hash = await bcrypt.hash(contrasena, 12);
-
     const { data: existingUser, error: findErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id_usuario, dni')
+      .select('id_usuario')
       .eq('dni', Number(dni))
-      .limit(1)
       .maybeSingle();
-
     if (findErr) {
-      console.error('Error checking existing user:', findErr);
-      throw new Error('Error al verificar el usuario existente');
+      console.error('registrarUsuario existing user error:', findErr);
+      return res.status(500).json({ error: 'No se pudo verificar el usuario existente' });
     }
-
     if (existingUser) {
       return res.status(409).json({ error: 'El usuario ya existe' });
     }
 
-    const basePayload = { dni: Number(dni), password_hash: hash, activo: true };
+    const hash = await bcrypt.hash(String(contrasena), 12);
 
-    let insertData = null;
-    let insertErr = null;
-
-    ({ data: insertData, error: insertErr } = await supabaseAdmin
+    const { data: inserted, error: insertErr } = await supabaseAdmin
       .from('usuarios')
-      .insert([basePayload])
+      .insert([{ dni: Number(dni), password_hash: hash, activo: true }])
       .select('id_usuario, dni, activo')
-      .maybeSingle());
+      .maybeSingle();
 
     if (insertErr) {
-      console.error('Error inserting user:', insertErr);
-      throw new Error('Error al registrar el usuario: ' + insertErr.message);
+      console.error('registrarUsuario insert error:', insertErr);
+      return res.status(500).json({ error: 'No se pudo registrar el usuario' });
     }
 
-    await assignRoleToUser(insertData.id_usuario, roleId);
+    await assignRoleToUser(inserted.id_usuario, roleId);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Usuario registrado con éxito',
-      user: { ...insertData, id_rol: roleId },
+      user: { ...inserted, id_rol: roleId },
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    console.error('registrarUsuario exception:', err);
+    return res.status(500).json({ error: err.message || 'Error al registrar usuario' });
   }
 };
 
-// Login
 const loginUsuario = async (req, res) => {
   try {
     const { dni, contrasena } = req.body || {};
-    if (!dni || !contrasena) return res.status(400).json({ error: 'Faltan credenciales' });
+    if (!dni || !contrasena) {
+      return res.status(400).json({ error: 'Faltan credenciales' });
+    }
 
-    let user = null;
-    let findErr = null;
-
-    ({ data: user, error: findErr } = await supabaseAdmin
+    const { data: user, error: findErr } = await supabaseAdmin
       .from('usuarios')
       .select('id_usuario, dni, password_hash, activo')
       .eq('dni', Number(dni))
-      .limit(1)
-      .maybeSingle());
+      .maybeSingle();
 
     if (findErr) {
-      console.error('Error fetching user for login:', findErr);
+      console.error('loginUsuario lookup error:', findErr);
       return res.status(500).json({ error: 'Error interno' });
     }
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
     if (user.activo === false) {
       return res.status(403).json({ error: 'Usuario inactivo' });
     }
 
-    let match = false;
+    let credentialsValid = false;
     if (!user.password_hash) {
       if (String(contrasena) === DEFAULT_PASSWORD) {
-        const newHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
-        const { error: updPwdErr } = await supabaseAdmin
+        const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+        const { error: initErr } = await supabaseAdmin
           .from('usuarios')
-          .update({ password_hash: newHash })
+          .update({ password_hash: hash })
           .eq('id_usuario', user.id_usuario);
-        if (updPwdErr) {
-          console.error('Error setting default password hash during login:', updPwdErr);
+        if (initErr) {
+          console.error('loginUsuario default password hash error:', initErr);
           return res.status(500).json({ error: 'No se pudo validar credenciales' });
         }
-        match = true;
-      } else {
-        return res.status(401).json({ error: 'Credenciales inválidas' });
+        credentialsValid = true;
       }
     } else {
-      match = await bcrypt.compare(contrasena, user.password_hash || '');
-      if (!match) return res.status(401).json({ error: 'Credenciales inválidas' });
+      credentialsValid = await bcrypt.compare(String(contrasena), user.password_hash || '');
+    }
+
+    if (!credentialsValid) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
     const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
-    const token = jwt.sign({ id: user.id_usuario, dni: user.dni }, secret, {
-      expiresIn: '8h',
-    });
+    const token = jwt.sign({ id: user.id_usuario, dni: user.dni }, secret, { expiresIn: '8h' });
 
-    const firstLogin = String(contrasena) === DEFAULT_PASSWORD;
-
-    const [perfil, roles] = await Promise.all([
-      fetchUserProfile(user.id_usuario),
-      fetchUserRoles(user.id_usuario),
-    ]);
-
-    const rolNombre = roles[0]?.nombre || null;
-
+    const roles = await fetchUserRoles(user.id_usuario);
+    const perfil = await fetchUserProfile(user.id_usuario, roles);
     const needsProfile = computeNeedsProfile(perfil);
 
-    res.json({
+    return res.json({
       success: true,
       token,
       user: {
         id: user.id_usuario,
         dni: user.dni,
         id_rol: roles[0]?.id ?? null,
-        rol_nombre: rolNombre,
+        rol_nombre: roles[0]?.nombre ?? null,
         roles,
       },
       profile: perfil,
-      firstLogin,
+      firstLogin: String(contrasena) === DEFAULT_PASSWORD,
       needsProfile,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('loginUsuario exception:', err);
+    return res.status(500).json({ error: err.message || 'Error al iniciar sesión' });
   }
 };
 
-// Primer registro
 const primerRegistro = async (req, res) => {
   try {
     const token = extractToken(req);
@@ -447,10 +606,15 @@ const primerRegistro = async (req, res) => {
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (e) {
+    } catch (err) {
       return res.status(401).json({ error: 'Token inválido' });
     }
+
     const userId = payload.id;
+    const snapshot = await fetchUserAndPersona(userId);
+    if (!snapshot) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
 
     const {
       nombre,
@@ -465,34 +629,41 @@ const primerRegistro = async (req, res) => {
       nuevaContrasena,
     } = req.body || {};
 
-    if (!nombre || !apellido || !telefono || !nuevaContrasena || !fecha_nacimiento || !email) {
-      return res.status(400).json({ error: 'Faltan datos obligatorios (nombre, apellido, telefono, email, fecha_nacimiento, nuevaContrasena)' });
+    if (!nombre || !apellido || !telefono || !fecha_nacimiento || !email || !nuevaContrasena) {
+      return res.status(400).json({
+        error: 'Faltan datos obligatorios (nombre, apellido, telefono, email, fecha_nacimiento, nuevaContrasena)',
+      });
     }
-    if (!isValidDateYYYYMMDD(String(fecha_nacimiento))) {
+
+    const fechaStr = String(fecha_nacimiento);
+    if (!isValidDateYYYYMMDD(fechaStr)) {
       return res.status(400).json({ error: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
     }
 
-    if (!isSafePassword(String(nuevaContrasena))) {
+    if (!isSafePassword(nuevaContrasena)) {
       return res.status(400).json({ error: 'La nueva contraseña es insegura o inválida' });
     }
     if (String(nuevaContrasena) === DEFAULT_PASSWORD) {
-      return res.status(400).json({ error: 'Debes elegir una contraseña distinta a la genérica' });
+      return res.status(400).json({ error: 'Elegí una contraseña distinta a la genérica' });
     }
 
     let resolvedTipo = null;
     let resolvedProfesionId = null;
 
-    if (typeof seleccion === 'string' && seleccion.trim() !== '') {
-      if (seleccion === 'secretario') {
-        resolvedTipo = 'secretario';
+    if (typeof seleccion === 'string' && seleccion.trim()) {
+      if (isRecepcionTipo(seleccion)) {
+        resolvedTipo = 'recepcion';
       } else if (!Number.isNaN(Number(seleccion))) {
         resolvedTipo = 'profesional';
         resolvedProfesionId = Number(seleccion);
       }
     }
 
-    if (!resolvedTipo && typeof tipoUsuario === 'string' && tipoUsuario.trim() !== '') {
-      resolvedTipo = tipoUsuario.trim().toLowerCase();
+    if (!resolvedTipo && typeof tipoUsuario === 'string' && tipoUsuario.trim()) {
+      const normalized = normalizeTipo(tipoUsuario);
+      if (normalized === 'profesional' || normalized === 'recepcion') {
+        resolvedTipo = normalized;
+      }
     }
 
     if (resolvedProfesionId === null && profesionId !== undefined && profesionId !== null && !Number.isNaN(Number(profesionId))) {
@@ -500,193 +671,56 @@ const primerRegistro = async (req, res) => {
     }
 
     if (!resolvedTipo) {
-      resolvedTipo = resolvedProfesionId ? 'profesional' : 'secretario';
+      resolvedTipo = resolvedProfesionId ? 'profesional' : 'recepcion';
     }
 
     if (resolvedTipo === 'profesional' && !resolvedProfesionId) {
       return res.status(400).json({ error: 'Seleccioná una profesión válida' });
     }
 
-    if (resolvedTipo !== 'profesional' && resolvedTipo !== 'secretario') {
-      return res.status(400).json({ error: 'Tipo de usuario inválido' });
+    const currentProfile = await fetchUserProfile(userId, null, snapshot);
+    if (currentProfile && !computeNeedsProfile(currentProfile)) {
+      return res.status(409).json({ error: 'El perfil ya fue completado' });
     }
 
-    // Verificar si ya existe perfil profesional completo para evitar múltiples primer-registro
-    let existingProfesional = null;
-    try {
-      const { data: exRow, error: exErr } = await supabaseAdmin
-        .from('profesionales')
-        .select('id_profesional, nombre, apellido, telefono, email, fecha_nacimiento, foto_perfil, id_departamento')
-        .eq('id_profesional', Number(userId))
-        .maybeSingle();
-      if (exErr && exErr.code !== 'PGRST116') {
-        console.warn('primerRegistro fetch existing profesional warn:', exErr.message);
-      }
-      existingProfesional = exRow || null;
-    } catch (e) {
-      // ignorar
-    }
+    const previousPath = snapshot.persona?.foto_perfil || null;
+    const fotoPath = await processProfilePhoto(userId, foto_perfil, previousPath);
 
-    let existingSecretario = null;
-    let secretariosHasUsuarioIdColumn = true;
-    if (resolvedTipo === 'secretario') {
-      try {
-        const { data: secRow, error: secErr } = await supabaseAdmin
-          .from('secretarios')
-          .select('id, usuario_id, foto_perfil')
-          .eq('usuario_id', Number(userId))
-          .maybeSingle();
-        if (!secErr || secErr.code === 'PGRST116') {
-          existingSecretario = secRow || null;
-          secretariosHasUsuarioIdColumn = true;
-        } else if (secErr && ['42703', 'PGRST204'].includes(secErr.code)) {
-          secretariosHasUsuarioIdColumn = false;
-        }
-      } catch (e) {
-        secretariosHasUsuarioIdColumn = false;
-      }
+    const personaPayload = {
+      nombre: String(nombre).trim(),
+      apellido: String(apellido).trim(),
+      telefono: normalizePhoneValue(telefono),
+      email: normalizeEmailValue(email),
+      fecha_nacimiento: fechaStr,
+      foto_perfil: fotoPath,
+    };
 
-      if (!secretariosHasUsuarioIdColumn) {
-        try {
-          const { data: secRowById, error: secErrById } = await supabaseAdmin
-            .from('secretarios')
-            .select('id, foto_perfil')
-            .eq('id', Number(userId))
-            .maybeSingle();
-          if (!secErrById || secErrById.code === 'PGRST116') {
-            existingSecretario = secRowById || existingSecretario;
-          }
-        }
-        catch (e) {
-          // ignore
-        }
-      }
-    }
+    const personaId = await savePersonaForUser(userId, snapshot.personaId, personaPayload);
 
     if (resolvedTipo === 'profesional') {
-      if (existingProfesional && isProfessionalProfileComplete(existingProfesional)) {
-        return res.status(409).json({ error: 'El perfil ya fue completado' });
-      }
-
-      const existingProfesionalPath = existingProfesional?.foto_perfil || null;
-      let uploadedProfesionalFoto = null;
-      if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
-        uploadedProfesionalFoto = await uploadProfileImageIfNeeded(userId, foto_perfil, {
-          previousPath: existingProfesionalPath,
-        });
-      }
-
-      let fotoPathToStore = existingProfesionalPath;
-      if (uploadedProfesionalFoto?.path) {
-        fotoPathToStore = uploadedProfesionalFoto.path;
-      } else if (typeof foto_perfil === 'string' && isHttpUrl(foto_perfil)) {
-        fotoPathToStore = foto_perfil;
-      }
-
-      const profesionalPayload = {
-        id_profesional: userId,
-        nombre,
-        apellido,
-        telefono,
-        email: email || null,
-        fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: fotoPathToStore || null,
-        id_departamento: resolvedProfesionId,
-      };
-
-      const { error: profesionalErr } = await supabaseAdmin
-        .from('profesionales')
-        .upsert([profesionalPayload], { onConflict: 'id_profesional' });
-      if (profesionalErr) {
-        console.error('primerRegistro upsert profesionales error:', profesionalErr);
-        return res.status(500).json({ error: 'No se pudo actualizar el perfil profesional' });
-      }
-
-      const { error: linkErr } = await supabaseAdmin
-        .from('profesional_departamentos')
-        .upsert(
-          [{ profesional_id: userId, departamento_id: resolvedProfesionId }],
-          { onConflict: 'profesional_id,departamento_id' }
-        );
-      if (linkErr && linkErr.code !== '23505') {
-        console.warn('primerRegistro profesional_departamentos warning:', linkErr.message);
-      }
+      await setPersonaProfession(personaId, resolvedProfesionId);
     } else {
-      const existingSecretarioPath = existingSecretario?.foto_perfil || null;
-      let uploadedSecretarioFoto = null;
-      if (foto_perfil && typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
-        uploadedSecretarioFoto = await uploadProfileImageIfNeeded(userId, foto_perfil, {
-          previousPath: existingSecretarioPath,
+      await setPersonaProfession(personaId, null);
+      try {
+        await syncLegacySecretarioRecord(userId, {
+          nombre: String(nombre).trim(),
+          apellido: String(apellido).trim(),
+          telefono: normalizePhoneValue(telefono),
+          email: normalizeEmailValue(email),
+          fecha_nacimiento: fechaStr,
+          foto_perfil: fotoPath,
         });
-      }
-
-      let secretarioFotoPath = existingSecretarioPath;
-      if (uploadedSecretarioFoto?.path) {
-        secretarioFotoPath = uploadedSecretarioFoto.path;
-      } else if (typeof foto_perfil === 'string' && isHttpUrl(foto_perfil)) {
-        secretarioFotoPath = foto_perfil;
-      }
-
-      const numericUserId = Number(userId);
-
-      const secretarioPayload = {
-        nombre,
-        apellido,
-        telefono,
-        email: email || null,
-        fecha_nacimiento: String(fecha_nacimiento),
-        foto_perfil: secretarioFotoPath || null,
-      };
-
-      if (!Number.isNaN(numericUserId)) {
-        if (secretariosHasUsuarioIdColumn) {
-          secretarioPayload.usuario_id = numericUserId;
-        } else {
-          secretarioPayload.id = numericUserId;
-        }
-      }
-
-      let secretarioErr = null;
-      ({ error: secretarioErr } = await supabaseAdmin
-        .from('secretarios')
-        .upsert([secretarioPayload], {
-          onConflict: secretariosHasUsuarioIdColumn ? 'usuario_id' : 'id',
-          ignoreDuplicates: false,
-        }));
-
-      if (secretarioErr && ['42703', '428C9', 'PGRST204'].includes(secretarioErr.code)) {
-        try {
-          const overridePayload = {
-            id: numericUserId,
-            nombre,
-            apellido,
-            telefono,
-            email: email || null,
-            fecha_nacimiento: String(fecha_nacimiento),
-            foto_perfil: secretarioFotoPath || null,
-          };
-          if (secretariosHasUsuarioIdColumn) {
-            overridePayload.usuario_id = numericUserId;
-          }
-
-          await upsertWithIdentityOverride('secretarios', overridePayload, { onConflict: 'id' });
-          secretarioErr = null;
-        } catch (overrideErr) {
-          secretarioErr = overrideErr;
-        }
-      }
-
-      if (secretarioErr) {
-        console.error('primerRegistro upsert secretarios error:', secretarioErr);
-        return res.status(500).json({ error: 'No se pudo actualizar el perfil de secretario' });
+      } catch (secretarioErr) {
+        console.error('primerRegistro sync secretaria error:', secretarioErr);
+        return res.status(500).json({ error: 'No se pudo actualizar el perfil de recepción' });
       }
     }
 
-    const hash = await bcrypt.hash(String(nuevaContrasena), 12);
+    const passwordHash = await bcrypt.hash(String(nuevaContrasena), 12);
     const { error: pwdErr } = await supabaseAdmin
       .from('usuarios')
-      .update({ password_hash: hash })
-      .eq('id_usuario', userId);
+      .update({ password_hash: passwordHash })
+      .eq('id_usuario', Number(userId));
     if (pwdErr) {
       console.error('primerRegistro update password error:', pwdErr);
       return res.status(500).json({ error: 'No se pudo actualizar la contraseña' });
@@ -695,14 +729,14 @@ const primerRegistro = async (req, res) => {
     const roleId = await fetchRoleIdForTipo(resolvedTipo);
     if (roleId) {
       await assignRoleToUser(userId, roleId);
-    } else {
-      console.warn('primerRegistro: no se encontró rol para tipo', resolvedTipo);
     }
 
-    const perfil = await fetchUserProfile(userId);
-    return res.json({ success: true, profile: perfil });
+    const profile = await fetchUserProfile(userId);
+    return res.json({ success: true, profile });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('primerRegistro exception:', err);
+    const status = err.status || 500;
+    return res.status(status).json({ error: err.message || 'Error en el primer registro' });
   }
 };
 
@@ -710,15 +744,21 @@ const actualizarPerfil = async (req, res) => {
   try {
     const token = extractToken(req);
     if (!token) return res.status(401).json({ error: 'Token requerido' });
+
     const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (e) {
+    } catch (err) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
     const userId = payload.id;
+    const snapshot = await fetchUserAndPersona(userId);
+    if (!snapshot) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
     const {
       nombre,
       apellido,
@@ -733,336 +773,155 @@ const actualizarPerfil = async (req, res) => {
       nuevaContrasena,
     } = req.body || {};
 
-    const currentProfile = await fetchUserProfile(userId);
-    if (!currentProfile) {
-      return res.status(404).json({ error: 'Perfil no encontrado para el usuario' });
-    }
-
-    const previousPhotoPath = currentProfile?.foto_perfil_path || null;
-
-    let resolvedTipo = null;
-    if (typeof tipoUsuario === 'string' && tipoUsuario.trim()) {
-      resolvedTipo = tipoUsuario.trim().toLowerCase();
-    } else if (currentProfile?.tipo) {
-      resolvedTipo = currentProfile.tipo;
-    } else if (profesionId !== undefined && profesionId !== null && profesionId !== '') {
-      resolvedTipo = 'profesional';
-    } else {
-      resolvedTipo = 'secretario';
-    }
-
-    if (resolvedTipo !== 'profesional' && resolvedTipo !== 'secretario') {
-      return res.status(400).json({ error: 'Tipo de usuario inválido' });
-    }
-
-    if (currentProfile?.tipo && resolvedTipo !== currentProfile.tipo) {
-      resolvedTipo = currentProfile.tipo;
-    }
-
-    const userPayload = {};
+    let userUpdate = {};
     if (dni !== undefined) {
       const dniStr = String(dni).trim();
-      if (!dniStr) {
-        return res.status(400).json({ error: 'DNI inválido' });
-      }
       if (!isValidDni(dniStr)) {
         return res.status(400).json({ error: 'DNI inválido. Debe tener entre 7 y 15 números.' });
       }
       const dniNum = Number(dniStr);
-      const { data: existingDni, error: dniErr } = await supabaseAdmin
+      const { data: conflict, error: dniErr } = await supabaseAdmin
         .from('usuarios')
         .select('id_usuario')
         .eq('dni', dniNum)
         .neq('id_usuario', Number(userId))
         .maybeSingle();
-
       if (dniErr && dniErr.code !== 'PGRST116') {
-        console.error('actualizarPerfil validar DNI error:', dniErr);
+        console.error('actualizarPerfil DNI lookup error:', dniErr);
         return res.status(500).json({ error: 'No se pudo validar el DNI' });
       }
-      if (existingDni) {
+      if (conflict) {
         return res.status(409).json({ error: 'El DNI ingresado ya está en uso' });
       }
-      userPayload.dni = dniNum;
+      userUpdate.dni = dniNum;
     }
 
     if (nuevaContrasena) {
       if (!isSafePassword(nuevaContrasena)) {
         return res.status(400).json({ error: 'Contraseña inválida o insegura' });
       }
-      if (String(nuevaContrasena).toLowerCase() === String(DEFAULT_PASSWORD).toLowerCase()) {
+      if (String(nuevaContrasena) === DEFAULT_PASSWORD) {
         return res.status(400).json({ error: 'Elegí una contraseña distinta a la genérica' });
       }
-      userPayload.password_hash = await bcrypt.hash(String(nuevaContrasena), 12);
+      userUpdate.password_hash = await bcrypt.hash(String(nuevaContrasena), 12);
     }
 
-    if (Object.keys(userPayload).length > 0) {
-      const { error: usuarioUpdateErr } = await supabaseAdmin
+    if (Object.keys(userUpdate).length > 0) {
+      const { error: updErr } = await supabaseAdmin
         .from('usuarios')
-        .update(userPayload)
+        .update(userUpdate)
         .eq('id_usuario', Number(userId));
-
-      if (usuarioUpdateErr) {
-        console.error('actualizarPerfil usuarios update error:', usuarioUpdateErr);
-        return res.status(500).json({ error: 'No se pudo actualizar las credenciales del usuario' });
+      if (updErr) {
+        console.error('actualizarPerfil usuarios update error:', updErr);
+        return res.status(500).json({ error: 'No se pudieron actualizar las credenciales' });
       }
     }
 
-    let fotoUrlToStore;
-    if (removeFoto === true) {
-      fotoUrlToStore = null;
-      await deleteStorageAsset(previousPhotoPath);
-    } else if (foto_perfil !== undefined) {
-      if (typeof foto_perfil === 'string' && foto_perfil.startsWith('data:image')) {
-        const uploadResult = await uploadProfileImageIfNeeded(userId, foto_perfil, {
-          previousPath: previousPhotoPath,
-        });
-        fotoUrlToStore = uploadResult?.path || previousPhotoPath || null;
-      } else if (foto_perfil === null || (typeof foto_perfil === 'string' && foto_perfil.trim() === '')) {
-        fotoUrlToStore = null;
-        await deleteStorageAsset(previousPhotoPath);
-      } else if (typeof foto_perfil === 'string') {
-        fotoUrlToStore = foto_perfil;
-        if (previousPhotoPath && foto_perfil !== previousPhotoPath) {
-          await deleteStorageAsset(previousPhotoPath);
-        }
+    const currentProfile = await fetchUserProfile(userId, null, snapshot);
+    const currentTipo = normalizeTipo(currentProfile?.tipo);
+
+    let resolvedTipo = currentTipo || 'profesional';
+    if (typeof tipoUsuario === 'string' && tipoUsuario.trim()) {
+      const normalized = normalizeTipo(tipoUsuario);
+      if (normalized === 'profesional' || normalized === 'recepcion') {
+        resolvedTipo = normalized;
       }
+    } else if (!currentTipo && (profesionId !== undefined && profesionId !== null && profesionId !== '')) {
+      resolvedTipo = 'profesional';
     }
 
-    if (resolvedTipo === 'profesional') {
-      const updatePayload = {};
-      if (nombre !== undefined) updatePayload.nombre = nombre;
-      if (apellido !== undefined) updatePayload.apellido = apellido;
-      if (telefono !== undefined) updatePayload.telefono = telefono;
-      if (email !== undefined) updatePayload.email = email || null;
+    if (resolvedTipo !== 'profesional' && resolvedTipo !== 'recepcion') {
+      resolvedTipo = 'profesional';
+    }
 
-      if (fecha_nacimiento !== undefined) {
-        if (!fecha_nacimiento || String(fecha_nacimiento).trim() === '') {
+    const previousPhotoPath = snapshot.persona?.foto_perfil || null;
+    const nextPhotoPath = removeFoto === true
+      ? null
+      : await processProfilePhoto(userId, foto_perfil, previousPhotoPath);
+
+    const personaPayload = {};
+    if (nombre !== undefined) personaPayload.nombre = String(nombre).trim();
+    if (apellido !== undefined) personaPayload.apellido = String(apellido).trim();
+    if (telefono !== undefined) personaPayload.telefono = normalizePhoneValue(telefono);
+    if (email !== undefined) personaPayload.email = normalizeEmailValue(email);
+    if (foto_perfil !== undefined || removeFoto === true) personaPayload.foto_perfil = nextPhotoPath;
+
+    if (fecha_nacimiento !== undefined) {
+      if (!fecha_nacimiento) {
+        if (resolvedTipo === 'profesional') {
           return res.status(400).json({ error: 'fecha_nacimiento es obligatorio para profesionales' });
         }
-        if (!isValidDateYYYYMMDD(String(fecha_nacimiento))) {
+        personaPayload.fecha_nacimiento = null;
+      } else {
+        const fechaStr = String(fecha_nacimiento);
+        if (!isValidDateYYYYMMDD(fechaStr)) {
           return res.status(400).json({ error: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
         }
-        updatePayload.fecha_nacimiento = String(fecha_nacimiento);
-      }
-
-      let departamentoToAssign = null;
-      let shouldUpdateDepartment = false;
-      if (profesionId !== undefined) {
-        shouldUpdateDepartment = true;
-        if (profesionId === null || profesionId === '') {
-          departamentoToAssign = null;
-          updatePayload.id_departamento = null;
-        } else {
-          const parsedProf = Number(profesionId);
-          if (Number.isNaN(parsedProf)) {
-            return res.status(400).json({ error: 'profesionId inválido' });
-          }
-          departamentoToAssign = parsedProf;
-          updatePayload.id_departamento = parsedProf;
-        }
-      }
-
-      if (fotoUrlToStore !== undefined) {
-        updatePayload.foto_perfil = fotoUrlToStore;
-      }
-
-      if (Object.keys(updatePayload).length === 0 && !shouldUpdateDepartment) {
-        return res.status(400).json({ error: 'No hay cambios para actualizar' });
-      }
-
-      if (Object.keys(updatePayload).length > 0) {
-        const { data: updatedProfesional, error: profesionalErr } = await supabaseAdmin
-          .from('profesionales')
-          .update(updatePayload)
-          .eq('id_profesional', Number(userId))
-          .select('id_profesional')
-          .maybeSingle();
-
-        if (profesionalErr) {
-          if (profesionalErr.code === 'PGRST116') {
-            return res.status(404).json({ error: 'Perfil profesional no encontrado' });
-          }
-          console.error('actualizarPerfil profesionales error:', profesionalErr);
-          return res.status(500).json({ error: 'No se pudo actualizar el perfil profesional' });
-        }
-
-        if (!updatedProfesional) {
-          return res.status(404).json({ error: 'Perfil profesional no encontrado' });
-        }
-      }
-
-      if (shouldUpdateDepartment) {
-        if (departamentoToAssign === null) {
-          const { error: delErr } = await supabaseAdmin
-            .from('profesional_departamentos')
-            .delete()
-            .eq('profesional_id', Number(userId));
-          if (delErr && delErr.code !== 'PGRST116') {
-            console.warn('actualizarPerfil delete profesional_departamentos warn:', delErr.message);
-          }
-        } else {
-          const { error: linkErr } = await supabaseAdmin
-            .from('profesional_departamentos')
-            .upsert(
-              [{ profesional_id: Number(userId), departamento_id: departamentoToAssign }],
-              { onConflict: 'profesional_id,departamento_id' }
-            );
-          if (linkErr && linkErr.code !== '23505') {
-            console.warn('actualizarPerfil profesional_departamentos warning:', linkErr.message);
-          }
-        }
-      }
-    } else {
-      const secretarioPayload = {};
-      if (nombre !== undefined) secretarioPayload.nombre = nombre;
-      if (apellido !== undefined) secretarioPayload.apellido = apellido;
-      if (telefono !== undefined) {
-        const telefonoNormalizado = telefono === null ? null : String(telefono).trim();
-        secretarioPayload.telefono = !telefonoNormalizado ? null : telefonoNormalizado;
-      }
-      if (email !== undefined) {
-        const emailNormalizado = email === null ? null : String(email).trim();
-        secretarioPayload.email = emailNormalizado || null;
-      }
-      if (fecha_nacimiento !== undefined) {
-        if (fecha_nacimiento) {
-          if (!isValidDateYYYYMMDD(String(fecha_nacimiento))) {
-            return res.status(400).json({ error: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
-          }
-          secretarioPayload.fecha_nacimiento = String(fecha_nacimiento);
-        } else {
-          secretarioPayload.fecha_nacimiento = null;
-        }
-      }
-      if (fotoUrlToStore !== undefined) {
-        secretarioPayload.foto_perfil = fotoUrlToStore;
-      }
-
-      if (Object.keys(secretarioPayload).length === 0) {
-        return res.status(400).json({ error: 'No hay cambios para actualizar' });
-      }
-
-      const basePayload = { ...secretarioPayload };
-      const numericUserId = Number(userId);
-
-      let secretariosHasUsuarioIdColumn = true;
-      let existingSecretario = null;
-
-      try {
-        const { data: secretarioByUsuario, error: secretarioByUsuarioError } = await supabaseAdmin
-          .from('secretarios')
-          .select('id, usuario_id')
-          .eq('usuario_id', numericUserId)
-          .maybeSingle();
-
-        if (secretarioByUsuarioError && secretarioByUsuarioError.code !== 'PGRST116') {
-          if (['42703', 'PGRST204'].includes(secretarioByUsuarioError.code)) {
-            secretariosHasUsuarioIdColumn = false;
-          } else {
-            throw secretarioByUsuarioError;
-          }
-        } else if (secretarioByUsuario) {
-          existingSecretario = secretarioByUsuario;
-        }
-      } catch (lookupErr) {
-        if (lookupErr && ['42703', 'PGRST204'].includes(lookupErr.code)) {
-          secretariosHasUsuarioIdColumn = false;
-        } else {
-          console.warn('actualizarPerfil secretario lookup warn:', lookupErr);
-        }
-      }
-
-      if (!existingSecretario) {
-        try {
-          const { data: secretarioById, error: secretarioByIdError } = await supabaseAdmin
-            .from('secretarios')
-            .select('id')
-            .eq('id', numericUserId)
-            .maybeSingle();
-
-          if (!secretarioByIdError || secretarioByIdError.code === 'PGRST116') {
-            existingSecretario = secretarioById || null;
-          } else if (!['42703', 'PGRST204'].includes(secretarioByIdError.code)) {
-            console.warn('actualizarPerfil secretario lookup by id warn:', secretarioByIdError);
-          }
-        } catch (lookupByIdErr) {
-          console.warn('actualizarPerfil secretario lookup by id exception:', lookupByIdErr);
-        }
-      }
-
-      try {
-        if (existingSecretario) {
-          const targetColumn = secretariosHasUsuarioIdColumn ? 'usuario_id' : 'id';
-          const { error: updateErr } = await supabaseAdmin
-            .from('secretarios')
-            .update(basePayload)
-            .eq(targetColumn, numericUserId);
-
-          if (updateErr && updateErr.code !== 'PGRST116') {
-            if (['42703', 'PGRST204'].includes(updateErr.code)) {
-              secretariosHasUsuarioIdColumn = false;
-              existingSecretario = null;
-            } else {
-              throw updateErr;
-            }
-          }
-
-          if (updateErr && updateErr.code === 'PGRST116') {
-            existingSecretario = null;
-          }
-        }
-
-        if (!existingSecretario) {
-          const insertPayload = {
-            ...basePayload,
-            id: numericUserId,
-            ...(secretariosHasUsuarioIdColumn ? { usuario_id: numericUserId } : {}),
-          };
-
-          await upsertWithIdentityOverride('secretarios', insertPayload, { onConflict: 'id' });
-        }
-      } catch (secretarioErr) {
-        console.error('actualizarPerfil secretarios error:', secretarioErr);
-        return res.status(500).json({ error: 'No se pudo actualizar el perfil de secretario' });
+        personaPayload.fecha_nacimiento = fechaStr;
       }
     }
 
-    const [perfilActualizado, roles] = await Promise.all([
-      fetchUserProfile(userId),
-      fetchUserRoles(userId),
-    ]);
+    let personaId = snapshot.personaId;
+    if (Object.keys(personaPayload).length > 0) {
+      try {
+        personaId = await savePersonaForUser(userId, personaId, personaPayload);
+      } catch (err) {
+        const status = err.status || 500;
+        return res.status(status).json({ error: err.message || 'No se pudo actualizar la persona' });
+      }
+    }
 
-    const { data: usuarioRow, error: usuarioErr } = await supabaseAdmin
+    if (profesionId !== undefined) {
+      if (!personaId) {
+        return res.status(400).json({ error: 'No se puede asignar profesión sin datos personales' });
+      }
+      if (resolvedTipo !== 'profesional' || profesionId === null || profesionId === '') {
+        await setPersonaProfession(personaId, null);
+      } else {
+        const parsed = Number(profesionId);
+        if (Number.isNaN(parsed)) {
+          return res.status(400).json({ error: 'profesionId inválido' });
+        }
+        await setPersonaProfession(personaId, parsed);
+      }
+    }
+
+    const roles = await fetchUserRoles(userId);
+    const profile = await fetchUserProfile(userId, roles);
+    if (resolvedTipo === 'recepcion') {
+      try {
+        await syncLegacySecretarioRecord(userId, {
+          nombre: profile?.nombre ?? null,
+          apellido: profile?.apellido ?? null,
+          telefono: profile?.telefono ?? null,
+          email: profile?.email ?? null,
+          fecha_nacimiento: profile?.fecha_nacimiento ?? null,
+          foto_perfil: profile?.foto_perfil_path || profile?.foto_perfil || null,
+        });
+      } catch (secretarioErr) {
+        console.error('actualizarPerfil sync recepcion error:', secretarioErr);
+        return res.status(500).json({ error: 'No se pudo sincronizar el perfil de recepción' });
+      }
+    }
+    const { data: userRow } = await supabaseAdmin
       .from('usuarios')
       .select('id_usuario, dni, activo')
       .eq('id_usuario', Number(userId))
       .maybeSingle();
 
-    if (usuarioErr) {
-      console.error('actualizarPerfil usuario error:', usuarioErr);
-    }
-
-    const rolNombre = roles[0]?.nombre || null;
-
     return res.json({
       success: true,
-      profile: perfilActualizado,
-      user: usuarioRow
+      profile,
+      user: userRow
         ? {
-          id: usuarioRow.id_usuario,
-          dni: usuarioRow.dni,
-          activo: usuarioRow.activo,
+          id: userRow.id_usuario,
+          dni: userRow.dni,
+          activo: userRow.activo,
           id_rol: roles[0]?.id ?? null,
-          rol_nombre: rolNombre,
+          rol_nombre: roles[0]?.nombre ?? null,
           roles,
         }
-        : {
-          id: userId,
-          id_rol: roles[0]?.id ?? null,
-          rol_nombre: rolNombre,
-          roles,
-        },
+        : undefined,
     });
   } catch (err) {
     console.error('actualizarPerfil exception:', err);
@@ -1074,11 +933,12 @@ const obtenerPerfilActual = async (req, res) => {
   try {
     const token = extractToken(req);
     if (!token) return res.status(401).json({ error: 'Token requerido' });
+
     const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (e) {
+    } catch (err) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
@@ -1097,14 +957,9 @@ const obtenerPerfilActual = async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado o inactivo' });
     }
 
-    const [perfil, roles] = await Promise.all([
-      fetchUserProfile(user.id_usuario),
-      fetchUserRoles(user.id_usuario),
-    ]);
-
-    const rolNombre = roles[0]?.nombre || null;
-
-    const needsProfile = computeNeedsProfile(perfil);
+    const roles = await fetchUserRoles(user.id_usuario);
+    const profile = await fetchUserProfile(user.id_usuario, roles);
+    const needsProfile = computeNeedsProfile(profile);
 
     return res.json({
       success: true,
@@ -1112,15 +967,22 @@ const obtenerPerfilActual = async (req, res) => {
         id: user.id_usuario,
         dni: user.dni,
         id_rol: roles[0]?.id ?? null,
-        rol_nombre: rolNombre,
+        rol_nombre: roles[0]?.nombre ?? null,
         roles,
       },
-      profile: perfil,
+      profile,
       needsProfile,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('obtenerPerfilActual exception:', err);
+    return res.status(500).json({ error: err.message || 'Error al obtener el perfil' });
   }
 };
 
-module.exports = { registrarUsuario, loginUsuario, primerRegistro, actualizarPerfil, obtenerPerfilActual };
+module.exports = {
+  registrarUsuario,
+  loginUsuario,
+  primerRegistro,
+  actualizarPerfil,
+  obtenerPerfilActual,
+};

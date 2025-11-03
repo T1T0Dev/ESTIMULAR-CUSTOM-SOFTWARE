@@ -64,6 +64,55 @@ const listarResponsables = async (req, res) => {
     }
 };
 
+// Crear responsable
+const crearResponsable = async (req, res) => {
+    const { nombre, apellido, telefono, email, dni } = req.body || {};
+    if (!nombre || !apellido) {
+        return res.status(400).json({ success: false, message: 'Nombre y apellido son obligatorios' });
+    }
+
+    try {
+        let dniNumber = null;
+        if (dni !== undefined && dni !== null && String(dni).trim() !== '') {
+            if (!/^\d+$/.test(String(dni).trim())) {
+                return res.status(400).json({ success: false, message: 'DNI inválido. Solo números' });
+            }
+            dniNumber = Number(dni);
+
+            const { data: existing, error: existingErr } = await supabaseAdmin
+                .from('responsables')
+                .select('id_responsable, activo')
+                .eq('dni', dniNumber)
+                .maybeSingle();
+            if (existingErr && existingErr.code !== 'PGRST116') throw existingErr;
+            if (existing && existing.activo !== false) {
+                return res.status(409).json({ success: false, message: 'Ya existe un responsable con ese DNI' });
+            }
+        }
+
+        const payload = {
+            nombre,
+            apellido,
+            telefono: telefono || null,
+            email: email || null,
+            dni: dniNumber,
+            activo: true,
+        };
+
+        const { data, error } = await supabaseAdmin
+            .from('responsables')
+            .insert([payload])
+            .select('id_responsable, nombre, apellido, telefono, email, dni')
+            .maybeSingle();
+        if (error) throw error;
+
+        return res.status(201).json({ success: true, data });
+    } catch (err) {
+        console.error('crearResponsable failed:', err);
+        return res.status(500).json({ success: false, message: 'Error al crear responsable', error: err.message });
+    }
+};
+
 // Actualizar responsable
 const actualizarResponsable = async (req, res) => {
     const { id_responsable } = req.params;
@@ -132,6 +181,7 @@ const listarNinosDeResponsable = async (req, res) => {
 module.exports = {
     buscarPorDni,
     listarResponsables,
+    crearResponsable,
     actualizarResponsable,
     eliminarResponsable,
     listarNinosDeResponsable,

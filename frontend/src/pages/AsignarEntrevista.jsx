@@ -18,6 +18,13 @@ function edad(fechaNacimiento) {
   return e;
 }
 
+const resumirMotivo = (texto, max = 120) => {
+  if (!texto) return "";
+  const limpio = String(texto).trim();
+  if (limpio.length <= max) return limpio;
+  return `${limpio.slice(0, max - 1)}…`;
+};
+
 export default function AsignarEntrevista() {
   const [candidatos, setCandidatos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -256,6 +263,7 @@ export default function AsignarEntrevista() {
                     <th className="col-last">Apellido</th>
                     <th className="col-dniNac">Edad</th>
                     <th className="col-os">Obra Social</th>
+                    <th className="col-motivo">Motivo consulta</th>
                     <th className="col-turno">Turno asignado</th>
                     <th className="col-actions">Acciones</th>
                   </tr>
@@ -277,6 +285,18 @@ export default function AsignarEntrevista() {
                             : "—"}
                         </td>
                         <td className="col-os">{obra}</td>
+                        <td className="col-motivo">
+                          {c.motivo_consulta ? (
+                            <span
+                              className="motivo-text"
+                              title={c.motivo_consulta}
+                            >
+                              {resumirMotivo(c.motivo_consulta)}
+                            </span>
+                          ) : (
+                            <span className="muted">Sin motivo</span>
+                          )}
+                        </td>
                         <td className="col-turno">
                           {asig ? (
                             <div

@@ -1,21 +1,26 @@
 import "../styles/FormularioEntrevista.css";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 import API_BASE_URL from "../constants/api";
-
+import {
+  normalizePhone,
+  isPhoneValid,
+  PHONE_INPUT_HELPER,
+} from "../utils/phone";
 const Alerta = withReactContent(Swal);
 
 /* ─────────────── Helpers ─────────────── */
 
-const normalizarTexto = (texto = "") =>
-  texto
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+const normalizeObraName = (value) =>
+  value
+    ? String(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+    : "";
 
 const VALIDADORES = {
   requerido:
@@ -26,17 +31,24 @@ const VALIDADORES = {
     !valor || !/^[a-zA-ZÀ-ÿ\s]{2,50}$/.test(valor)
       ? "Debe contener solo letras/espacios (2-50)."
       : null,
-  dni: (valor) =>
-    !/^\d{7,8}$/.test(valor) ? "DNI inválido (7-8 dígitos)." : null,
+  dni: (valor) => {
+    const limpio = String(valor || "").trim();
+    if (!limpio) return "DNI obligatorio.";
+    return /^\d{7,8}$/.test(limpio)
+      ? null
+      : "DNI inválido (7-8 dígitos).";
+  },
   telefono: (valor) =>
-    !/^\d{7,15}$/.test(valor) ? "Teléfono inválido (7-15 dígitos)." : null,
+    isPhoneValid(valor, { min: 7, max: 15 })
+      ? null
+      : "Teléfono inválido (7-15 dígitos).",
   email: (valor) =>
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor) ? "Correo inválido." : null,
   fechaEnRango: (minima, maxima) => (valor) => {
     if (!valor) return "Fecha obligatoria.";
     const fecha = new Date(valor);
     return fecha < minima || fecha > maxima
-      ? "Niño/a debe tener hasta 18 años."
+      ? "El niño/a debe tener hasta 18 años."
       : null;
   },
   obraSocialEscrita: (valor) => {
@@ -195,61 +207,13 @@ const GrupoCheckbox = ({
   );
 };
 
-const SelectConOtra = ({
-  id = "obra_social",
-  etiqueta = "Obra social",
-  obras,
-  idSeleccionado,
-  textoOtra,
-  usarOtra,
-  onSeleccionarId,
-  onCambiarOtra,
-  onPerderFocoOtra,
-  error,
-}) => (
-  <div className="field">
-    <label className="label-entrevista" htmlFor={id}>
-      {etiqueta}
-    </label>
-    <select
-      id={id}
-      className="entrevista__input"
-      value={usarOtra ? "otra" : idSeleccionado || ""}
-      onChange={(evento) =>
-        evento.target.value === "otra"
-          ? onSeleccionarId(null, true)
-          : onSeleccionarId(evento.target.value, false)
-      }
-      required
-    >
-      <option value="">-- Seleccionar --</option>
-      {obras.map((obra) => (
-        <option key={obra.id_obra_social} value={obra.id_obra_social}>
-          {obra.nombre_obra_social || obra.nombre}
-        </option>
-      ))}
-      <option value="otra">Otra</option>
-    </select>
-
-    {usarOtra && (
-      <input
-        className="entrevista__input"
-        type="text"
-        placeholder="Escriba su obra social"
-        value={textoOtra || ""}
-        onChange={(evento) => onCambiarOtra(evento.target.value)}
-        onBlur={onPerderFocoOtra}
-        required
-      />
-    )}
-    {error && <span className="error-message">{error}</span>}
-  </div>
-);
-
 /* ───────── Componente principal ───────── */
 export default function FormularioEntrevista() {
   const { listaObras } = useObrasSociales();
   const { listaProfesiones, cargandoProfesiones } = useProfesiones();
+  const [responsableExistente, setResponsableExistente] = useState(null);
+  const [responsableLookupEstado, setResponsableLookupEstado] = useState("idle");
+  const lookupResponsableRef = useRef({ dni: null, status: null, data: null, timeoutId: null });
 
   const { fechaMinima, fechaMaxima } = useMemo(() => {
     const hoy = new Date();
@@ -274,6 +238,7 @@ export default function FormularioEntrevista() {
     tiene_obra_social: false,
     id_obra_social: "",
     obra_social_texto: "",
+    dni_responsable: "",
     nombre_responsable: "",
     apellido_responsable: "",
     telefono: "",
@@ -283,6 +248,121 @@ export default function FormularioEntrevista() {
     servicios: [],
     aceptar_terminos: false,
   });
+
+  const obrasActivas = useMemo(() => {
+    const lista = Array.isArray(listaObras) ? listaObras : [];
+    const estadosActivos = [
+      "activa",
+      "activo",
+      "habilitada",
+      "habilitado",
+      "vigente",
+    ];
+    return lista.filter((obra) => {
+      if (!obra) return false;
+      const estado = String(obra.estado ?? obra.status ?? "")
+        .toLowerCase()
+        .trim();
+      const flags = [
+        obra.activa,
+        obra.activo,
+        obra.habilitada,
+        obra.habilitado,
+      ];
+      if (flags.some((flag) => flag === true || flag === 1 || flag === "1")) {
+        return true;
+      }
+      if (flags.some((flag) => String(flag).toLowerCase() === "si")) {
+        return true;
+      }
+      if (estado) {
+        return estadosActivos.includes(estado);
+      }
+      return true;
+    });
+  }, [listaObras]);
+
+  const matchedObra = useMemo(() => {
+    if (!datos.id_obra_social) return null;
+    const targetId = String(datos.id_obra_social);
+    return (
+      obrasActivas.find((obra) => {
+        const obraId = obra?.id_obra_social ?? obra?.id ?? obra?.uuid;
+        return (
+          obraId !== undefined &&
+          obraId !== null &&
+          String(obraId) === targetId
+        );
+      }) || null
+    );
+  }, [datos.id_obra_social, obrasActivas]);
+
+  const obraInputValue = useMemo(() => {
+    if (matchedObra?.nombre_obra_social) return matchedObra.nombre_obra_social;
+    if (matchedObra?.nombre) return matchedObra.nombre;
+    return datos.obra_social_texto || "";
+  }, [matchedObra, datos.obra_social_texto]);
+
+  const obraManualNombre = useMemo(
+    () => (datos.id_obra_social ? "" : (datos.obra_social_texto || "").trim()),
+    [datos.id_obra_social, datos.obra_social_texto]
+  );
+
+  const usarOtraObra = datos.tiene_obra_social && !datos.id_obra_social;
+
+  const handleObraInputChange = useCallback(
+    (valor) => {
+      const texto = valor ?? "";
+      const normalizado = normalizeObraName(texto);
+      setDatos((prev) => {
+        if (!normalizado) {
+          if (!prev.id_obra_social && !prev.obra_social_texto) return prev;
+          return {
+            ...prev,
+            id_obra_social: "",
+            obra_social_texto: "",
+          };
+        }
+        const coincidencia = obrasActivas.find((obra) => {
+          const nombre = normalizeObraName(
+            obra?.nombre_obra_social || obra?.nombre || ""
+          );
+          return nombre && nombre === normalizado;
+        });
+        if (coincidencia) {
+          const obraId =
+            coincidencia.id_obra_social ??
+            coincidencia.id ??
+            coincidencia.uuid ??
+            "";
+          const obraIdStr =
+            obraId !== undefined && obraId !== null ? String(obraId) : "";
+          if (prev.id_obra_social === obraIdStr && prev.obra_social_texto === "")
+            return prev;
+          return {
+            ...prev,
+            id_obra_social: obraIdStr,
+            obra_social_texto: "",
+          };
+        }
+        if (prev.id_obra_social === "" && prev.obra_social_texto === texto)
+          return prev;
+        return {
+          ...prev,
+          id_obra_social: "",
+          obra_social_texto: texto,
+        };
+      });
+    },
+    [obrasActivas]
+  );
+
+  const handleObraBlur = useCallback(
+    (valor) => {
+      handleObraInputChange((valor ?? "").trim());
+    },
+    [handleObraInputChange]
+  );
 
   const serviciosOpciones = useMemo(() => {
     const registros = Array.isArray(listaProfesiones) ? listaProfesiones : [];
@@ -295,25 +375,9 @@ export default function FormularioEntrevista() {
       .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
   }, [listaProfesiones]);
 
-  const usarOtraObra = datos.tiene_obra_social && !datos.id_obra_social;
-
   const actualizarCampo = useCallback((campo, valor) => {
     setDatos((estadoAnterior) => ({ ...estadoAnterior, [campo]: valor }));
   }, []);
-
-  const alPerderFocoObra = () => {
-    const textoNormalizado = normalizarTexto(datos.obra_social_texto || "");
-    if (!textoNormalizado) return;
-    const coincidencia = listaObras.find(
-      (obra) =>
-        normalizarTexto(obra.nombre_obra_social || obra.nombre || "") ===
-        textoNormalizado
-    );
-    if (coincidencia) {
-      actualizarCampo("id_obra_social", String(coincidencia.id_obra_social));
-      actualizarCampo("obra_social_texto", "");
-    }
-  };
 
   useEffect(() => {
     if (!serviciosOpciones.length) return;
@@ -331,6 +395,115 @@ export default function FormularioEntrevista() {
       return { ...prev, servicios: filtrados };
     });
   }, [serviciosOpciones]);
+
+  useEffect(() => {
+    const dniCrudo = String(datos.dni_responsable || "").trim();
+    const dniLimpio = dniCrudo.replace(/\D/g, "");
+
+    if (dniLimpio !== datos.dni_responsable) {
+      setDatos((prev) => ({ ...prev, dni_responsable: dniLimpio }));
+      return;
+    }
+
+    if (!dniLimpio) {
+      setResponsableExistente(null);
+      setResponsableLookupEstado("idle");
+      lookupResponsableRef.current = { dni: null, status: null, data: null, timeoutId: null };
+      return;
+    }
+
+    if (dniLimpio.length < 7) {
+      setResponsableExistente(null);
+      setResponsableLookupEstado("typing");
+      if (lookupResponsableRef.current.timeoutId) {
+        clearTimeout(lookupResponsableRef.current.timeoutId);
+        lookupResponsableRef.current.timeoutId = null;
+      }
+      lookupResponsableRef.current = { dni: dniLimpio, status: "typing", data: null, timeoutId: null };
+      return;
+    }
+
+    if (
+      lookupResponsableRef.current.dni === dniLimpio &&
+      lookupResponsableRef.current.status &&
+      lookupResponsableRef.current.status !== "loading"
+    ) {
+      setResponsableLookupEstado(lookupResponsableRef.current.status);
+      setResponsableExistente(lookupResponsableRef.current.data);
+      return;
+    }
+
+    if (lookupResponsableRef.current.timeoutId) {
+      clearTimeout(lookupResponsableRef.current.timeoutId);
+    }
+
+    setResponsableLookupEstado("loading");
+    lookupResponsableRef.current = {
+      dni: dniLimpio,
+      status: "loading",
+      data: null,
+      timeoutId: null,
+    };
+
+    let cancelado = false;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/api/responsables`, {
+          params: { dni: dniLimpio },
+        });
+        if (cancelado) return;
+        const items = Array.isArray(data?.data) ? data.data : [];
+        if (items.length > 0) {
+          const existente = items[0];
+          const telefonoNormalizado = normalizePhone(existente.telefono);
+          lookupResponsableRef.current = {
+            dni: dniLimpio,
+            status: "found",
+            data: existente,
+            timeoutId: null,
+          };
+          setResponsableExistente(existente);
+          setResponsableLookupEstado("found");
+          setDatos((prev) => ({
+            ...prev,
+            nombre_responsable:
+              existente.nombre || prev.nombre_responsable || "",
+            apellido_responsable:
+              existente.apellido || prev.apellido_responsable || "",
+            telefono: telefonoNormalizado || prev.telefono || "",
+            email: existente.email || prev.email || "",
+          }));
+        } else {
+          lookupResponsableRef.current = {
+            dni: dniLimpio,
+            status: "missing",
+            data: null,
+            timeoutId: null,
+          };
+          setResponsableExistente(null);
+          setResponsableLookupEstado("missing");
+        }
+      } catch (error) {
+        console.warn("Error al buscar responsable", error?.message || error);
+        if (cancelado) return;
+        lookupResponsableRef.current = {
+          dni: dniLimpio,
+          status: "error",
+          data: null,
+          timeoutId: null,
+        };
+        setResponsableLookupEstado("error");
+      }
+    }, 600);
+
+    lookupResponsableRef.current.timeoutId = timeoutId;
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timeoutId);
+      lookupResponsableRef.current.timeoutId = null;
+    };
+  }, [datos.dni_responsable]);
 
   const [errores, setErrores] = useState({});
   const validarTodo = () => {
@@ -350,6 +523,7 @@ export default function FormularioEntrevista() {
         fechaMax
       )(datos.fecha_nacimiento),
       dni_nino: VALIDADORES.dni(datos.dni_nino),
+      dni_responsable: VALIDADORES.dni(datos.dni_responsable),
       nombre_responsable: VALIDADORES.nombre(datos.nombre_responsable),
       apellido_responsable: VALIDADORES.nombre(datos.apellido_responsable),
       telefono: VALIDADORES.telefono(datos.telefono),
@@ -423,6 +597,7 @@ export default function FormularioEntrevista() {
         }
       }
     } else if (p === 3) {
+      e.dni_responsable = VALIDADORES.dni(datos.dni_responsable);
       e.nombre_responsable = VALIDADORES.nombre(datos.nombre_responsable);
       e.apellido_responsable = VALIDADORES.nombre(datos.apellido_responsable);
       e.telefono = VALIDADORES.telefono(datos.telefono);
@@ -464,26 +639,38 @@ export default function FormularioEntrevista() {
     }
     if (!validarTodo()) return;
 
+    const obraIdParsed =
+      datos.tiene_obra_social && datos.id_obra_social
+        ? Number.parseInt(datos.id_obra_social, 10)
+        : null;
+
     const payloadNino = {
       nombre: datos.nombre_nino,
       apellido: datos.apellido_nino,
       fecha_nacimiento: datos.fecha_nacimiento || null,
       dni: datos.dni_nino || null,
       certificado_discapacidad: !!datos.certificado_discapacidad,
+      motivo_consulta: (datos.motivo_consulta || "").trim() || null,
       id_obra_social:
-        datos.tiene_obra_social && !usarOtraObra ? datos.id_obra_social : null,
+        datos.tiene_obra_social && !usarOtraObra
+          ? !Number.isNaN(obraIdParsed) && obraIdParsed !== null
+            ? obraIdParsed
+            : null
+          : null,
       obra_social_texto:
         datos.tiene_obra_social && usarOtraObra
-          ? datos.obra_social_texto
+          ? (datos.obra_social_texto || "").trim() || null
           : null,
       tipo: "candidato",
       responsable: {
         nombre: datos.nombre_responsable,
         apellido: datos.apellido_responsable,
-        telefono: datos.telefono || null,
+        telefono: datos.telefono
+          ? normalizePhone(datos.telefono)
+          : null,
         email: datos.email || null,
         parentesco: datos.parentesco || null,
-        dni: null,
+        dni: datos.dni_responsable || null,
       },
     };
 
@@ -509,6 +696,7 @@ export default function FormularioEntrevista() {
           tiene_obra_social: false,
           id_obra_social: "",
           obra_social_texto: "",
+          dni_responsable: "",
           nombre_responsable: "",
           apellido_responsable: "",
           telefono: "",
@@ -518,6 +706,8 @@ export default function FormularioEntrevista() {
           servicios: [],
           aceptar_terminos: false,
         });
+        setResponsableExistente(null);
+        lookupResponsableRef.current = { dni: null, status: null };
         setErrores({});
       } else {
         Alerta.fire({
@@ -672,21 +862,51 @@ export default function FormularioEntrevista() {
                 }}
               />
               {datos.tiene_obra_social && (
-                <SelectConOtra
-                  obras={listaObras}
-                  idSeleccionado={datos.id_obra_social}
-                  textoOtra={datos.obra_social_texto}
-                  usarOtra={usarOtraObra}
-                  onSeleccionarId={(idSeleccionado, esOtra) => {
-                    actualizarCampo("id_obra_social", idSeleccionado || "");
-                    if (!esOtra) actualizarCampo("obra_social_texto", "");
-                  }}
-                  onCambiarOtra={(valor) =>
-                    actualizarCampo("obra_social_texto", valor)
-                  }
-                  onPerderFocoOtra={alPerderFocoObra}
+                <Campo
+                  id="obra_social"
+                  etiqueta="Obra social"
                   error={errores.obra_social}
-                />
+                >
+                  <input
+                    id="obra_social"
+                    className="entrevista__input"
+                    type="text"
+                    list="obras-sociales-activas"
+                    placeholder="Buscá o escribí una obra social"
+                    value={obraInputValue}
+                    onChange={(e) => handleObraInputChange(e.target.value)}
+                    onBlur={(e) => handleObraBlur(e.target.value)}
+                  />
+                  <datalist id="obras-sociales-activas">
+                    {obrasActivas
+                      .filter(
+                        (obra) =>
+                          (obra?.nombre_obra_social || obra?.nombre || "")
+                            .trim().length > 0
+                      )
+                      .map((obra) => {
+                        const nombre =
+                          (obra?.nombre_obra_social || obra?.nombre || "")
+                            .trim();
+                        const optionKey = String(
+                          obra?.id_obra_social ??
+                            obra?.id ??
+                            obra?.uuid ??
+                            nombre
+                        );
+                        return <option key={optionKey} value={nombre} />;
+                      })}
+                  </datalist>
+                  <span className="muted">
+                    Seleccioná una obra social existente o escribí una nueva.
+                    Las nuevas se registrarán como pendientes.
+                  </span>
+                  {usarOtraObra && obraManualNombre ? (
+                    <span className="muted">
+                      Se registrará "{obraManualNombre}" como pendiente.
+                    </span>
+                  ) : null}
+                </Campo>
               )}
             </fieldset>
           )}
@@ -694,6 +914,65 @@ export default function FormularioEntrevista() {
           {paso === 3 && (
             <fieldset>
               <legend>Datos del responsable</legend>
+              <Campo
+                id="dni_responsable"
+                etiqueta="DNI del responsable"
+                error={errores.dni_responsable}
+              >
+                <EntradaTexto
+                  id="dni_responsable"
+                  name="dni_responsable"
+                  placeholder="Ej: 44028630"
+                  value={datos.dni_responsable}
+                  onChange={(e) =>
+                    actualizarCampo(
+                      "dni_responsable",
+                      e.target.value.replace(/\D/g, "").slice(0, 8)
+                    )
+                  }
+                />
+                {responsableLookupEstado === "loading" && (
+                  <span className="muted" style={{ display: "block", marginTop: "0.3rem" }}>
+                    Buscando responsable…
+                  </span>
+                )}
+                {responsableLookupEstado === "missing" && (
+                  <span className="muted" style={{ display: "block", marginTop: "0.3rem" }}>
+                    No encontramos un responsable con ese DNI. Completa los datos para registrarlo.
+                  </span>
+                )}
+                {responsableLookupEstado === "error" && (
+                  <span className="error-message" style={{ display: "block", marginTop: "0.3rem" }}>
+                    No pudimos verificar el DNI. Intentá nuevamente.
+                  </span>
+                )}
+              </Campo>
+              {responsableExistente && (
+                <div
+                  className="entrevista__responsable-existente"
+                  style={{
+                    background: "var(--bg-muted, #f7f7f7)",
+                    borderRadius: "8px",
+                    padding: "0.75rem 1rem",
+                    marginBottom: "1rem",
+                    color: "var(--text-muted, #444)",
+                  }}
+                >
+                  <strong>
+                    {`¡Qué bueno verte, ${
+                      [
+                        responsableExistente.nombre,
+                        responsableExistente.apellido,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || "de nuevo"
+                    }!`}
+                  </strong>
+                  <p style={{ margin: "0.35rem 0 0" }}>
+                    Encontramos tus datos y los completamos automáticamente.
+                  </p>
+                </div>
+              )}
               <Campo
                 id="nombre_responsable"
                 etiqueta="Nombre/s"
@@ -730,8 +1009,19 @@ export default function FormularioEntrevista() {
                   name="telefono"
                   placeholder="Ej: 1123456789"
                   value={datos.telefono}
-                  onChange={(e) => actualizarCampo("telefono", e.target.value)}
+                  onChange={(e) =>
+                    actualizarCampo(
+                      "telefono",
+                      normalizePhone(e.target.value)
+                    )
+                  }
                 />
+                <small
+                  className="muted"
+                  style={{ display: "block", marginTop: "0.25rem" }}
+                >
+                  {PHONE_INPUT_HELPER}
+                </small>
               </Campo>
               <Campo id="email" etiqueta="Email" error={errores.email}>
                 <EntradaTexto

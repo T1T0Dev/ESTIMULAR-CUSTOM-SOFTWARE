@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../styles/Login.css";
@@ -6,6 +6,12 @@ import useAuthStore from "../store/useAuthStore";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import logoEstimular from "../assets/logo_estimular.png";
 import API_BASE_URL from "../constants/api";
+
+const RECEPCION_KEYS = ["recepcion", "recepción", "secretario", "secretaria"];
+
+function isRecepcionTipo(value) {
+  return RECEPCION_KEYS.includes(String(value || "").toLowerCase());
+}
 
 export default function PrimerRegistro() {
   const [form, setForm] = useState({
@@ -33,6 +39,10 @@ export default function PrimerRegistro() {
   const needsProfile = useAuthStore((state) => state.needsProfile);
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const setNeedsProfile = useAuthStore((state) => state.setNeedsProfile);
+  const esRecepcion = useMemo(
+    () => isRecepcionTipo(form.tipoUsuario),
+    [form.tipoUsuario]
+  );
 
   useEffect(() => {
     if (profile) {
@@ -46,7 +56,9 @@ export default function PrimerRegistro() {
             ? String(profile.fecha_nacimiento).slice(0, 10)
             : "") || "",
         email: profile.email || "",
-        tipoUsuario: profile.tipo || "profesional",
+        tipoUsuario: isRecepcionTipo(profile.tipo)
+          ? "recepcion"
+          : profile.tipo || "profesional",
         profesionId:
           profile.departamento_id ||
           profile.departamento?.id_departamento ||
@@ -116,12 +128,12 @@ export default function PrimerRegistro() {
     }
     setLoading(true);
     try {
-      const seleccion =
-        form.tipoUsuario === "secretario"
-          ? "secretario"
-          : form.profesionId
-          ? Number(form.profesionId)
-          : null;
+      const esRecepcionActual = isRecepcionTipo(form.tipoUsuario);
+      const seleccion = esRecepcionActual
+        ? "recepcion"
+        : form.profesionId
+        ? Number(form.profesionId)
+        : null;
       const response = await axios.post(
         `${API_BASE_URL}/api/login/primer-registro`,
         {
@@ -130,9 +142,9 @@ export default function PrimerRegistro() {
           telefono: form.telefono,
           fecha_nacimiento: form.fecha_nacimiento,
           email: form.email,
-          tipoUsuario: form.tipoUsuario,
+          tipoUsuario: esRecepcionActual ? "recepcion" : form.tipoUsuario,
           profesionId:
-            form.tipoUsuario === "profesional"
+            !esRecepcionActual && form.tipoUsuario === "profesional"
               ? Number(form.profesionId)
               : null,
           seleccion,
@@ -169,7 +181,7 @@ export default function PrimerRegistro() {
         </div>
         <div className="left-content">
           <h1>
-            Bienvenido, completá tu <span>perfil</span>
+            Bienvenid@, completá tu <span>perfil</span>
           </h1>
           <p>Estos datos son necesarios para comenzar a usar el sistema.</p>
         </div>
@@ -234,10 +246,10 @@ export default function PrimerRegistro() {
                 }
               >
                 <option value="profesional">Profesional</option>
-                <option value="secretario">Secretario/a</option>
+                <option value="recepcion">Recepción</option>
               </select>
             </div>
-            {form.tipoUsuario === "profesional" ? (
+            {!esRecepcion && form.tipoUsuario === "profesional" ? (
               <div>
                 <label>Profesión</label>
                 <select
@@ -261,7 +273,7 @@ export default function PrimerRegistro() {
                 <input
                   type="text"
                   disabled
-                  value="Secretaría"
+                  value="Recepción"
                   style={{ opacity: 0.6 }}
                 />
               </div>

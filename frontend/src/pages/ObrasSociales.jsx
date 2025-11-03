@@ -7,6 +7,21 @@ import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import CrearObraSocial from "../components/CrearObraSocial";
 import API_BASE_URL from "../constants/api";
 
+const sanitizeNombreObra = (value) => {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFC")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const canonicalNombreObra = (value) =>
+  sanitizeNombreObra(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s/g, "");
+
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -56,7 +71,13 @@ export default function ObrasSociales() {
             params: { search, page: pageNum, pageSize, estado: estadoSel },
           }
         );
-        setItems(res.data.data || []);
+        const data = res.data.data || [];
+        setItems(
+          data.map((item) => ({
+            ...item,
+            nombre_obra_social: sanitizeNombreObra(item?.nombre_obra_social),
+          }))
+        );
         setTotal(res.data.total || 0);
         setError(null);
       } catch (e) {
@@ -196,12 +217,14 @@ export default function ObrasSociales() {
                               onChange={(e) =>
                                 setEditData((ed) => ({
                                   ...ed,
-                                  nombre_obra_social: e.target.value,
+                                  nombre_obra_social: sanitizeNombreObra(
+                                    e.target.value
+                                  ),
                                 }))
                               }
                             />
                           ) : (
-                            o.nombre_obra_social || "—"
+                            sanitizeNombreObra(o.nombre_obra_social) || "—"
                           )}
                         </td>
                         <td>
@@ -259,9 +282,42 @@ export default function ObrasSociales() {
                                         editData.nombre_obra_social !==
                                           o.nombre_obra_social
                                       ) {
-                                        payload.nombre_obra_social = String(
-                                          editData.nombre_obra_social
-                                        ).trim();
+                                        const nombreActualizado =
+                                          sanitizeNombreObra(
+                                            editData.nombre_obra_social
+                                          );
+                                        if (!nombreActualizado) {
+                                          Swal.close();
+                                          Swal.fire({
+                                            icon: "warning",
+                                            title: "Nombre requerido",
+                                            text: "El nombre no puede quedar vacío.",
+                                          });
+                                          return;
+                                        }
+                                        const nombreCanonico =
+                                          canonicalNombreObra(
+                                            nombreActualizado
+                                          );
+                                        const duplicado = items.some(
+                                          (item) =>
+                                            item.id_obra_social !==
+                                              o.id_obra_social &&
+                                            canonicalNombreObra(
+                                              item.nombre_obra_social
+                                            ) === nombreCanonico
+                                        );
+                                        if (duplicado) {
+                                          Swal.close();
+                                          Swal.fire({
+                                            icon: "error",
+                                            title: "Duplicado",
+                                            text: "Ya existe otra obra social con ese nombre.",
+                                          });
+                                          return;
+                                        }
+                                        payload.nombre_obra_social =
+                                          nombreActualizado;
                                       }
                                       if (
                                         editData.estado !== undefined &&
@@ -316,7 +372,9 @@ export default function ObrasSociales() {
                                   onClick={() => {
                                     setEditId(o.id_obra_social);
                                     setEditData({
-                                      nombre_obra_social: o.nombre_obra_social,
+                                      nombre_obra_social: sanitizeNombreObra(
+                                        o.nombre_obra_social
+                                      ),
                                       estado: o.estado,
                                     });
                                   }}
