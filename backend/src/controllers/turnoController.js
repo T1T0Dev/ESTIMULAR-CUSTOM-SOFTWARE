@@ -1,6 +1,14 @@
 const turnoModel = require('../models/turnoModel');
 const notificacionModel = require('../models/notificacionModel');
 const { supabaseAdmin } = require('../config/db');
+const { generateTurnoSuggestionsForNino, cancelAutoScheduledTurnosForNino } = require('../services/entrevistaTurnoScheduler');
+
+function parseNumericId(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed)) return null;
+  return parsed;
+}
 
 function isAdminRoleName(value) {
   if (!value) return false;
@@ -155,7 +163,7 @@ async function handleCreateTurno(req, res) {
 
 async function handleUpdateTurno(req, res) {
   const { id } = req.params;
-  const dataToUpdate = req.body;
+  const dataToUpdate = { ...req.body };
   const loggedInUserIdHeader = req.headers['x-user-id'];
   const loggedInUserId = loggedInUserIdHeader ? Number.parseInt(loggedInUserIdHeader, 10) : null;
 
@@ -165,6 +173,14 @@ async function handleUpdateTurno(req, res) {
 
   if (!id || Object.keys(dataToUpdate).length === 0) {
     return res.status(400).json({ success: false, message: 'Se requiere el ID del turno y datos para actualizar.' });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(dataToUpdate, 'nino_id')) {
+    const parsedNinoId = parseNumericId(dataToUpdate.nino_id);
+    if (parsedNinoId === null && dataToUpdate.nino_id !== null) {
+      return res.status(400).json({ success: false, message: 'El valor de nino_id no es válido.' });
+    }
+    dataToUpdate.nino_id = parsedNinoId;
   }
 
   try {
@@ -212,10 +228,85 @@ async function handleUpdateTurno(req, res) {
       });
     }
 
-    res.json({ success: true, message: 'Turno actualizado correctamente.' });
+    res.json({
+      success: true,
+      message: 'Turno actualizado correctamente.',
+    });
   } catch (error) {
     console.error('Error al actualizar el turno:', error);
     res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+  }
+}
+
+async function handleAutoScheduleEntrevista(req, res) {
+  const {
+    nino_id: ninoIdRaw,
+    consultorio_id: consultorioIdRaw,
+    base_inicio: baseInicioRaw,
+    replace_existing: replaceExistingRaw,
+  } = req.body || {};
+  const loggedInUserIdHeader = req.headers['x-user-id'];
+  const loggedInUserId = loggedInUserIdHeader ? Number.parseInt(loggedInUserIdHeader, 10) : null;
+
+  const parsedNinoId = parseNumericId(ninoIdRaw);
+  if (!parsedNinoId) {
+    return res.status(400).json({ success: false, message: 'Se requiere un nino_id válido para programar turnos.' });
+  }
+
+  const parsedConsultorio = parseNumericId(consultorioIdRaw);
+  const baseInicio = baseInicioRaw ? new Date(baseInicioRaw) : null;
+
+  try {
+    const replaceExisting =
+      replaceExistingRaw === true || String(replaceExistingRaw).toLowerCase() === 'true';
+
+    if (replaceExisting) {
+      await cancelAutoScheduledTurnosForNino(parsedNinoId);
+    }
+
+    const suggestions = await generateTurnoSuggestionsForNino({
+      ninoId: parsedNinoId,
+      baseInicio: Number.isNaN(baseInicio?.getTime()) ? null : baseInicio,
+      consultorioId: parsedConsultorio,
+    });
+
+    return res.json({
+      success: true,
+      data: suggestions,
+      total: Array.isArray(suggestions?.propuestas) ? suggestions.propuestas.length : 0,
+    });
+  } catch (error) {
+    console.error('Error al programar turnos automáticos desde entrevista:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudieron programar los turnos solicitados.',
+      error: error?.message || error,
+    });
+  }
+}
+
+async function handleCancelAutoScheduleEntrevista(req, res) {
+  const { nino_id: ninoIdRaw } = req.body || {};
+  const parsedNinoId = parseNumericId(ninoIdRaw);
+
+  if (!parsedNinoId) {
+    return res.status(400).json({ success: false, message: 'Se requiere un nino_id válido para cancelar turnos automáticos.' });
+  }
+
+  try {
+    const cancelled = await cancelAutoScheduledTurnosForNino(parsedNinoId);
+    return res.json({
+      success: true,
+      data: cancelled,
+      total: cancelled.length,
+    });
+  } catch (error) {
+    console.error('Error al cancelar turnos automáticos de entrevista:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudieron cancelar los turnos automáticos.',
+      error: error?.message || error,
+    });
   }
 }
 
@@ -224,4 +315,6 @@ module.exports = {
   handleGetTurnoFormData,
   handleCreateTurno,
   handleUpdateTurno,
+  handleAutoScheduleEntrevista,
+  handleCancelAutoScheduleEntrevista,
 };

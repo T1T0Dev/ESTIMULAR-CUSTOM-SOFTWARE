@@ -5,6 +5,7 @@ import { MdEventAvailable, MdChangeCircle, MdDelete } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
 import { parseNinosResponse } from "../utils/ninoResponse";
 import API_BASE_URL from "../constants/api";
+import NuevoTurnoPanel from "../components/NuevoTurnoPanel";
 import "../styles/NinosPage.css"; // reutilizamos estilos base
 import "../styles/AsignarEntrevista.css";
 
@@ -38,6 +39,43 @@ const extraerTurnos = (payload) => {
   return [];
 };
 
+const pad = (value) => String(value).padStart(2, "0");
+
+const formatDateForInput = (dateLike) => {
+  if (!dateLike) return "";
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const formatTimeForInput = (dateLike) => {
+  if (!dateLike) return "";
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const buildPanelNino = (nino) => {
+  if (!nino) return null;
+  const nombre = nino.nombre || nino.paciente_nombre || "";
+  const apellido = nino.apellido || nino.paciente_apellido || "";
+  return {
+    paciente_id: nino.id_nino,
+    id_nino: nino.id_nino,
+    paciente_nombre: nombre,
+    paciente_apellido: apellido,
+    paciente_dni: nino.dni || nino.paciente_dni || null,
+    paciente_fecha_nacimiento: nino.fecha_nacimiento || nino.paciente_fecha_nacimiento || null,
+    paciente_obra_social: nino.obra_social?.nombre_obra_social || nino.paciente_obra_social || null,
+    paciente_responsables: Array.isArray(nino.paciente_responsables)
+      ? nino.paciente_responsables
+      : Array.isArray(nino.responsables)
+        ? nino.responsables
+        : [],
+    paciente_tipo: nino.tipo || nino.paciente_tipo || "candidato",
+  };
+};
+
 export default function AsignarEntrevista() {
   const [candidatos, setCandidatos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +87,10 @@ export default function AsignarEntrevista() {
 
   // asignaciones por nino_id -> turno (o null)
   const [asignaciones, setAsignaciones] = useState({});
-
-  // modal
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalNino, setModalNino] = useState(null);
-  const [turnosDisp, setTurnosDisp] = useState([]);
-  const [loadingTurnos, setLoadingTurnos] = useState(false);
+  const [turnoPanelOpen, setTurnoPanelOpen] = useState(false);
+  const [turnoPrefill, setTurnoPrefill] = useState(null);
+  const [turnoQueue, setTurnoQueue] = useState([]);
+  const [turnoNino, setTurnoNino] = useState(null);
 
   const debouncedBusqueda = useDebounce(busqueda, 300);
   const skipPageEffectRef = useRef(false);
@@ -123,55 +159,181 @@ export default function AsignarEntrevista() {
 
   const totalPages = useMemo(() => Math.ceil(total / pageSize), [total]);
 
-  async function abrirModalAsignar(nino) {
-    setModalNino(nino);
-    setModalOpen(true);
-    setLoadingTurnos(true);
-    try {
-      const r = await axios.get(`${API_BASE_URL}/api/turnos`, {
-        params: { disponible: true, estado: "pendiente", limit: 50 },
-      });
-      setTurnosDisp(extraerTurnos(r?.data));
-    } catch (e) {
-      console.error("No se pudieron cargar turnos disponibles", e);
-      setTurnosDisp([]);
-    } finally {
-      setLoadingTurnos(false);
-    }
-  }
+  const resetTurnoPanelState = useCallback(() => {
+    setTurnoPanelOpen(false);
+    setTurnoPrefill(null);
+    setTurnoQueue([]);
+    setTurnoNino(null);
+  }, []);
 
-  async function asignarTurno(turnoId, ninoId) {
+  const handleTurnoCreadoDesdeEntrevista = useCallback(
+    (turnoCreado) => {
+      const ninoId = turnoNino?.paciente_id || turnoNino?.id_nino;
+
+      if (turnoCreado && ninoId) {
+        setAsignaciones((prev) => ({
+          ...prev,
+          [ninoId]: turnoCreado,
+        }));
+      }
+
+      setTurnoQueue((prevQueue) => {
+        if (prevQueue.length === 0) {
+          resetTurnoPanelState();
+          Swal.fire({
+            icon: "success",
+            title: "Turnos completados",
+            text: "Se crearon todos los turnos sugeridos.",
+            timer: 1800,
+            showConfirmButton: false,
+            toast: true,
+            position: "top-end",
+          });
+          fetchCandidatos(busqueda, page);
+          return [];
+        }
+
+        const [nextPrefill, ...rest] = prevQueue;
+        setTurnoPrefill(nextPrefill);
+
+        if (rest.length === 0) {
+          Swal.fire({
+            icon: "info",
+            title: "Turno creado",
+            text: "Queda 1 turno sugerido por cargar.",
+            timer: 1800,
+            showConfirmButton: false,
+            toast: true,
+            position: "top-end",
+          });
+        } else {
+          Swal.fire({
+            icon: "info",
+            title: "Turno creado",
+            text: `Quedan ${rest.length + 1} turnos sugeridos por cargar.`,
+            timer: 2000,
+            showConfirmButton: false,
+            toast: true,
+            position: "top-end",
+          });
+        }
+
+        return rest;
+      });
+    },
+    [busqueda, fetchCandidatos, page, resetTurnoPanelState, setAsignaciones, turnoNino]
+  );
+
+  const handleCloseTurnoPanel = useCallback(() => {
+    resetTurnoPanelState();
+  }, [resetTurnoPanelState]);
+
+  async function programarTurnosEntrevista(nino, { replaceExisting = false } = {}) {
+    if (!nino?.id_nino) return;
+
+    if (replaceExisting) {
+      const confirmacion = await Swal.fire({
+        title: "Reprogramar turnos",
+        text: "Se cancelarán los turnos automáticos pendientes y se generarán nuevos en el próximo lunes disponible. ¿Deseas continuar?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, reprogramar",
+        cancelButtonText: "Cancelar",
+      });
+
+      if (!confirmacion.isConfirmed) {
+        return;
+      }
+    }
+
     try {
       Swal.fire({
-        title: "Asignando turno...",
+        title: "Programando turnos...",
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      await axios.put(`${API_BASE_URL}/api/turnos/${turnoId}`, {
-        nino_id: ninoId,
+      const response = await axios.post(`${API_BASE_URL}/api/turnos/auto-schedule`, {
+        nino_id: nino.id_nino,
+        replace_existing: replaceExisting,
       });
-      // refrescar asignación del niño
-      const r = await axios.get(`${API_BASE_URL}/api/turnos`, {
-        params: { nino_id: ninoId, limit: 1 },
-      });
-      setAsignaciones((prev) => ({
-        ...prev,
-        [ninoId]: extraerTurnos(r?.data)[0] || null,
-      }));
-      setModalOpen(false);
-      setModalNino(null);
+
+      const suggestions = response?.data?.data || {};
+      const propuestas = Array.isArray(suggestions?.propuestas)
+        ? suggestions.propuestas
+        : [];
+      const omitidos = Array.isArray(suggestions?.omitidos)
+        ? suggestions.omitidos
+        : [];
+
       Swal.close();
+
+      if (propuestas.length === 0) {
+        const message = omitidos.length > 0
+          ? "Todas las profesiones requeridas ya tienen turnos pendientes o confirmados."
+          : "No se encontraron turnos disponibles en los próximos lunes.";
+        Swal.fire({
+          icon: omitidos.length > 0 ? "info" : "warning",
+          title: "Sin propuestas",
+          text: message,
+        });
+        return;
+      }
+
+      const prefillList = propuestas.map((propuesta) => {
+        const inicio = propuesta.inicio || suggestions?.slot?.inicio;
+        const inicioDate = inicio ? new Date(inicio) : null;
+
+        return {
+          ...propuesta,
+          inicio,
+          date: formatDateForInput(inicioDate),
+          startTime: formatTimeForInput(inicioDate),
+          profesional_ids: Array.isArray(propuesta.profesional_ids)
+            ? propuesta.profesional_ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+            : [],
+          consultorio_id: propuesta.consultorio_id ?? null,
+          estado: propuesta.estado || "pendiente",
+        };
+      });
+
+      setTurnoNino(buildPanelNino(nino));
+      setTurnoPrefill(prefillList[0]);
+      setTurnoQueue(prefillList.slice(1));
+      setTurnoPanelOpen(true);
+
+      const nombresServicios = prefillList
+        .map((prefill) => prefill.departamento_nombre)
+        .filter(Boolean);
+
+      const mensajeToast = (() => {
+        const serviciosTexto = nombresServicios.length > 0
+          ? ` Servicios sugeridos: ${nombresServicios.join(', ')}.`
+          : '';
+
+        if (omitidos.length > 0) {
+          return `Se generaron ${prefillList.length} propuesta(s). ${omitidos.length} servicio(s) ya tenían turno activo.${serviciosTexto}`;
+        }
+
+        return `Revisá el formulario antes de confirmar la creación del turno.${serviciosTexto}`;
+      })();
+
       Swal.fire({
         icon: "success",
-        title: "Turno asignado",
-        timer: 1200,
+        title:
+          prefillList.length === 1
+            ? "Propuesta lista"
+            : `${prefillList.length} propuestas listas`,
+        text: mensajeToast,
+        toast: true,
+        timer: 2400,
+        position: "top-end",
         showConfirmButton: false,
       });
     } catch (e) {
       Swal.close();
       Swal.fire({
         icon: "error",
-        title: "No se pudo asignar",
+        title: "No se pudieron programar turnos",
         text: e?.response?.data?.message || "Intenta nuevamente",
       });
     }
@@ -193,7 +355,10 @@ export default function AsignarEntrevista() {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-  await axios.put(`${API_BASE_URL}/api/turnos/${turnoId}`, {
+      await axios.post(`${API_BASE_URL}/api/turnos/auto-schedule/cancel`, {
+        nino_id: ninoId,
+      });
+      await axios.put(`${API_BASE_URL}/api/turnos/${turnoId}`, {
         nino_id: null,
       });
       setAsignaciones((prev) => ({ ...prev, [ninoId]: null }));
@@ -332,7 +497,7 @@ export default function AsignarEntrevista() {
                             <button
                               className="icon-btn success"
                               title={asig ? "Cambiar turno" : "Asignar turno"}
-                              onClick={() => abrirModalAsignar(c)}
+                              onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
                             >
                               {asig ? (
                                 <MdChangeCircle size={20} />
@@ -385,58 +550,15 @@ export default function AsignarEntrevista() {
         )}
       </div>
 
-      {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal-info" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setModalOpen(false)}>
-              &times;
-            </button>
-            <h2>Seleccionar turno disponible</h2>
-            {modalNino && (
-              <div className="modal-section">
-                <div className="modal-grid">
-                  <div className="label">Candidato</div>
-                  <div className="value">
-                    {modalNino.nombre} {modalNino.apellido}
-                  </div>
-                  <div className="label">DNI</div>
-                  <div className="value">{modalNino.dni || "—"}</div>
-                </div>
-              </div>
-            )}
-            <div className="modal-section">
-              {loadingTurnos ? (
-                <div className="loader">Cargando turnos…</div>
-              ) : turnosDisp.length === 0 ? (
-                <div className="empty">No hay turnos disponibles</div>
-              ) : (
-                <div className="turnos-grid">
-                  {turnosDisp.map((t) => (
-                    <button
-                      key={t.id}
-                      className="turno-card"
-                      onClick={() => asignarTurno(t.id, modalNino.id_nino)}
-                    >
-                      <div className="turno-card-top">
-                        <div className="turno-fecha">
-                          {new Date(t.inicio).toLocaleDateString()}
-                        </div>
-                        <div className="turno-hora">
-                          {new Date(t.inicio).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
-                      </div>
-                      <div className="turno-duracion">{t.duracion_min} min</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <NuevoTurnoPanel
+        isOpen={turnoPanelOpen}
+        onClose={handleCloseTurnoPanel}
+        onCreated={handleTurnoCreadoDesdeEntrevista}
+        defaultDate={turnoPrefill?.inicio ? new Date(turnoPrefill.inicio) : undefined}
+        loggedInProfesionalId={null}
+        initialNino={turnoNino}
+        prefillData={turnoPrefill}
+      />
     </section>
   );
 }

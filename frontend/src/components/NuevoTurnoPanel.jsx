@@ -25,12 +25,30 @@ const MONEDAS = [
 const formatProfesionalNombre = (prof) =>
   [prof?.nombre, prof?.apellido].filter(Boolean).join(' ').trim();
 
+const pad2 = (value) => String(value).padStart(2, '0');
+
+const toDateInputValue = (dateLike) => {
+  if (!dateLike) return '';
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+};
+
+const toTimeInputValue = (dateLike) => {
+  if (!dateLike) return '';
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+};
+
 export default function NuevoTurnoPanel({
   isOpen,
   onClose,
   onCreated,
   defaultDate,
   loggedInProfesionalId,
+  initialNino = null,
+  prefillData = null,
 }) {
   const [formData, setFormData] = useState(() => ({
     departamento_id: '',
@@ -50,6 +68,7 @@ export default function NuevoTurnoPanel({
   const [ninoQuery, setNinoQuery] = useState('');
   const [ninoResultados, setNinoResultados] = useState([]);
   const [selectedNino, setSelectedNino] = useState(null);
+  const ninoBloqueado = Boolean(initialNino);
   const [isSearchingNinos, setIsSearchingNinos] = useState(false);
   const [formOptions, setFormOptions] = useState({
     departamentos: [],
@@ -93,11 +112,20 @@ export default function NuevoTurnoPanel({
           }
         }
 
-        setFormData((prev) => ({
-          ...prev,
-          profesional_ids: initialProfesionales,
-          date: moment(defaultDate || new Date()).format('YYYY-MM-DD'),
-        }));
+        const shouldOverrideProfesionales =
+          !prefillData?.profesional_ids || prefillData?.profesional_ids?.length === 0;
+        const shouldOverrideDate = !prefillData?.inicio && !prefillData?.date;
+
+        setFormData((prev) => {
+          const next = { ...prev };
+          if (shouldOverrideProfesionales) {
+            next.profesional_ids = initialProfesionales;
+          }
+          if (shouldOverrideDate) {
+            next.date = moment(defaultDate || new Date()).format('YYYY-MM-DD');
+          }
+          return next;
+        });
       })
       .catch((error) => {
         console.error('Error al cargar datos del formulario del turno:', error);
@@ -106,12 +134,19 @@ export default function NuevoTurnoPanel({
       .finally(() => {
         setIsLoadingForm(false);
       });
-  }, [isOpen, defaultDate, loggedInProfesionalId]);
+  }, [defaultDate, isOpen, loggedInProfesionalId, prefillData]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    if (ninoQuery.trim().length < 2) {
+    if (ninoBloqueado) {
+      setNinoResultados([]);
+      setIsSearchingNinos(false);
+      return;
+    }
+
+    const trimmed = ninoQuery.trim();
+    if (trimmed.length < 2) {
       setNinoResultados([]);
       return;
     }
@@ -120,7 +155,7 @@ export default function NuevoTurnoPanel({
     const delay = setTimeout(() => {
       axios
         .get(`${API_BASE_URL}/api/ninos`, {
-          params: { search: ninoQuery.trim(), limit: 8 },
+          params: { search: trimmed, limit: 8 },
         })
         .then((response) => {
           const apiData = response.data?.data;
@@ -138,7 +173,7 @@ export default function NuevoTurnoPanel({
     return () => {
       clearTimeout(delay);
     };
-  }, [ninoQuery, isOpen]);
+  }, [isOpen, ninoBloqueado, ninoQuery]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -165,6 +200,68 @@ export default function NuevoTurnoPanel({
       setSuccessMessage('');
     }
   }, [isOpen, defaultDate]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!initialNino) return;
+
+    setSelectedNino(initialNino);
+    const nombreCompleto = [initialNino.paciente_nombre, initialNino.paciente_apellido]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    setNinoQuery(nombreCompleto);
+    setNinoResultados([]);
+  }, [initialNino, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!prefillData) return;
+
+    setFormData((prev) => {
+      const next = { ...prev };
+
+      if (prefillData.departamento_id !== undefined && prefillData.departamento_id !== null) {
+        next.departamento_id = String(prefillData.departamento_id);
+      }
+
+      if (prefillData.consultorio_id !== undefined) {
+        next.consultorio_id = prefillData.consultorio_id ? String(prefillData.consultorio_id) : '';
+      }
+
+      const inicioSource = prefillData.inicio || null;
+      const inicioDate = inicioSource ? new Date(inicioSource) : null;
+
+      const dateValue = prefillData.date || toDateInputValue(inicioDate) || next.date;
+      const timeValue = prefillData.startTime || toTimeInputValue(inicioDate) || next.startTime;
+
+      if (dateValue) next.date = dateValue;
+      if (timeValue) next.startTime = timeValue;
+
+      if (prefillData.duracion_min !== undefined && prefillData.duracion_min !== null) {
+        next.duracion_min = prefillData.duracion_min;
+      }
+
+      if (Array.isArray(prefillData.profesional_ids)) {
+        next.profesional_ids = prefillData.profesional_ids
+          .map((id) => Number(id))
+          .filter((id) => !Number.isNaN(id));
+      }
+
+      if (prefillData.estado) {
+        next.estado = prefillData.estado;
+      }
+
+      if (prefillData.notas !== undefined) {
+        next.notas = prefillData.notas || '';
+      }
+
+      return next;
+    });
+
+    setErrorMessage('');
+    setSuccessMessage('');
+  }, [isOpen, prefillData]);
 
   useEffect(() => {
     if (!formData.departamento_id) return;
@@ -230,6 +327,7 @@ export default function NuevoTurnoPanel({
   };
 
   const handleClearNino = () => {
+    if (ninoBloqueado) return;
     setSelectedNino(null);
     setNinoQuery('');
   };
@@ -323,8 +421,10 @@ export default function NuevoTurnoPanel({
             ? 'Turno creado correctamente.'
             : `Se programaron ${createdTurnos.length} turnos en total.`;
         setSuccessMessage(mensaje);
-        setSelectedNino(null);
-        setNinoQuery('');
+        if (!ninoBloqueado) {
+          setSelectedNino(null);
+          setNinoQuery('');
+        }
         setFormData((prev) => ({
           ...prev,
           consultorio_id: '',
@@ -395,8 +495,10 @@ export default function NuevoTurnoPanel({
                   }}
                   placeholder="Buscar por nombre, apellido o DNI"
                   autoComplete="off"
+                  disabled={ninoBloqueado}
+                  readOnly={ninoBloqueado}
                 />
-                {selectedNino && (
+                {selectedNino && !ninoBloqueado && (
                   <button
                     type="button"
                     className="clear-button"
