@@ -97,6 +97,125 @@ async function fetchFirstProfesionalesPorDepartamento(departamentoIds) {
   return map;
 }
 
+async function fetchProfesionalesDisponiblesPorDepartamento(departamentoIds) {
+  const uniqueDepartmentIds = uniqueNumericIds(departamentoIds);
+  if (uniqueDepartmentIds.length === 0) {
+    return new Map();
+  }
+
+  const { data: relaciones, error: relacionesError } = await supabaseAdmin
+    .from('profesional_departamentos')
+    .select('profesional_id, departamento_id')
+    .in('departamento_id', uniqueDepartmentIds);
+
+  if (relacionesError) throw relacionesError;
+
+  const departamentoProfesionales = new Map();
+  const profesionalIdsSet = new Set();
+
+  (relaciones || []).forEach((row) => {
+    const departamentoId = parseId(row?.departamento_id);
+    const profesionalId = parseId(row?.profesional_id);
+    if (!departamentoId || !profesionalId) return;
+    if (!departamentoProfesionales.has(departamentoId)) {
+      departamentoProfesionales.set(departamentoId, new Set());
+    }
+    departamentoProfesionales.get(departamentoId).add(profesionalId);
+    profesionalIdsSet.add(profesionalId);
+  });
+
+  if (profesionalIdsSet.size === 0) {
+    return new Map();
+  }
+
+  const profesionalIds = Array.from(profesionalIdsSet.values());
+
+  const { data: usuariosData, error: usuariosError } = await supabaseAdmin
+    .from('usuarios')
+    .select('id_usuario, persona_id')
+    .in('id_usuario', profesionalIds);
+
+  if (usuariosError) throw usuariosError;
+
+  const usuarioPersonaMap = new Map();
+  const personaIdsSet = new Set();
+
+  (usuariosData || []).forEach((row) => {
+    const usuarioId = parseId(row?.id_usuario);
+    const personaId = parseId(row?.persona_id);
+    if (!usuarioId) return;
+    if (personaId) personaIdsSet.add(personaId);
+    usuarioPersonaMap.set(usuarioId, personaId || null);
+  });
+
+  let personasData = [];
+  if (personaIdsSet.size > 0) {
+    const { data, error } = await supabaseAdmin
+      .from('personas')
+      .select('id, nombre, apellido')
+      .in('id', Array.from(personaIdsSet.values()));
+    if (error) throw error;
+    personasData = data || [];
+  }
+
+  const personaMap = new Map();
+  (personasData || []).forEach((row) => {
+    const personaId = parseId(row?.id);
+    if (!personaId) return;
+    personaMap.set(personaId, {
+      nombre: row?.nombre || null,
+      apellido: row?.apellido || null,
+    });
+  });
+
+  const { data: rolesData, error: rolesError } = await supabaseAdmin
+    .from('usuario_roles')
+    .select('usuario_id, rol:roles ( nombre_rol )')
+    .in('usuario_id', profesionalIds);
+
+  if (rolesError) throw rolesError;
+
+  const rolesPorUsuario = new Map();
+  (rolesData || []).forEach((row) => {
+    const usuarioId = parseId(row?.usuario_id);
+    if (!usuarioId) return;
+    const lista = rolesPorUsuario.get(usuarioId) || [];
+    const rolNombre = row?.rol?.nombre_rol || null;
+    if (rolNombre) {
+      lista.push(rolNombre);
+    }
+    rolesPorUsuario.set(usuarioId, lista);
+  });
+
+  const collator = new Intl.Collator('es', { sensitivity: 'base', ignorePunctuation: true });
+  const result = new Map();
+
+  departamentoProfesionales.forEach((profIdsSet, deptId) => {
+    const list = Array.from(profIdsSet.values()).map((profId) => {
+      const personaId = usuarioPersonaMap.get(profId) || null;
+      const persona = personaId ? personaMap.get(personaId) : null;
+      const roles = rolesPorUsuario.get(profId) || [];
+      const nombre = persona?.nombre || null;
+      const apellido = persona?.apellido || null;
+      const nombreCompleto = [nombre, apellido].filter(Boolean).join(' ').trim() || `Profesional ${profId}`;
+
+      return {
+        id_profesional: profId,
+        nombre,
+        apellido,
+        nombre_completo: nombreCompleto,
+        roles,
+        es_admin: roles.some((rol) => typeof rol === 'string' && rol.toLowerCase().includes('admin')),
+      };
+    });
+
+    list.sort((a, b) => collator.compare(a.nombre_completo || '', b.nombre_completo || ''));
+    result.set(deptId, list);
+  });
+
+  return result;
+}
+
 async function findAvailableSlotForDay(baseDay, requiredMinutes, consultorioIds, preferredConsultorioId = null) {
   const dayStart = new Date(baseDay.getTime());
   dayStart.setHours(DEFAULT_DAY_START_HOUR, 0, 0, 0);
@@ -223,7 +342,8 @@ async function fetchRequiredDepartments(ninoId) {
         departamentoId,
         departamentoNombre: row?.departamento?.nombre || null,
         duracion,
-        profesionalId: profesionalAsignado || responsableDefault || null,
+        profesionalAsignadoId: profesionalAsignado || null,
+        responsableId: responsableDefault || null,
       });
     }
   });
@@ -335,7 +455,10 @@ async function generateTurnoSuggestionsForNino({
   );
 
   const departamentoIds = pendientes.map((need) => need.departamentoId);
-  const fallbackProfesionales = await fetchFirstProfesionalesPorDepartamento(departamentoIds);
+  const [fallbackProfesionales, profesionalesDisponibles] = await Promise.all([
+    fetchFirstProfesionalesPorDepartamento(departamentoIds),
+    fetchProfesionalesDisponiblesPorDepartamento(departamentoIds),
+  ]);
 
   const candidateSlot = await findFirstAvailableSlot({
     referenceDate: baseInicio || new Date(),
@@ -351,7 +474,7 @@ async function generateTurnoSuggestionsForNino({
   const shouldShareSlot = pendientes.length > 1;
   const sharedInicioIso = candidateSlot.inicio.toISOString();
   const sharedFinIso = candidateSlot.fin.toISOString();
-  const sharedDuration = parseInt(candidateSlot.duracion_min, 10) || maxDuration;
+  const sharedDuration = maxDuration;
 
   const propuestas = pendientes.map((need) => {
     const inicio = shouldShareSlot ? sharedInicioIso : new Date(candidateSlot.inicio.getTime()).toISOString();
@@ -359,10 +482,27 @@ async function generateTurnoSuggestionsForNino({
       ? sharedFinIso
       : addMinutes(new Date(candidateSlot.inicio.getTime()), need.duracion).toISOString();
 
-    const profesionalPreferido = need.profesionalId
-      || fallbackProfesionales.get(need.departamentoId)
-      || null;
+    const disponibles = (profesionalesDisponibles.get(need.departamentoId) || []).map((prof) => ({
+      ...prof,
+      es_responsable: need.responsableId ? prof.id_profesional === need.responsableId : false,
+    }));
+
+    const candidatoResponsable = disponibles.find((prof) => prof.es_responsable);
+    const candidatoAdmin = disponibles.find((prof) => prof.es_admin);
+    const fallbackProfesionalId = fallbackProfesionales.get(need.departamentoId) || null;
+
+    const profesionalPreferido = need.profesionalAsignadoId
+      || (candidatoResponsable ? candidatoResponsable.id_profesional : null)
+      || (need.responsableId ? need.responsableId : null)
+      || (candidatoAdmin ? candidatoAdmin.id_profesional : null)
+      || fallbackProfesionalId
+      || (disponibles.length > 0 ? disponibles[0].id_profesional : null);
+
     const profesionalIds = profesionalPreferido ? [profesionalPreferido] : [];
+    const disponiblesMarcados = disponibles.map((prof) => ({
+      ...prof,
+      seleccionado_por_defecto: profesionalIds.includes(prof.id_profesional),
+    }));
     const duracionMin = shouldShareSlot ? sharedDuration : need.duracion;
 
     return {
@@ -375,6 +515,7 @@ async function generateTurnoSuggestionsForNino({
       consultorio_id: assignedConsultorioId,
       estado: 'pendiente',
       notas: 'Entrevista',
+      profesionales_disponibles: disponiblesMarcados,
     };
   });
 

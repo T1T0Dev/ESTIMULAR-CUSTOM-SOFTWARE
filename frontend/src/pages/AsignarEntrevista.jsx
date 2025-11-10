@@ -6,6 +6,7 @@ import { formatDateDMY } from "../utils/date";
 import { parseNinosResponse } from "../utils/ninoResponse";
 import API_BASE_URL from "../constants/api";
 import NuevoTurnoPanel from "../components/NuevoTurnoPanel";
+import ProfesionalesSelectorModal from "../components/ProfesionalesSelectorModal";
 import useAuthStore from "../store/useAuthStore";
 import "../styles/NinosPage.css"; // reutilizamos estilos base
 import "../styles/AsignarEntrevista.css";
@@ -56,6 +57,11 @@ const formatTimeForInput = (dateLike) => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+const normalizeProfesionalId = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && !Number.isNaN(parsed) ? parsed : null;
+};
+
 const buildPanelNino = (nino) => {
   if (!nino) return null;
   const nombre = nino.nombre || nino.paciente_nombre || "";
@@ -92,6 +98,9 @@ export default function AsignarEntrevista() {
   const [turnoPrefill, setTurnoPrefill] = useState(null);
   const [turnoQueue, setTurnoQueue] = useState([]);
   const [turnoNino, setTurnoNino] = useState(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectorPropuestas, setSelectorPropuestas] = useState([]);
+  const [selectorOmitidos, setSelectorOmitidos] = useState([]);
 
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
@@ -183,6 +192,85 @@ export default function AsignarEntrevista() {
     setTurnoPrefill(null);
     setTurnoQueue([]);
     setTurnoNino(null);
+  }, []);
+
+  const launchTurnoCreationFlow = useCallback(
+    (prefillList, omitidosList = []) => {
+      if (!Array.isArray(prefillList) || prefillList.length === 0) {
+        resetTurnoPanelState();
+        Swal.fire({
+          icon: "info",
+          title: "Sin propuestas",
+          text: "No hay turnos para crear con la selección actual.",
+          toast: true,
+          timer: 2200,
+          position: "top-end",
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      setTurnoPrefill(prefillList[0]);
+      setTurnoQueue(prefillList.slice(1));
+      setTurnoPanelOpen(true);
+
+      const nombresServicios = prefillList
+        .map((prefill) => prefill.departamento_nombre)
+        .filter(Boolean);
+
+      const serviciosTexto = nombresServicios.length > 0
+        ? ` Servicios: ${nombresServicios.join(", ")}.`
+        : "";
+
+      const mensajeToast = omitidosList.length > 0
+        ? `Se generarán ${prefillList.length} propuesta(s). ${omitidosList.length} servicio(s) ya tenían turno activo.${serviciosTexto}`
+        : `Revisá los datos y confirmá cada turno.${serviciosTexto}`;
+
+      Swal.fire({
+        icon: "success",
+        title:
+          prefillList.length === 1
+            ? "Propuesta lista"
+            : `${prefillList.length} propuestas listas`,
+        text: mensajeToast,
+        toast: true,
+        timer: 2600,
+        position: "top-end",
+        showConfirmButton: false,
+      });
+    },
+    [resetTurnoPanelState]
+  );
+
+  const handleProfesionalesConfirm = useCallback(
+    (actualizadas) => {
+      const omitidosActuales = selectorOmitidos;
+      setSelectorOpen(false);
+      setSelectorPropuestas([]);
+      setSelectorOmitidos([]);
+
+      if (!Array.isArray(actualizadas) || actualizadas.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Sin propuestas",
+          text: "No hay turnos para crear con la selección actual.",
+          toast: true,
+          timer: 2200,
+          position: "top-end",
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      launchTurnoCreationFlow(actualizadas, omitidosActuales);
+    },
+    [launchTurnoCreationFlow, selectorOmitidos]
+  );
+
+  const handleProfesionalesCancel = useCallback(() => {
+    setSelectorOpen(false);
+    setSelectorPropuestas([]);
+    setSelectorOmitidos([]);
   }, []);
 
   const handleTurnoCreadoDesdeEntrevista = useCallback(
@@ -302,39 +390,81 @@ export default function AsignarEntrevista() {
         const inicio = propuesta.inicio || suggestions?.slot?.inicio;
         const inicioDate = inicio ? new Date(inicio) : null;
 
+        const disponibles = Array.isArray(propuesta.profesionales_disponibles)
+          ? propuesta.profesionales_disponibles
+              .map((prof) => {
+                const profId = normalizeProfesionalId(prof?.id_profesional);
+                if (profId === null) return null;
+                const nombre = prof?.nombre ?? null;
+                const apellido = prof?.apellido ?? null;
+                const nombreCompleto = prof?.nombre_completo
+                  || [nombre, apellido].filter(Boolean).join(" ").trim()
+                  || `Profesional ${profId}`;
+                return {
+                  ...prof,
+                  id_profesional: profId,
+                  nombre,
+                  apellido,
+                  nombre_completo: nombreCompleto,
+                  es_responsable: Boolean(prof?.es_responsable),
+                  es_admin: Boolean(prof?.es_admin),
+                  seleccionado_por_defecto: Boolean(prof?.seleccionado_por_defecto),
+                };
+              })
+              .filter(Boolean)
+          : [];
+
+        const idsIniciales = Array.isArray(propuesta.profesional_ids)
+          ? propuesta.profesional_ids
+              .map((id) => normalizeProfesionalId(id))
+              .filter((id) => id !== null)
+          : [];
+
+        const sugeridos = idsIniciales.length > 0
+          ? idsIniciales
+          : disponibles
+              .filter((prof) => prof.seleccionado_por_defecto)
+              .map((prof) => prof.id_profesional);
+
+        const finalProfesionales = sugeridos.length > 0
+          ? Array.from(new Set(sugeridos))
+          : [];
+
+        const finalProfesionalesSet = new Set(finalProfesionales);
+        const disponiblesMarcados = disponibles.map((prof) => ({
+          ...prof,
+          seleccionado_por_defecto:
+            prof.seleccionado_por_defecto || finalProfesionalesSet.has(prof.id_profesional),
+        }));
+
         return {
           ...propuesta,
           inicio,
           date: formatDateForInput(inicioDate),
           startTime: formatTimeForInput(inicioDate),
-          profesional_ids: Array.isArray(propuesta.profesional_ids)
-            ? propuesta.profesional_ids.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
-            : [],
+          profesional_ids: finalProfesionales,
           consultorio_id: propuesta.consultorio_id ?? null,
           estado: propuesta.estado || "pendiente",
+          profesionales_disponibles: disponiblesMarcados,
         };
       });
 
       setTurnoNino(buildPanelNino(nino));
-      setTurnoPrefill(prefillList[0]);
-      setTurnoQueue(prefillList.slice(1));
-      setTurnoPanelOpen(true);
+      setSelectorPropuestas(prefillList);
+      setSelectorOmitidos(omitidos);
+      setSelectorOpen(true);
 
       const nombresServicios = prefillList
         .map((prefill) => prefill.departamento_nombre)
         .filter(Boolean);
 
-      const mensajeToast = (() => {
-        const serviciosTexto = nombresServicios.length > 0
-          ? ` Servicios sugeridos: ${nombresServicios.join(', ')}.`
-          : '';
+      const serviciosTexto = nombresServicios.length > 0
+        ? ` Servicios: ${nombresServicios.join(", ")}.`
+        : "";
 
-        if (omitidos.length > 0) {
-          return `Se generaron ${prefillList.length} propuesta(s). ${omitidos.length} servicio(s) ya tenían turno activo.${serviciosTexto}`;
-        }
-
-        return `Revisá el formulario antes de confirmar la creación del turno.${serviciosTexto}`;
-      })();
+      const mensajeToast = omitidos.length > 0
+        ? `Se generaron ${prefillList.length} propuesta(s). ${omitidos.length} servicio(s) ya tenían turno activo.${serviciosTexto}`
+        : `Se generaron ${prefillList.length} propuesta(s). Elegí los profesionales para cada servicio antes de confirmar.${serviciosTexto}`;
 
       Swal.fire({
         icon: "success",
@@ -344,7 +474,7 @@ export default function AsignarEntrevista() {
             : `${prefillList.length} propuestas listas`,
         text: mensajeToast,
         toast: true,
-        timer: 2400,
+        timer: 2600,
         position: "top-end",
         showConfirmButton: false,
       });
@@ -407,175 +537,184 @@ export default function AsignarEntrevista() {
   }
 
   return (
-    <section className="ninos-page">
-      <div className="ninos-top">
-        <h1 className="ninos-title">Asignar Entrevista</h1>
-        <div className="ninos-controls">
-          <form
-            className="busqueda-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setPage(1);
-              fetchCandidatos(busqueda, 1);
-            }}
-          >
-            <label className="sr-only" htmlFor="buscar">
-              Buscar
-            </label>
-            <div className="search">
-              <input
-                id="buscar"
-                type="text"
-                className="busqueda-input"
-                placeholder="Buscar candidato por nombre, apellido o DNI"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-              />
-            </div>
-          </form>
-        </div>
-      </div>
+    <>
+      <ProfesionalesSelectorModal
+        isOpen={selectorOpen}
+        propuestas={selectorPropuestas}
+        onCancel={handleProfesionalesCancel}
+        onConfirm={handleProfesionalesConfirm}
+      />
 
-      <div className="card ninos-card">
-        {loading ? (
-          <div className="loader">Cargando…</div>
-        ) : error ? (
-          <div className="error">{error}</div>
-        ) : candidatos.length === 0 ? (
-          <div className="empty">No hay candidatos.</div>
-        ) : (
-          <>
-            <div className="table-tools">
-              <div className="left">
-                <div className="meta">{total} candidatos</div>
+      <section className="ninos-page">
+        <div className="ninos-top">
+          <h1 className="ninos-title">Asignar Entrevista</h1>
+          <div className="ninos-controls">
+            <form
+              className="busqueda-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setPage(1);
+                fetchCandidatos(busqueda, 1);
+              }}
+            >
+              <label className="sr-only" htmlFor="buscar">
+                Buscar
+              </label>
+              <div className="search">
+                <input
+                  id="buscar"
+                  type="text"
+                  className="busqueda-input"
+                  placeholder="Buscar candidato por nombre, apellido o DNI"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
               </div>
-              <div className="right">
-                <div className="meta">
-                  Página {page} de {totalPages}
+            </form>
+          </div>
+        </div>
+
+        <div className="card ninos-card">
+          {loading ? (
+            <div className="loader">Cargando…</div>
+          ) : error ? (
+            <div className="error">{error}</div>
+          ) : candidatos.length === 0 ? (
+            <div className="empty">No hay candidatos.</div>
+          ) : (
+            <>
+              <div className="table-tools">
+                <div className="left">
+                  <div className="meta">{total} candidatos</div>
+                </div>
+                <div className="right">
+                  <div className="meta">
+                    Página {page} de {totalPages}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="dashboard-table-wrapper">
-              <table
-                className="table candidatos-table"
-                role="table"
-                aria-label="Asignar entrevista a candidatos"
-              >
-                <thead>
-                  <tr>
-                    <th className="col-dni">DNI</th>
-                    <th className="col-name">Nombre</th>
-                    <th className="col-last">Apellido</th>
-                    <th className="col-dniNac">Edad</th>
-                    <th className="col-os">Obra Social</th>
-                    <th className="col-motivo">Motivo consulta</th>
-                    <th className="col-turno">Turno asignado</th>
-                    <th className="col-actions">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {candidatos.map((c) => {
-                    const asig = asignaciones[c.id_nino] || null;
-                    const obra = c.obra_social?.nombre_obra_social || "—";
-                    return (
-                      <tr key={c.id_nino}>
-                        <td className="col-dni">{c.dni || "—"}</td>
-                        <td className="col-name">{c.nombre}</td>
-                        <td className="col-last">{c.apellido}</td>
-                        <td className="col-dniNac">
-                          {c.fecha_nacimiento
-                            ? `${formatDateDMY(c.fecha_nacimiento)} (${edad(
-                                c.fecha_nacimiento
-                              )} años)`
-                            : "—"}
-                        </td>
-                        <td className="col-os">{obra}</td>
-                        <td className="col-motivo">
-                          {c.motivo_consulta ? (
-                            <span
-                              className="motivo-text"
-                              title={c.motivo_consulta}
-                            >
-                              {resumirMotivo(c.motivo_consulta)}
-                            </span>
-                          ) : (
-                            <span className="muted">Sin motivo</span>
-                          )}
-                        </td>
-                        <td className="col-turno">
-                          {asig ? (
-                            <div
-                              className="turno-chip"
-                              title={`Desde ${formatDateDMY(
-                                asig.inicio
-                              )} a ${formatDateDMY(asig.fin)}`}
-                            >
-                              <span>
-                                {new Date(asig.inicio).toLocaleString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="muted">Sin asignar</span>
-                          )}
-                        </td>
-                        <td className="col-actions">
-                          <div className="row-actions">
-                            <button
-                              className="icon-btn success"
-                              title={asig ? "Cambiar turno" : "Asignar turno"}
-                              onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
-                            >
-                              {asig ? (
-                                <MdChangeCircle size={20} />
-                              ) : (
-                                <MdEventAvailable size={20} />
-                              )}
-                            </button>
-                            {asig && (
-                              <button
-                                className="icon-btn danger"
-                                title="Quitar asignación"
-                                onClick={() =>
-                                  quitarAsignacion(asig.id, c.id_nino)
-                                }
+              <div className="dashboard-table-wrapper">
+                <table
+                  className="table candidatos-table"
+                  role="table"
+                  aria-label="Asignar entrevista a candidatos"
+                >
+                  <thead>
+                    <tr>
+                      <th className="col-dni">DNI</th>
+                      <th className="col-name">Nombre</th>
+                      <th className="col-last">Apellido</th>
+                      <th className="col-dniNac">Edad</th>
+                      <th className="col-os">Obra Social</th>
+                      <th className="col-motivo">Motivo consulta</th>
+                      <th className="col-turno">Turno asignado</th>
+                      <th className="col-actions">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {candidatos.map((c) => {
+                      const asig = asignaciones[c.id_nino] || null;
+                      const obra = c.obra_social?.nombre_obra_social || "—";
+                      return (
+                        <tr key={c.id_nino}>
+                          <td className="col-dni">{c.dni || "—"}</td>
+                          <td className="col-name">{c.nombre}</td>
+                          <td className="col-last">{c.apellido}</td>
+                          <td className="col-dniNac">
+                            {c.fecha_nacimiento
+                              ? `${formatDateDMY(c.fecha_nacimiento)} (${edad(
+                                  c.fecha_nacimiento
+                                )} años)`
+                              : "—"}
+                          </td>
+                          <td className="col-os">{obra}</td>
+                          <td className="col-motivo">
+                            {c.motivo_consulta ? (
+                              <span
+                                className="motivo-text"
+                                title={c.motivo_consulta}
                               >
-                                <MdDelete size={18} />
-                              </button>
+                                {resumirMotivo(c.motivo_consulta)}
+                              </span>
+                            ) : (
+                              <span className="muted">Sin motivo</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="paginacion-sweeper">
-                <button
-                  className="sweeper-btn"
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  &lt;
-                </button>
-                <span className="sweeper-info">
-                  Página {page} de {totalPages}
-                </span>
-                <button
-                  className="sweeper-btn"
-                  disabled={page === totalPages}
-                  onClick={() => setPage(page + 1)}
-                >
-                  &gt;
-                </button>
+                          </td>
+                          <td className="col-turno">
+                            {asig ? (
+                              <div
+                                className="turno-chip"
+                                title={`Desde ${formatDateDMY(
+                                  asig.inicio
+                                )} a ${formatDateDMY(asig.fin)}`}
+                              >
+                                <span>
+                                  {new Date(asig.inicio).toLocaleString()}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="muted">Sin asignar</span>
+                            )}
+                          </td>
+                          <td className="col-actions">
+                            <div className="row-actions">
+                              <button
+                                className="icon-btn success"
+                                title={asig ? "Cambiar turno" : "Asignar turno"}
+                                onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
+                              >
+                                {asig ? (
+                                  <MdChangeCircle size={20} />
+                                ) : (
+                                  <MdEventAvailable size={20} />
+                                )}
+                              </button>
+                              {asig && (
+                                <button
+                                  className="icon-btn danger"
+                                  title="Quitar asignación"
+                                  onClick={() =>
+                                    quitarAsignacion(asig.id, c.id_nino)
+                                  }
+                                >
+                                  <MdDelete size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {totalPages > 1 && (
+                <div className="paginacion-sweeper">
+                  <button
+                    className="sweeper-btn"
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                  >
+                    &lt;
+                  </button>
+                  <span className="sweeper-info">
+                    Página {page} de {totalPages}
+                  </span>
+                  <button
+                    className="sweeper-btn"
+                    disabled={page === totalPages}
+                    onClick={() => setPage(page + 1)}
+                  >
+                    &gt;
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
 
       <NuevoTurnoPanel
         isOpen={turnoPanelOpen}
@@ -586,6 +725,6 @@ export default function AsignarEntrevista() {
         initialNino={turnoNino}
         prefillData={turnoPrefill}
       />
-    </section>
+    </>
   );
 }
