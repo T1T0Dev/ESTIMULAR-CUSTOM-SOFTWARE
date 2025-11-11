@@ -262,7 +262,8 @@ async function fetchProfesionalesDisponiblesPorDepartamento(departamentoIds) {
     const list = Array.from(profIdsSet.values()).map((rawId) => {
       const usuarioInfo = encontradosPorId.get(rawId);
       const personaInfo = encontradosPorPersona.get(rawId);
-      const usuarioId = usuarioInfo?.usuarioId || personaInfo?.usuarioId || null;
+
+      const usuarioId = (personaInfo?.usuarioId ?? null) || (usuarioInfo?.usuarioId ?? null) || null;
       const personaId = personaInfo?.personaId || usuarioInfo?.personaId || (personaMap.has(rawId) ? rawId : null);
       const persona = personaId ? personaMap.get(personaId) : null;
       const roles = usuarioId ? rolesPorUsuario.get(usuarioId) || [] : [];
