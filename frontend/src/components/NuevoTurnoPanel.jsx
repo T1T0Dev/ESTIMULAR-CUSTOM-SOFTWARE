@@ -277,11 +277,61 @@ export default function NuevoTurnoPanel({
   }, [formData.departamento_id, formOptions.departamentos]);
 
   const profesionalesFiltrados = useMemo(() => {
-    if (!formData.departamento_id) return formOptions.profesionales;
-    return formOptions.profesionales.filter(
+    const listaProfesionales = Array.isArray(formOptions.profesionales)
+      ? formOptions.profesionales
+      : [];
+
+    const idsSeleccionados = new Set(
+      (formData.profesional_ids || [])
+        .map((id) => Number(id))
+        .filter((id) => !Number.isNaN(id))
+    );
+
+    const seleccionados = listaProfesionales.filter((prof) =>
+      idsSeleccionados.has(Number(prof.id_profesional))
+    );
+
+    if (!formData.departamento_id) {
+      const mapa = new Map();
+      seleccionados.forEach((prof) => {
+        const idNum = Number(prof.id_profesional);
+        if (!Number.isNaN(idNum)) {
+          mapa.set(idNum, prof);
+        }
+      });
+      listaProfesionales.forEach((prof) => {
+        const idNum = Number(prof.id_profesional);
+        if (!Number.isNaN(idNum) && !mapa.has(idNum)) {
+          mapa.set(idNum, prof);
+        }
+      });
+      return Array.from(mapa.values());
+    }
+
+    const filtrados = listaProfesionales.filter(
       (prof) => String(prof.id_departamento) === String(formData.departamento_id)
     );
-  }, [formData.departamento_id, formOptions.profesionales]);
+
+    const seleccionadosFuera = seleccionados.filter(
+      (prof) => String(prof.id_departamento) !== String(formData.departamento_id)
+    );
+
+    const mapa = new Map();
+    seleccionadosFuera.forEach((prof) => {
+      const idNum = Number(prof.id_profesional);
+      if (!Number.isNaN(idNum)) {
+        mapa.set(idNum, prof);
+      }
+    });
+    filtrados.forEach((prof) => {
+      const idNum = Number(prof.id_profesional);
+      if (!Number.isNaN(idNum)) {
+        mapa.set(idNum, prof);
+      }
+    });
+
+    return Array.from(mapa.values());
+  }, [formData.departamento_id, formData.profesional_ids, formOptions.profesionales]);
 
   const handleInputChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -481,6 +531,31 @@ export default function NuevoTurnoPanel({
           <form className="nuevo-turno-form" onSubmit={handleSubmit}>
             {errorMessage && <div className="nuevo-turno-alert error">{errorMessage}</div>}
             {successMessage && <div className="nuevo-turno-alert success">{successMessage}</div>}
+            {Array.isArray(prefillData?.profesionales_resumen) &&
+              prefillData.profesionales_resumen.length > 0 && (
+                <div className="nuevo-turno-alert info">
+                  <div className="multi-turno-title">Profesionales confirmados</div>
+                  <ul className="multi-turno-list">
+                    {prefillData.profesionales_resumen.map((prof) => (
+                      <li key={prof.id_profesional}>
+                        <strong>{prof.nombre_completo}</strong>
+                        {Array.isArray(prof.departamentos) && prof.departamentos.length > 0 && (
+                          <span className="multi-turno-departamentos">
+                            {" "}
+                            · {prof.departamentos.join(", ")}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {Array.isArray(prefillData.departamentos_resumen) &&
+                    prefillData.departamentos_resumen.length > 1 && (
+                      <p className="multi-turno-hint">
+                        Este turno reúne {prefillData.departamentos_resumen.length} servicios simultáneamente.
+                      </p>
+                    )}
+                </div>
+              )}
 
             <div className="form-section">
               <label htmlFor="nino">Niño/a</label>

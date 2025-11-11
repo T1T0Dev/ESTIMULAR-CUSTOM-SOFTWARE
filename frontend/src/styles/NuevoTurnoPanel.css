@@ -246,6 +246,39 @@
   color: #047857;
 }
 
+.nuevo-turno-alert.info {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.multi-turno-title {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.multi-turno-list {
+  margin: 0.25rem 0 0.35rem;
+  padding-left: 1.1rem;
+  color: inherit;
+}
+
+.multi-turno-list li {
+  margin: 0.15rem 0;
+  line-height: 1.35;
+}
+
+.multi-turno-departamentos {
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.multi-turno-hint {
+  font-size: 0.82rem;
+  color: inherit;
+  opacity: 0.9;
+  margin: 0;
+}
+
 .nuevo-turno-actions {
   display: flex;
   justify-content: flex-end;
