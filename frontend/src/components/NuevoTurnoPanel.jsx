@@ -552,6 +552,11 @@ export default function NuevoTurnoPanel({
             {Array.isArray(prefillData?.profesionales_resumen) &&
               prefillData.profesionales_resumen.length > 0 && (
                 <div className="nuevo-turno-alert info">
+                  {serviciosResumen && (
+                    <p className="multi-turno-services">
+                      Servicios incluidos: <strong>{serviciosResumen}</strong>
+                    </p>
+                  )}
                   <div className="multi-turno-title">Profesionales confirmados</div>
                   <ul className="multi-turno-list">
                     {prefillData.profesionales_resumen.map((prof) => (
@@ -651,37 +656,38 @@ export default function NuevoTurnoPanel({
             </div>
 
             <div className="form-grid">
-              <div className="form-section">
-                <label htmlFor="departamento_id">Servicio</label>
-                <select
-                  id="departamento_id"
-                  name="departamento_id"
-                  value={formData.departamento_id}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                  required={!departamentoBloqueado}
-                  disabled={departamentoBloqueado}
-                >
-                  <option value="">Seleccionar servicio</option>
-                  {formOptions.departamentos.map((dep) => (
-                    <option key={dep.id_departamento} value={dep.id_departamento}>
-                      {dep.nombre}
-                    </option>
-                  ))}
-                </select>
-                {formData.departamento_id && (
-                  <p className="field-hint">
-                    Duración sugerida: {
-                      formOptions.departamentos.find(
-                        (dep) => String(dep.id_departamento) === String(formData.departamento_id)
-                      )?.duracion_default_min || '—'
-                    }{' '}
-                    minutos
-                  </p>
-                )}
-              </div>
+              {!departamentoBloqueado && (
+                <div className="form-section">
+                  <label htmlFor="departamento_id">Servicio</label>
+                  <select
+                    id="departamento_id"
+                    name="departamento_id"
+                    value={formData.departamento_id}
+                    onChange={(event) => {
+                      handleInputChange(event);
+                      resetMessages();
+                    }}
+                    required
+                  >
+                    <option value="">Seleccionar servicio</option>
+                    {formOptions.departamentos.map((dep) => (
+                      <option key={dep.id_departamento} value={dep.id_departamento}>
+                        {dep.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.departamento_id && (
+                    <p className="field-hint">
+                      Duración sugerida: {
+                        formOptions.departamentos.find(
+                          (dep) => String(dep.id_departamento) === String(formData.departamento_id)
+                        )?.duracion_default_min || '—'
+                      }{' '}
+                      minutos
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="form-section">
                 <label htmlFor="consultorio_id">Consultorio</label>
@@ -693,6 +699,7 @@ export default function NuevoTurnoPanel({
                     handleInputChange(event);
                     resetMessages();
                   }}
+                  disabled={departamentoBloqueado}
                 >
                   <option value="">Sin asignar</option>
                   {formOptions.consultorios.map((consultorio) => (
@@ -701,6 +708,11 @@ export default function NuevoTurnoPanel({
                     </option>
                   ))}
                 </select>
+                {departamentoBloqueado && formData.consultorio_id && (
+                  <p className="field-hint">
+                    Este consultorio se mantendrá para el turno combinado.
+                  </p>
+                )}
               </div>
 
               <div className="form-section">
@@ -750,29 +762,31 @@ export default function NuevoTurnoPanel({
                 />
               </div>
 
-              <div className="form-section">
-                <label>Profesionales</label>
-                <div className="profesionales-list">
-                  {profesionalesFiltrados.length === 0 ? (
-                    <p className="field-hint">No hay profesionales para este servicio.</p>
-                  ) : (
-                    profesionalesFiltrados.map((prof) => (
-                      <label key={prof.id_profesional} className="checkbox-item">
-                        <input
-                          type="checkbox"
-                          value={prof.id_profesional}
-                          checked={formData.profesional_ids.includes(Number(prof.id_profesional))}
-                          onChange={() => {
-                            toggleProfesional(Number(prof.id_profesional));
-                            resetMessages();
-                          }}
-                        />
-                        <span>{prof.nombre_completo}</span>
-                      </label>
-                    ))
-                  )}
+              {!departamentoBloqueado && (
+                <div className="form-section">
+                  <label>Profesionales</label>
+                  <div className="profesionales-list">
+                    {profesionalesFiltrados.length === 0 ? (
+                      <p className="field-hint">No hay profesionales para este servicio.</p>
+                    ) : (
+                      profesionalesFiltrados.map((prof) => (
+                        <label key={prof.id_profesional} className="checkbox-item">
+                          <input
+                            type="checkbox"
+                            value={prof.id_profesional}
+                            checked={formData.profesional_ids.includes(Number(prof.id_profesional))}
+                            onChange={() => {
+                              toggleProfesional(Number(prof.id_profesional));
+                              resetMessages();
+                            }}
+                          />
+                          <span>{prof.nombre_completo}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="form-grid">
