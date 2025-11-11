@@ -128,24 +128,88 @@ async function fetchProfesionalesDisponiblesPorDepartamento(departamentoIds) {
     return new Map();
   }
 
-  const profesionalIds = Array.from(profesionalIdsSet.values());
+  const rawProfesionalIds = Array.from(profesionalIdsSet.values());
 
-  const { data: usuariosData, error: usuariosError } = await supabaseAdmin
+  const { data: usuariosPorIdData, error: usuariosPorIdError } = await supabaseAdmin
     .from('usuarios')
-    .select('id_usuario, persona_id')
-    .in('id_usuario', profesionalIds);
+    .select('id_usuario, persona_id, activo')
+    .in('id_usuario', rawProfesionalIds);
+  if (usuariosPorIdError) throw usuariosPorIdError;
 
-  if (usuariosError) throw usuariosError;
+  const encontradosPorId = new Map();
+  const encontradosPorPersona = new Map();
 
-  const usuarioPersonaMap = new Map();
-  const personaIdsSet = new Set();
-
-  (usuariosData || []).forEach((row) => {
+  (usuariosPorIdData || []).forEach((row) => {
     const usuarioId = parseId(row?.id_usuario);
     const personaId = parseId(row?.persona_id);
-    if (!usuarioId) return;
-    if (personaId) personaIdsSet.add(personaId);
-    usuarioPersonaMap.set(usuarioId, personaId || null);
+    if (usuarioId) {
+      encontradosPorId.set(usuarioId, {
+        usuarioId,
+        personaId: personaId || null,
+        activo: row?.activo !== false,
+      });
+    }
+    if (personaId) {
+      const current = encontradosPorPersona.get(personaId);
+      if (!current || !current.usuarioId) {
+        encontradosPorPersona.set(personaId, {
+          usuarioId: usuarioId || null,
+          personaId,
+          activo: row?.activo !== false,
+        });
+      }
+    }
+  });
+
+  const personaIdsPendientes = rawProfesionalIds.filter((id) => !encontradosPorPersona.has(id));
+
+  if (personaIdsPendientes.length > 0) {
+    const { data: usuariosPorPersonaData, error: usuariosPorPersonaError } = await supabaseAdmin
+      .from('usuarios')
+      .select('id_usuario, persona_id, activo')
+      .in('persona_id', personaIdsPendientes);
+    if (usuariosPorPersonaError) throw usuariosPorPersonaError;
+
+    (usuariosPorPersonaData || []).forEach((row) => {
+      const usuarioId = parseId(row?.id_usuario);
+      const personaId = parseId(row?.persona_id);
+      if (usuarioId) {
+        if (!encontradosPorId.has(usuarioId)) {
+          encontradosPorId.set(usuarioId, {
+            usuarioId,
+            personaId: personaId || null,
+            activo: row?.activo !== false,
+          });
+        }
+      }
+      if (personaId && !encontradosPorPersona.has(personaId)) {
+        encontradosPorPersona.set(personaId, {
+          usuarioId: usuarioId || null,
+          personaId,
+          activo: row?.activo !== false,
+        });
+      }
+    });
+  }
+
+  const personaIdsSet = new Set(
+    rawProfesionalIds
+      .map((id) => parseId(id))
+      .filter((id) => id !== null),
+  );
+
+  encontradosPorPersona.forEach((info, key) => {
+    const parsedKey = parseId(key);
+    if (parsedKey !== null) {
+      personaIdsSet.add(parsedKey);
+    }
+  });
+
+  encontradosPorId.forEach((info) => {
+    const parsedPersona = parseId(info?.personaId);
+    if (parsedPersona !== null) {
+      personaIdsSet.add(parsedPersona);
+    }
   });
 
   let personasData = [];
@@ -168,12 +232,16 @@ async function fetchProfesionalesDisponiblesPorDepartamento(departamentoIds) {
     });
   });
 
-  const { data: rolesData, error: rolesError } = await supabaseAdmin
-    .from('usuario_roles')
-    .select('usuario_id, rol:roles ( nombre_rol )')
-    .in('usuario_id', profesionalIds);
-
-  if (rolesError) throw rolesError;
+  const usuarioIds = Array.from(encontradosPorId.keys());
+  let rolesData = [];
+  if (usuarioIds.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from('usuario_roles')
+      .select('usuario_id, rol:roles ( nombre_rol )')
+      .in('usuario_id', usuarioIds);
+    if (error) throw error;
+    rolesData = data || [];
+  }
 
   const rolesPorUsuario = new Map();
   (rolesData || []).forEach((row) => {
@@ -191,16 +259,23 @@ async function fetchProfesionalesDisponiblesPorDepartamento(departamentoIds) {
   const result = new Map();
 
   departamentoProfesionales.forEach((profIdsSet, deptId) => {
-    const list = Array.from(profIdsSet.values()).map((profId) => {
-      const personaId = usuarioPersonaMap.get(profId) || null;
+    const list = Array.from(profIdsSet.values()).map((rawId) => {
+      const usuarioInfo = encontradosPorId.get(rawId);
+      const personaInfo = encontradosPorPersona.get(rawId);
+      const usuarioId = usuarioInfo?.usuarioId || personaInfo?.usuarioId || null;
+      const personaId = personaInfo?.personaId || usuarioInfo?.personaId || (personaMap.has(rawId) ? rawId : null);
       const persona = personaId ? personaMap.get(personaId) : null;
-      const roles = rolesPorUsuario.get(profId) || [];
+      const roles = usuarioId ? rolesPorUsuario.get(usuarioId) || [] : [];
       const nombre = persona?.nombre || null;
       const apellido = persona?.apellido || null;
-      const nombreCompleto = [nombre, apellido].filter(Boolean).join(' ').trim() || `Profesional ${profId}`;
+      const nombreCompletoBase = [nombre, apellido].filter(Boolean).join(' ').trim();
+      const nombreCompleto = nombreCompletoBase || `Profesional ${usuarioId || rawId}`;
 
       return {
-        id_profesional: profId,
+        id_profesional: usuarioId || rawId,
+        usuario_id: usuarioId || null,
+        persona_id: personaId || null,
+        id_profesional_origen: rawId,
         nombre,
         apellido,
         nombre_completo: nombreCompleto,
@@ -476,6 +551,36 @@ async function generateTurnoSuggestionsForNino({
   const sharedFinIso = candidateSlot.fin.toISOString();
   const sharedDuration = maxDuration;
 
+  const matchesProfesionalId = (prof, targetId) => {
+    const normalizedTarget = parseId(targetId);
+    if (!normalizedTarget) return false;
+    const candidates = [
+      prof?.id_profesional,
+      prof?.usuario_id,
+      prof?.persona_id,
+      prof?.id_profesional_origen,
+    ]
+      .map((value) => parseId(value))
+      .filter((value) => value !== null);
+    return candidates.some((candidate) => candidate === normalizedTarget);
+  };
+
+  const resolvePreferredProfesional = (targets, disponiblesList) => {
+    if (!Array.isArray(disponiblesList) || disponiblesList.length === 0) {
+      return null;
+    }
+    const normalizedTargets = (Array.isArray(targets) ? targets : [targets])
+      .map((value) => parseId(value))
+      .filter((value) => value !== null);
+    for (const target of normalizedTargets) {
+      const match = disponiblesList.find((prof) => matchesProfesionalId(prof, target));
+      if (match) {
+        return match.id_profesional;
+      }
+    }
+    return null;
+  };
+
   const propuestas = pendientes.map((need) => {
     const inicio = shouldShareSlot ? sharedInicioIso : new Date(candidateSlot.inicio.getTime()).toISOString();
     const fin = shouldShareSlot
@@ -491,11 +596,12 @@ async function generateTurnoSuggestionsForNino({
     const candidatoAdmin = disponibles.find((prof) => prof.es_admin);
     const fallbackProfesionalId = fallbackProfesionales.get(need.departamentoId) || null;
 
-    const profesionalPreferido = need.profesionalAsignadoId
+    const profesionalPreferido =
+      resolvePreferredProfesional([need.profesionalAsignadoId], disponibles)
       || (candidatoResponsable ? candidatoResponsable.id_profesional : null)
-      || (need.responsableId ? need.responsableId : null)
+      || resolvePreferredProfesional([need.responsableId], disponibles)
       || (candidatoAdmin ? candidatoAdmin.id_profesional : null)
-      || fallbackProfesionalId
+      || resolvePreferredProfesional([fallbackProfesionalId], disponibles)
       || (disponibles.length > 0 ? disponibles[0].id_profesional : null);
 
     const profesionalIds = profesionalPreferido ? [profesionalPreferido] : [];
