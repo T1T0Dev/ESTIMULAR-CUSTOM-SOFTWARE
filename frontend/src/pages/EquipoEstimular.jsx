@@ -85,6 +85,7 @@ export default function EquipoEstimular() {
   const debouncedBusqueda = useDebounce(busqueda, 300);
   const skipPageEffectRef = useRef(false);
   const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
 
   useEffect(() => {
     let active = true;
@@ -141,6 +142,9 @@ export default function EquipoEstimular() {
   }, [departamentoOptions]);
 
   const isAdmin = useMemo(() => {
+    if (profile?.es_admin || user?.es_admin) {
+      return true;
+    }
     const names = [];
     if (user?.rol_nombre) names.push(user.rol_nombre);
     if (Array.isArray(user?.roles)) {
@@ -153,7 +157,7 @@ export default function EquipoEstimular() {
     return names
       .map((value) => value.toLowerCase())
       .some((value) => value.includes("admin") || value.includes("administr"));
-  }, [user?.rol_nombre, user?.roles]);
+  }, [profile?.es_admin, user?.es_admin, user?.rol_nombre, user?.roles]);
 
   const handleOpenReset = useCallback((member) => {
     if (!member?.id_usuario) return;

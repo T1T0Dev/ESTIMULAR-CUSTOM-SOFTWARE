@@ -23,6 +23,9 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
   }, [overrideProfesionalId, profile?.id_profesional, user?.id_profesional, user?.id]);
 
   const isAdmin = useMemo(() => {
+    if (profile?.es_admin || user?.es_admin) {
+      return true;
+    }
     const names = [];
     if (user?.rol_nombre) names.push(user.rol_nombre);
     if (Array.isArray(user?.roles)) {
@@ -35,7 +38,7 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
     return names
       .map((value) => value.toLowerCase())
       .some((value) => value.includes("admin") || value.includes("administr"));
-  }, [user?.rol_nombre, user?.roles]);
+  }, [profile?.es_admin, user?.es_admin, user?.rol_nombre, user?.roles]);
 
   const currentUserId = user?.id ?? null;
 

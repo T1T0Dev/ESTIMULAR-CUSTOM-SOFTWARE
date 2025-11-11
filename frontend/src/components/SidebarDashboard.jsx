@@ -20,6 +20,22 @@ export default function SidebarDashboard() {
   const profile = useAuthStore((s) => s.profile);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
+  const esAdmin = React.useMemo(() => {
+    if (profile?.es_admin || user?.es_admin) return true;
+    const names = [];
+    if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (Array.isArray(user?.roles)) {
+      names.push(
+        ...user.roles
+          .map((r) => r?.nombre)
+          .filter((value) => typeof value === "string")
+      );
+    }
+    return names
+      .map((value) => value.toLowerCase())
+      .some((value) => value.includes("admin") || value.includes("administr"));
+  }, [profile?.es_admin, user?.es_admin, user?.rol_nombre, user?.roles]);
+
   const fullName = React.useMemo(() => {
     return [profile?.nombre, profile?.apellido]
       .filter(Boolean)
@@ -29,6 +45,9 @@ export default function SidebarDashboard() {
 
   const displayName = fullName || (user?.dni ? `DNI ${user.dni}` : "Usuario");
   const primaryRole = React.useMemo(() => {
+    if (esAdmin) {
+      return "Administración";
+    }
     // 1) Profesión del perfil profesional si existe
     if (profile?.profesion) return profile.profesion;
     if (profile?.departamento?.nombre) return profile.departamento.nombre;
@@ -78,6 +97,7 @@ export default function SidebarDashboard() {
     }
     return null;
   }, [
+    esAdmin,
     profile?.profesion,
     profile?.departamento?.nombre,
     profile?.tipo,

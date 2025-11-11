@@ -59,6 +59,9 @@ function isRecepcionTipo(value) {
 function mapRoleDisplayName(rawName) {
   const normalized = normalizeText(rawName);
   if (!normalized) return rawName || null;
+  if (normalized.includes('admin')) {
+    return 'Admin';
+  }
   if (
     normalized === 'recepcion' ||
     normalized === 'recepcionista' ||
@@ -69,6 +72,22 @@ function mapRoleDisplayName(rawName) {
     return 'Recepción';
   }
   return rawName;
+}
+
+function rolePriority(normalizedName) {
+  if (!normalizedName) return 50;
+  if (normalizedName.includes('admin')) return 0;
+  if (normalizedName.includes('recepcion') || normalizedName.includes('secretar')) return 1;
+  if (normalizedName.includes('profes')) return 2;
+  return 5;
+}
+
+function hasAdminRole(roles = []) {
+  return roles.some((role) => {
+    const rawName = role?.nombre || role?.rolNombre || role?.rol || role?.nombre_rol;
+    const normalized = normalizeText(rawName);
+    return normalized.includes('admin');
+  });
 }
 
 function determineTipoFromRoles(roles = [], hasProfession = false) {
@@ -122,12 +141,25 @@ async function fetchUserRoles(idUsuario) {
       }
       return [];
     }
-    return (data || [])
-      .map((row) => ({
-        id: row.rol_id ?? row.rol?.id_rol ?? null,
-        nombre: mapRoleDisplayName(row.rol?.nombre_rol ?? null),
-      }))
+    const roles = (data || [])
+      .map((row) => {
+        const rawName = row.rol?.nombre_rol ?? null;
+        const normalized = normalizeText(rawName);
+        return {
+          id: row.rol_id ?? row.rol?.id_rol ?? null,
+          nombre: mapRoleDisplayName(rawName),
+          _normalized: normalized,
+        };
+      })
       .filter((rol) => rol.id || rol.nombre);
+
+    roles.sort((a, b) => {
+      const priorityDiff = rolePriority(a._normalized) - rolePriority(b._normalized);
+      if (priorityDiff !== 0) return priorityDiff;
+      return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+    });
+
+    return roles.map(({ _normalized, ...rest }) => rest);
   } catch (err) {
     console.error('fetchUserRoles exception:', err);
     return [];
@@ -271,9 +303,11 @@ async function fetchUserProfile(idUsuario, rolesHint = null, prefetchedSnapshot 
   const profesion = await fetchPersonaProfesion(personaId);
   const foto = await resolveStorageAsset(persona.foto_perfil);
   const tipo = determineTipoFromRoles(roles, !!profesion?.id_departamento);
+  const esAdmin = hasAdminRole(roles);
 
   return {
     tipo,
+    es_admin: esAdmin,
     id_usuario: user.id_usuario,
     persona_id: personaId,
     nombre: persona.nombre ?? null,
@@ -522,7 +556,7 @@ const registrarUsuario = async (req, res) => {
 
     return res.status(201).json({
       message: 'Usuario registrado con éxito',
-      user: { ...inserted, id_rol: roleId },
+      user: { ...inserted, id_rol: roleId, es_admin: false },
     });
   } catch (err) {
     console.error('registrarUsuario exception:', err);
@@ -581,6 +615,7 @@ const loginUsuario = async (req, res) => {
 
     const roles = await fetchUserRoles(user.id_usuario);
     const perfil = await fetchUserProfile(user.id_usuario, roles);
+    const esAdmin = hasAdminRole(roles);
     const needsProfile = computeNeedsProfile(perfil);
 
     return res.json({
@@ -592,6 +627,7 @@ const loginUsuario = async (req, res) => {
         id_rol: roles[0]?.id ?? null,
         rol_nombre: roles[0]?.nombre ?? null,
         roles,
+        es_admin: esAdmin,
       },
       profile: perfil,
       firstLogin: String(contrasena) === DEFAULT_PASSWORD,
@@ -893,6 +929,7 @@ const actualizarPerfil = async (req, res) => {
 
     const roles = await fetchUserRoles(userId);
     const profile = await fetchUserProfile(userId, roles);
+    const esAdmin = hasAdminRole(roles);
     if (resolvedTipo === 'recepcion') {
       try {
         await syncLegacySecretarioRecord(userId, {
@@ -925,6 +962,7 @@ const actualizarPerfil = async (req, res) => {
           id_rol: roles[0]?.id ?? null,
           rol_nombre: roles[0]?.nombre ?? null,
           roles,
+          es_admin: esAdmin,
         }
         : undefined,
     });
@@ -964,6 +1002,7 @@ const obtenerPerfilActual = async (req, res) => {
 
     const roles = await fetchUserRoles(user.id_usuario);
     const profile = await fetchUserProfile(user.id_usuario, roles);
+    const esAdmin = hasAdminRole(roles);
     const needsProfile = computeNeedsProfile(profile);
 
     return res.json({
@@ -974,6 +1013,7 @@ const obtenerPerfilActual = async (req, res) => {
         id_rol: roles[0]?.id ?? null,
         rol_nombre: roles[0]?.nombre ?? null,
         roles,
+        es_admin: esAdmin,
       },
       profile,
       needsProfile,
