@@ -31,13 +31,21 @@ async function updateTurnoEstadoPago(turnoId, estado_pago) {
     .select("id");
 
   if (error) {
-    if (error.code === "42703") {
-      // Columna no existe en la nueva estructura; ignorar silenciosamente.
+    const errorCode = error.code;
+    const errorMessage = typeof error.message === "string" ? error.message : "";
+
+    if (
+      errorCode === "42703" ||
+      errorCode === "PGRST204" ||
+      errorMessage.includes("'estado_pago' column")
+    ) {
+      // Columna no existe en el esquema actual; omitir actualización suavemente.
       console.warn(
         "La columna estado_pago no existe en turnos. Se omite la actualización del estado de pago."
       );
       return { affectedRows: 0, skipped: true };
     }
+
     throw error;
   }
 
