@@ -32,6 +32,34 @@ const roundToNearestMinutes = (date, intervalMinutes) => {
   return new Date(roundedTime);
 };
 
+const intersectsLunchBreak = (start, end = null) => {
+  if (!start) return false;
+
+  const windowStart = moment(start).clone().hours(13).minutes(0).seconds(0).milliseconds(0);
+  const windowEnd = moment(start).clone().hours(14).minutes(0).seconds(0).milliseconds(0);
+
+  const startMoment = moment(start);
+  if (!end) {
+    return startMoment.isSameOrAfter(windowStart) && startMoment.isBefore(windowEnd);
+  }
+
+  const endMoment = moment(end);
+  if (!endMoment.isValid()) {
+    return startMoment.isSameOrAfter(windowStart) && startMoment.isBefore(windowEnd);
+  }
+
+  return startMoment.isBefore(windowEnd) && endMoment.isAfter(windowStart);
+};
+
+const HIDDEN_SLOT_STYLE = Object.freeze({
+  display: 'none',
+  height: 0,
+  minHeight: 0,
+  padding: 0,
+  border: 'none',
+  margin: 0,
+});
+
 // --- Componentes Personalizados ---
 
 const StatusLegend = () => {
@@ -227,6 +255,9 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
   }, [currentDate, fetchTurnos, isAdmin, loggedInProfesionalId, currentUserId]);
 
   const handleEventDrop = useCallback(async ({ event, start, end, resourceId }) => {
+    if (intersectsLunchBreak(start, end)) {
+      return;
+    }
     handleEventAction(event, {
       inicio: moment(start).toISOString(),
       fin: moment(end).toISOString(),
@@ -235,6 +266,9 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
   }, [handleEventAction]);
 
   const handleEventResize = useCallback(async ({ event, start, end }) => {
+    if (intersectsLunchBreak(start, end)) {
+      return;
+    }
     handleEventAction(event, {
       inicio: moment(start).toISOString(),
       fin: moment(end).toISOString(),
@@ -317,6 +351,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
   const handleSelectSlot = useCallback((slotInfo) => {
     if (!slotInfo) return;
     const { start, end, resourceId } = slotInfo;
+    if (intersectsLunchBreak(start, end)) return;
     const roundedStart = roundToNearestMinutes(start, 30);
     if (!roundedStart) return;
 
@@ -340,6 +375,16 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
 
     handleOpenNuevoTurno(prefill);
   }, [handleOpenNuevoTurno]);
+
+  const slotPropGetter = useCallback((date) => {
+    if (intersectsLunchBreak(date)) {
+      return {
+        className: 'hidden-lunch-slot',
+        style: HIDDEN_SLOT_STYLE,
+      };
+    }
+    return {};
+  }, []);
 
   const isEventDraggable = useCallback(
     (event) => {
@@ -388,6 +433,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
         max={moment(currentDate).set({ h: 20, m: 0 }).toDate()}
         formats={formats}
         eventPropGetter={eventPropGetter}
+        slotPropGetter={slotPropGetter}
         components={{
           toolbar: (toolbarProps) => (
             <CustomToolbar

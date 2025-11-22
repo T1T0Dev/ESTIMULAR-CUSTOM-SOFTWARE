@@ -1,11 +1,33 @@
 /* Turnos.css */
 
+/* Layout específico de la página de turnos */
+.dashboard-content > .turnos-page,
+.turnos-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 0;
+}
+
+.turnos-page .turnos-grid-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
 /* Estilo general del contenedor del calendario */
 .turnos-grid-container {
-  height: 90vh; /* Ocupa casi toda la altura de la pantalla */
-  padding: 0; /* Padding eliminado para una vista más compacta */
-  background-color: #fcfdff; /* Un fondo muy claro */
+  height: 100%;
+  padding: 0;
+  background-color: #fcfdff;
   position: relative;
+}
+
+.rbc-day-slot .rbc-time-slot {
+  min-height: 28px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 /* Estilo para los eventos (turnos) */
@@ -69,15 +91,20 @@
   height: 2px;
 }
 
-/* Estilo para el horario de almuerzo */
+/* Ocultar por completo el rango de almuerzo */
+.hidden-lunch-slot,
 .rbc-time-slot.lunch-break {
-    background-color: #f1f1f1; /* Un gris claro para indicar el receso */
-    border-top: 1px dashed #ccc;
-    border-bottom: 1px dashed #ccc;
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
 }
 
-.rbc-day-slot .rbc-time-slot:not(.lunch-break) {
-    border-top: none;
+.rbc-timeslot-group .hidden-lunch-slot + .rbc-time-slot,
+.rbc-timeslot-group .rbc-time-slot.lunch-break + .rbc-time-slot {
+  border-top: 1px solid var(--neutral-200, #e5e7eb);
 }
 
 /* Estilos para la Leyenda de Estados */
@@ -111,8 +138,8 @@
 
 .floating-create-turno-btn {
   position: absolute;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: 0.85rem;
+  right: 1.25rem;
   background-color: var(--color-accent-blue, #6366f1);
   color: #fff;
   border: none;
