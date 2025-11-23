@@ -8,6 +8,7 @@ import {
   MdAssignment,
   MdLocalHospital,
   MdFamilyRestroom,
+  MdAttachMoney,
 } from "react-icons/md";
 import "../styles/SidebarDashboard.css";
 import useAuthStore from "../store/useAuthStore";
@@ -205,6 +206,16 @@ export default function SidebarDashboard() {
         >
           <MdLocalHospital size={18} /> <span>Obras sociales</span>
         </NavLink>
+
+          <NavLink
+          to="/dashboard/panel-financiero"
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
+        >
+          <MdAttachMoney size={18} /> <span>Panel financiero</span>
+        </NavLink>
+
       </nav>
 
       <div className="sd-footer">

@@ -21,6 +21,7 @@ import Responsables from "./pages/Responsables";
 import AsignarEntrevista from "./pages/AsignarEntrevista";
 import EquipoEstimular from "./pages/EquipoEstimular";
 import Turnos from "./pages/Turnos";
+import PanelFinanciero from "./pages/PanelFinanciero";
 import useAuthStore from "./store/useAuthStore";
 import { NotificacionProvider } from "./context/NotificacionContext";
 
@@ -70,6 +71,7 @@ function DashboardRoutes() {
           element={<div className="p-24">Pacientes (placeholder)</div>}
         />
         <Route path="responsables" element={<Responsables />} />
+        <Route path="panel-financiero" element={<PanelFinanciero />} />
       </Routes>
     </DashboardLayout>
   );
