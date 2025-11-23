@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
+import Swal from 'sweetalert2';  // Agrega la importación de SweetAlert2
 import './../styles/TurnoModal.css';
 
 const parseProfesionalIds = (value) =>
@@ -11,6 +12,8 @@ const parseProfesionalIds = (value) =>
 export default function TurnoModal({ event, onClose, onUpdate, onDelete, onOpenPagos, onOpenPaciente, loggedInProfesionalId, isAdmin = false }) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false); // Nuevo estado para el modal de cancelación
+  const [cancelTexto, setCancelTexto] = useState(''); // Estado para el motivo
 
   useEffect(() => {
     if (event) {
@@ -51,11 +54,49 @@ export default function TurnoModal({ event, onClose, onUpdate, onDelete, onOpenP
   };
 
   const createStatusHandler = (status, openPaymentModal = false) => () => {
+    if (status === 'cancelado') {
+      setShowCancelModal(true); // Abre el modal de cancelación en lugar de window.confirm
+      return;
+    }
     const message = `¿Está seguro de que desea cambiar el estado a ${status.toUpperCase()}?`;
     if (window.confirm(message)) {
-
       onUpdate(event, { estado: status }, openPaymentModal);
     }
+  };
+
+  const handleCancelSubmit = async () => {
+    if (!cancelTexto.trim()) {
+      Swal.fire('Advertencia', 'Por favor, ingrese el texto para la cancelación.', 'warning');  // Cambia alert por Swal
+      return;
+    }
+    const subject = `Cancelación de turno ${moment(event.start).format('DD/MM/YYYY')}`;
+    const body = cancelTexto;
+    console.log('Event:', event);  // Agrega para depurar
+    console.log('ID del turno:', event.id);  // Verifica si event.id existe
+    try {
+      const response = await fetch(`http://localhost:3001/api/turnos/cancelar/${event.id}`, {  // Cambia event.data.id a event.id
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, body }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        Swal.fire('Éxito', 'Turno cancelado exitosamente. Se ha enviado un email al responsable.', 'success');  // Cambia alert por Swal
+        onUpdate(event, { estado: 'cancelado' });
+        setShowCancelModal(false);
+        setCancelTexto('');
+      } else {
+        Swal.fire('Error', 'Error al cancelar turno: ' + result.message, 'error');  // Cambia alert por Swal
+      }
+    } catch (error) {
+      console.error('Error en cancelación:', error);
+      Swal.fire('Error', 'Error al cancelar turno', 'error');  // Cambia alert por Swal
+    }
+  };
+
+  const handleCancelCancel = () => {
+    setShowCancelModal(false);
+    setCancelTexto('');
   };
 
   const handleDeleteTurno = () => {
@@ -121,6 +162,27 @@ export default function TurnoModal({ event, onClose, onUpdate, onDelete, onOpenP
           )}
         </div>
       </div>
+
+      {/* Nuevo modal de cancelación */}
+      {showCancelModal && (
+        <div className="modal-backdrop" onClick={handleCancelCancel}>
+          <div className="modal-content cancel-modal" onClick={e => e.stopPropagation()}>
+            <h3>Cancelación de turno</h3>
+            <label htmlFor="motivo">Motivo de la cancelación del turno</label>
+            <textarea
+              id="motivo"
+              value={cancelTexto}
+              onChange={(e) => setCancelTexto(e.target.value)}
+              placeholder="Redacte el motivo aquí..."
+              rows="4"
+            />
+            <div className="modal-buttons">
+              <button className="btn-cancel2" onClick={handleCancelCancel}>Cancelar</button>
+              <button className="btn-send" onClick={handleCancelSubmit}>Enviar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

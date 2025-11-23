@@ -223,3 +223,100 @@
   color: #333;
 }
 .btn-change-day:hover { background-color: #e0e0e0; }
+
+.cancel-modal {
+  max-width: 450px;
+  background: white;
+  border: 2px solid var(--color-rosa1);
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  padding: 2rem;
+}
+
+.cancel-modal h3 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--color-rosa2);
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.cancel-modal label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.cancel-modal input[type="text"] {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.cancel-modal input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-rosa1);
+}
+
+.cancel-modal textarea {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s;
+}
+
+.cancel-modal textarea:focus {
+  outline: none;
+  border-color: var(--color-rosa1);
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.btn-cancel2 {
+  flex: 1;
+  background-color: #f5f5f5;
+  color: #666;
+  border: 1px solid #ccc;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-cancel:hover {
+  background-color: #e0e0e0;
+}
+
+.btn-send {
+  flex: 1;
+  background-color: var(--color-rosa1);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-send:hover {
+  background-color: var(--color-rosa2);
+}
