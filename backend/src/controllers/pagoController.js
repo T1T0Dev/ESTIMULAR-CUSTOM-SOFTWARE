@@ -192,9 +192,30 @@ async function handleGetPagosDashboardDeudas(req, res) {
     }
 
     const agrupadas = new Map();
+    const nowMs = Date.now();
 
     pagos.forEach((pago) => {
-      const turno = pago.turno || {};
+      const turno = pago.turno || null;
+      const turnoId = turno?.id || pago.turno_id || null;
+      if (!turno || !turnoId) {
+        return;
+      }
+
+      const estadoTurno = typeof turno.estado === 'string' ? turno.estado.toLowerCase() : '';
+      if (estadoTurno !== 'confirmado') {
+        return;
+      }
+
+      const turnoFechaCruda = turno.fin || turno.inicio || null;
+      const turnoFecha = turnoFechaCruda ? new Date(turnoFechaCruda) : null;
+      if (!turnoFecha || Number.isNaN(turnoFecha.getTime())) {
+        return;
+      }
+
+      if (turnoFecha.getTime() > nowMs) {
+        return;
+      }
+
       const ninoId = pago.nino_id || turno.nino_id || null;
       if (!Number.isInteger(ninoId)) return;
 
@@ -224,7 +245,6 @@ async function handleGetPagosDashboardDeudas(req, res) {
         }
       }
 
-      const turnoId = turno.id || pago.turno_id || null;
       const turnoKey = turnoId ? String(turnoId) : `pago-${pago.id}`;
       if (!registro.turnos.has(turnoKey)) {
         registro.turnos.set(turnoKey, {
