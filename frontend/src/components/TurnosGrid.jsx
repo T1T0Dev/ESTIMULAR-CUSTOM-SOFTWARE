@@ -65,7 +65,6 @@ const HIDDEN_SLOT_STYLE = Object.freeze({
 const StatusLegend = () => {
   const statuses = [
     { name: 'Confirmado', class: 'confirmado' },
-    { name: 'Completado', class: 'completado' },
     { name: 'Pendiente', class: 'pendiente' },
     { name: 'Cancelado', class: 'cancelado' },
     { name: 'No Presentó', class: 'no_presento' },
