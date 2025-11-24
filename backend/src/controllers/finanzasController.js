@@ -15,7 +15,7 @@ const getResumenMensual = async (req, res) => {
         // Cargamos todos los pagos del año (por fecha de registro) junto a su turno.
         const { data: pagos, error: pagosError } = await supabaseAdmin
             .from('pagos')
-            .select('id, monto, estado, registrado_en, turno_id, turno:turnos ( id, inicio )')
+            .select('id, monto, estado, registrado_en, turno_id, turno:turnos ( id, inicio, estado )')
             .gte('registrado_en', desdeIso)
             .lt('registrado_en', hastaIso);
 
@@ -69,7 +69,8 @@ const getResumenMensual = async (req, res) => {
                 .filter((p) => {
                     if (p.estado !== 'pendiente') return false;
                     const turno = p.turno || null;
-                    const f = turno && turno.inicio ? new Date(turno.inicio) : null;
+                    if (!turno || turno.estado !== 'confirmado') return false;
+                    const f = turno.inicio ? new Date(turno.inicio) : null;
                     return (
                         f &&
                         f.toISOString() >= inicioMesIso &&

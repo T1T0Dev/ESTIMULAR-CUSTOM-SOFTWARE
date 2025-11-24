@@ -44,7 +44,7 @@ export default function PanelFinanciero() {
       setLoading(true);
       setError(null);
       try {
-        const { data } = await axios.get(
+        const { data } = await axios.get( 
           `${API_BASE_URL}/api/finanzas/resumen-mensual`,
           { params: { anio: anioSeleccionado } }
         );
