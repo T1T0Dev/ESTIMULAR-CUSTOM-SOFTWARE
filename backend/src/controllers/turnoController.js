@@ -63,6 +63,8 @@ async function handleGetTurnos(req, res) {
 
       if (estado) query = query.eq('estado', estado);
       if (nino_id) query = query.eq('nino_id', Number(nino_id));
+      if (req.query.notas) query = query.eq('notas', req.query.notas);
+      if (req.query.departamentoId) query = query.eq('departamento_id', Number(req.query.departamentoId));
 
       if (String(disponible) === 'true') {
         query = query.is('nino_id', null);

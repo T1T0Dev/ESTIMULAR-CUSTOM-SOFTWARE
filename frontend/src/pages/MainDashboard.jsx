@@ -7,6 +7,7 @@ import {
   MdLocalHospital,
   MdEventAvailable,
   MdRefresh,
+  MdSchedule,
 } from "react-icons/md";
 import useAuthStore from "../store/useAuthStore";
 import "../styles/MainDashboard.css";
@@ -96,15 +97,19 @@ export default function MainDashboard() {
   const user = useAuthStore((state) => state.user);
   const needsProfile = useAuthStore((state) => state.needsProfile);
 
+  const isAdmin = user?.es_admin;
+
   const [summary, setSummary] = useState({
     professionals: 0,
     children: 0,
     obras: 0,
     turnosPendientes: 0,
+    ...(isAdmin ? { entrevistasPendientes: 0 } : {}),
   });
   const [latestProfessionals, setLatestProfessionals] = useState([]);
   const [latestChildren, setLatestChildren] = useState([]);
   const [upcomingTurnos, setUpcomingTurnos] = useState([]);
+  const [latestEntrevistas, setLatestEntrevistas] = useState([]);
   const [profesionesMap, setProfesionesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -140,13 +145,7 @@ export default function MainDashboard() {
     setError(null);
 
     try {
-      const [
-        equipoResult,
-        ninosResult,
-        obrasResult,
-        turnosResult,
-        profesionesResult,
-      ] = await Promise.allSettled([
+      const promises = [
         axios.get(`${API_BASE_URL}/api/equipo`, {
           params: { page: 1, pageSize: 4, activo: true },
         }),
@@ -160,7 +159,19 @@ export default function MainDashboard() {
           params: { estado: "pendiente", limit: 8 },
         }),
         axios.get(`${API_BASE_URL}/api/profesiones`),
-      ]);
+        ...(isAdmin ? [axios.get(`${API_BASE_URL}/api/turnos`, {
+          params: { estado: "pendiente", notas: "Entrevista", departamentoId: profile?.profesion_id, limit: 8 },
+        })] : []),
+      ];
+
+      const results = await Promise.allSettled(promises);
+
+      const equipoResult = results[0];
+      const ninosResult = results[1];
+      const obrasResult = results[2];
+      const turnosResult = results[3];
+      const profesionesResult = results[4];
+      const entrevistaResult = isAdmin ? results[5] : null;
 
       if (!activeRef.current) return;
 
@@ -217,6 +228,16 @@ export default function MainDashboard() {
         errors.push("profesiones");
       }
 
+      let entrevistasListado = [];
+      let entrevistasTotal = 0;
+      if (isAdmin && entrevistaResult && entrevistaResult.status === "fulfilled") {
+        const payload = entrevistaResult.value?.data ?? {};
+        entrevistasListado = resolveArrayData(payload);
+        entrevistasTotal = resolveTotalCount(payload, entrevistasListado.length);
+      } else if (isAdmin) {
+        errors.push("entrevistas");
+      }
+
       const profesionesDictionary = profesionesListado.reduce(
         (acc, profesion) => {
           if (profesion?.id_departamento) {
@@ -236,6 +257,9 @@ export default function MainDashboard() {
         })
         .slice(0, 5);
 
+      const upcomingEntrevistas = entrevistasListado
+        .slice(0, 5);
+
       if (activeRef.current) {
         setProfesionesMap(profesionesDictionary);
         setSummary({
@@ -243,10 +267,12 @@ export default function MainDashboard() {
           children: childrenTotal,
           obras: obrasTotal,
           turnosPendientes: turnosTotal,
+          ...(isAdmin ? { entrevistasPendientes: entrevistasTotal } : {}),
         });
         setLatestProfessionals(profesionalesListado.slice(0, 4));
         setLatestChildren(ninosListado.slice(0, 4));
         setUpcomingTurnos(upcoming);
+        if (isAdmin) setLatestEntrevistas(upcomingEntrevistas);
         setError(
           errors.length
             ? `No se pudieron cargar algunos datos (${errors.join(", ")}).`
@@ -309,6 +335,14 @@ export default function MainDashboard() {
         to: "/dashboard/turnos",
         hint: `${upcomingTurnos.length} próximos`,
       },
+      ...(isAdmin ? [{
+        id: "entrevistas",
+        label: "Entrevistas pendientes",
+        value: summary.entrevistasPendientes,
+        icon: <MdSchedule size={24} />,
+        to: "/dashboard/entrevistas",
+        hint: `${latestEntrevistas.length} próximas`,
+      }] : []),
     ],
     [
       summary.professionals,
@@ -318,6 +352,8 @@ export default function MainDashboard() {
       summary.obras,
       summary.turnosPendientes,
       upcomingTurnos.length,
+      summary.entrevistasPendientes,
+      latestEntrevistas.length,
     ]
   );
 
@@ -432,6 +468,58 @@ export default function MainDashboard() {
                 </ul>
               )}
             </section>
+
+            {isAdmin && (
+              <section className="main-dashboard__panel main-dashboard__panel--wide">
+                <div className="main-dashboard__panel-header">
+                  <h2>Entrevistas pendientes</h2>
+                  <NavLink to="/dashboard/entrevistas">Ver todas</NavLink>
+                </div>
+                {latestEntrevistas.length === 0 ? (
+                  <p className="main-dashboard__empty">
+                    No hay entrevistas pendientes.
+                  </p>
+                ) : (
+                  <ul className="main-dashboard__turnos">
+                    {latestEntrevistas.map((entrevista) => {
+                      const { date, time } = formatDateParts(entrevista.inicio);
+                      const area =
+                        entrevista?.departamento_id &&
+                        profesionesMap[entrevista.departamento_id]
+                          ? profesionesMap[entrevista.departamento_id]
+                          : entrevista?.departamento_id
+                          ? `Área ${entrevista.departamento_id}`
+                          : "Sin área";
+                      return (
+                        <li key={entrevista.id} className="main-dashboard__turno-item">
+                          <div className="main-dashboard__turno-date">
+                            <span className="main-dashboard__turno-day">
+                              {date}
+                            </span>
+                            <span className="main-dashboard__turno-time">
+                              {time}
+                            </span>
+                          </div>
+                          <div className="main-dashboard__turno-info">
+                            <p className="main-dashboard__turno-area">{area}</p>
+                            <p className="main-dashboard__turno-meta">
+                              {entrevista.nino_id ? "Asignado" : "Disponible"}
+                              {" - "}
+                              {capitalize(entrevista.estado)}
+                              {entrevista.consultorio_id && (
+                                <span>
+                                  {" - "}Consultorio {entrevista.consultorio_id}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            )}
 
             <section className="main-dashboard__panel">
               <div className="main-dashboard__panel-header">

@@ -201,6 +201,10 @@
   background: linear-gradient(135deg, #ffa351, var(--color-naranja1));
 }
 
+.stat-card--4 .stat-card__icon {
+  background: linear-gradient(135deg, #9c27b0, #ba68c8);
+}
+
 .main-dashboard__panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
