@@ -620,6 +620,7 @@ async function crearIntegrante(req, res) {
 					dni: Number(dni),
 					password_hash: hash,
 					activo: true,
+					primer_registro_completado: false,
 					persona_id: persona.id,
 				},
 			])

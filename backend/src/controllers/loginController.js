@@ -224,6 +224,7 @@ async function fetchUserAndPersona(idUsuario) {
         id_usuario,
         dni,
         activo,
+        primer_registro_completado,
         persona_id,
         persona:personas (
           id,
@@ -251,6 +252,7 @@ async function fetchUserAndPersona(idUsuario) {
         id_usuario: data.id_usuario,
         dni: data.dni,
         activo: data.activo,
+        primer_registro_completado: data.primer_registro_completado ?? true,
         persona_id: personaId,
       },
       persona,
@@ -310,6 +312,7 @@ async function fetchUserProfile(idUsuario, rolesHint = null, prefetchedSnapshot 
     es_admin: esAdmin,
     id_usuario: user.id_usuario,
     persona_id: personaId,
+    primer_registro_completado: user.primer_registro_completado ?? null,
     nombre: persona.nombre ?? null,
     apellido: persona.apellido ?? null,
     telefono: persona.telefono ?? null,
@@ -325,6 +328,7 @@ async function fetchUserProfile(idUsuario, rolesHint = null, prefetchedSnapshot 
 
 function computeNeedsProfile(perfil) {
   if (!perfil) return true;
+  if (perfil.primer_registro_completado === false) return true;
   const required = [perfil.nombre, perfil.apellido, perfil.telefono, perfil.email, perfil.fecha_nacimiento];
   if (required.some((value) => value === null || value === undefined || String(value).trim() === '')) {
     return true;
@@ -543,7 +547,7 @@ const registrarUsuario = async (req, res) => {
 
     const { data: inserted, error: insertErr } = await supabaseAdmin
       .from('usuarios')
-      .insert([{ dni: Number(dni), password_hash: hash, activo: true }])
+      .insert([{ dni: Number(dni), password_hash: hash, activo: true, primer_registro_completado: false }])
       .select('id_usuario, dni, activo')
       .maybeSingle();
 
@@ -617,6 +621,7 @@ const loginUsuario = async (req, res) => {
     const perfil = await fetchUserProfile(user.id_usuario, roles);
     const esAdmin = hasAdminRole(roles);
     const needsProfile = computeNeedsProfile(perfil);
+    const firstLogin = !perfil?.primer_registro_completado || String(contrasena) === DEFAULT_PASSWORD;
 
     return res.json({
       success: true,
@@ -630,7 +635,7 @@ const loginUsuario = async (req, res) => {
         es_admin: esAdmin,
       },
       profile: perfil,
-      firstLogin: String(contrasena) === DEFAULT_PASSWORD,
+      firstLogin,
       needsProfile,
     });
   } catch (err) {
@@ -647,7 +652,7 @@ const primerRegistro = async (req, res) => {
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (err) {
+    } catch (_tokenErr) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
@@ -760,7 +765,10 @@ const primerRegistro = async (req, res) => {
     const passwordHash = await bcrypt.hash(String(nuevaContrasena), 12);
     const { error: pwdErr } = await supabaseAdmin
       .from('usuarios')
-      .update({ password_hash: passwordHash })
+      .update({
+        password_hash: passwordHash,
+        primer_registro_completado: true,
+      })
       .eq('id_usuario', Number(userId));
     if (pwdErr) {
       console.error('primerRegistro update password error:', pwdErr);
@@ -790,7 +798,7 @@ const actualizarPerfil = async (req, res) => {
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (err) {
+    } catch (_tokenErr) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
@@ -981,7 +989,7 @@ const obtenerPerfilActual = async (req, res) => {
     let payload;
     try {
       payload = jwt.verify(token, secret);
-    } catch (err) {
+    } catch (_tokenErr) {
       return res.status(401).json({ error: 'Token inválido' });
     }
 
