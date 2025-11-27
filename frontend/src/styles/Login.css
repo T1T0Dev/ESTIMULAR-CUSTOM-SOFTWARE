@@ -113,7 +113,7 @@
   border: 1px solid #baf7cd;
 }
 
-label {
+.login-card label {
   display: block;
   margin-top: 10px;
   margin-bottom: 6px;
@@ -121,8 +121,8 @@ label {
   font-weight: 600;
   font-size: 13px;
 }
-input,
-select {
+.login-card input,
+.login-card select {
   width: 100%;
   height: 44px;
   border-radius: 10px;
@@ -131,7 +131,7 @@ select {
   outline: none;
   transition: box-shadow 0.2s ease;
 }
-input:focus {
+.login-card input:focus {
   box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.16);
 }
 

@@ -1112,30 +1112,28 @@ export default function FormularioEntrevista() {
           {paso === 5 && (
             <fieldset>
               <legend>Términos</legend>
-              <div className="entrevista__mensaje-confidencialidad">
-                <p>
+              <div className="entrevista__terminos-container">
+                <p className="entrevista__terminos-texto">
                   Toda la información proporcionada en este formulario será
                   utilizada únicamente con fines terapéuticos y de evaluación
                   profesional. Los datos se mantendrán bajo estricta
                   confidencialidad, conforme a las normas de protección de datos
                   personales.
                 </p>
-              </div>
-              <div className="entrevista__terminos-container">
-                <input
-                  id="aceptar_terminos"
-                  className="entrevista__checkbox"
-                  type="checkbox"
-                  checked={datos.aceptar_terminos}
-                  onChange={(e) =>
-                    actualizarCampo("aceptar_terminos", e.target.checked)
-                  }
-                />
                 <label
-                  className="entrevista__label-terminos"
+                  className="entrevista__terminos-opcion"
                   htmlFor="aceptar_terminos"
                 >
-                  Acepto los términos y condiciones
+                  <input
+                    id="aceptar_terminos"
+                    className="entrevista__checkbox entrevista__checkbox--terminos"
+                    type="checkbox"
+                    checked={datos.aceptar_terminos}
+                    onChange={(e) =>
+                      actualizarCampo("aceptar_terminos", e.target.checked)
+                    }
+                  />
+                  <span>Acepto los términos y condiciones</span>
                 </label>
               </div>
               {errores.aceptar_terminos && (
