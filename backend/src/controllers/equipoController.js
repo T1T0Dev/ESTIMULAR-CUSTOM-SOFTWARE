@@ -646,8 +646,8 @@ async function crearIntegrante(req, res) {
 		const nombreSanitizado = typeof nombre === 'string' ? nombre.trim() : '';
 		const apellidoSanitizado = typeof apellido === 'string' ? apellido.trim() : '';
 		const fechaSanitizada = typeof fecha_nacimiento === 'string' ? fecha_nacimiento.trim() : '';
-		const nombreFinal = nombreSanitizado || 'Pendiente';
-		const apellidoFinal = apellidoSanitizado || 'Integrante';
+		const nombreFinal = nombreSanitizado || '';
+		const apellidoFinal = apellidoSanitizado || '';
 		const fechaFinal = fechaSanitizada
 			? new Date(fechaSanitizada).toISOString().slice(0, 10)
 			: null;
