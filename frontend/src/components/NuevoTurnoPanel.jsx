@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
 import axios from 'axios';
 import API_BASE_URL from '../constants/api';
@@ -6,7 +6,6 @@ import '../styles/NuevoTurnoPanel.css';
 
 const ESTADOS_TURNO = [
   { value: 'pendiente', label: 'Pendiente' },
-  { value: 'confirmado', label: 'Confirmado' },
   { value: 'completado', label: 'Completado' },
   { value: 'cancelado', label: 'Cancelado' },
 ];
@@ -15,6 +14,11 @@ const formatProfesionalNombre = (prof) =>
   [prof?.nombre, prof?.apellido].filter(Boolean).join(' ').trim();
 
 const pad2 = (value) => String(value).padStart(2, '0');
+
+const capitalizeFirst = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
 
 const toDateInputValue = (dateLike) => {
   if (!dateLike) return '';
@@ -93,6 +97,8 @@ export default function NuevoTurnoPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const modalRef = useRef(null);
 
   const departamentoBloqueado = Boolean(prefillData?.departamento_bloqueado);
 
@@ -139,14 +145,6 @@ export default function NuevoTurnoPanel({
     const final = Number((precioOriginalNumber * (1 - obraSocialDescuento)).toFixed(2));
     return final < 0 ? 0 : final;
   }, [precioOriginalNumber, obraSocialDescuento]);
-
-  const ahorroCalculado = useMemo(() => {
-    if (precioOriginalNumber === null) return null;
-    if (!obraSocialDescuento) return null;
-    const diferencia = precioOriginalNumber - precioConDescuento;
-    if (!Number.isFinite(diferencia) || Number.isNaN(diferencia)) return null;
-    return diferencia > 0 ? Number(diferencia.toFixed(2)) : null;
-  }, [precioOriginalNumber, precioConDescuento, obraSocialDescuento]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -264,6 +262,7 @@ export default function NuevoTurnoPanel({
       setNinoResultados([]);
       setErrorMessage('');
       setSuccessMessage('');
+      setRepeatEnabled(false);
     }
   }, [isOpen, defaultDate]);
 
@@ -324,6 +323,9 @@ export default function NuevoTurnoPanel({
 
       return next;
     });
+
+    const repeatCount = Number(prefillData.repetir_semanas);
+    setRepeatEnabled(Number.isFinite(repeatCount) && repeatCount > 0);
 
     setErrorMessage('');
     setSuccessMessage('');
@@ -399,6 +401,35 @@ export default function NuevoTurnoPanel({
     return Array.from(mapa.values());
   }, [formData.departamento_id, formData.profesional_ids, formOptions.profesionales]);
 
+  const dropdownDisabled = profesionalesFiltrados.length === 0;
+
+  const repeatSummaryText = useMemo(() => {
+    if (!repeatEnabled) return '';
+
+    const weeksNumber = Number(formData.repetir_semanas);
+    if (!Number.isFinite(weeksNumber) || weeksNumber <= 0) return '';
+    if (!formData.date || !formData.startTime) return '';
+
+    const baseDate = moment(formData.date, 'YYYY-MM-DD');
+    if (!baseDate.isValid()) return '';
+
+    const weekday = capitalizeFirst(baseDate.locale('es').format('dddd'));
+    let summary = `El turno se repetira por los proximos ${weeksNumber} ${weekday} a las ${formData.startTime}`;
+    if (formData.semana_por_medio) {
+      summary += ' dejando una semana de por medio.';
+    } else {
+      summary += '.';
+    }
+
+    return summary;
+  }, [
+    repeatEnabled,
+    formData.repetir_semanas,
+    formData.date,
+    formData.startTime,
+    formData.semana_por_medio,
+  ]);
+
   const handleInputChange = (event) => {
     const { name, value, type, checked } = event.target;
     setFormData((prev) => ({
@@ -416,21 +447,6 @@ export default function NuevoTurnoPanel({
     }));
   };
 
-  const toggleProfesional = (idProfesional) => {
-    setFormData((prev) => {
-      const exists = prev.profesional_ids.includes(idProfesional);
-      if (exists) {
-        return {
-          ...prev,
-          profesional_ids: prev.profesional_ids.filter((id) => id !== idProfesional),
-        };
-      }
-      return {
-        ...prev,
-        profesional_ids: [...prev.profesional_ids, idProfesional],
-      };
-    });
-  };
 
   const handleSelectNino = (nino) => {
     setSelectedNino(nino);
@@ -452,6 +468,61 @@ export default function NuevoTurnoPanel({
     setErrorMessage('');
     setSuccessMessage('');
   };
+
+  const handleProfesionalChange = (event) => {
+    const { value } = event.target;
+    const idNumber = Number(value);
+
+    setFormData((prev) => ({
+      ...prev,
+      profesional_ids: value && !Number.isNaN(idNumber) ? [idNumber] : [],
+    }));
+
+    resetMessages();
+  };
+
+  const handleRepeatToggle = () => {
+    setRepeatEnabled((prevEnabled) => {
+      const nextEnabled = !prevEnabled;
+
+      setFormData((prev) => {
+        if (nextEnabled) {
+          const currentCountNumber = Number(prev.repetir_semanas);
+          const nextCount =
+            Number.isFinite(currentCountNumber) && currentCountNumber > 0
+              ? String(currentCountNumber)
+              : '1';
+          return {
+            ...prev,
+            repetir_semanas: nextCount,
+          };
+        }
+
+        return {
+          ...prev,
+          repetir_semanas: '',
+          semana_por_medio: false,
+        };
+      });
+
+      return nextEnabled;
+    });
+
+    resetMessages();
+  };
+
+  const handleClose = useCallback(() => {
+    if (isSubmitting) return;
+    if (onClose) onClose();
+  }, [isSubmitting, onClose]);
+
+  const handleOverlayClick = useCallback(
+    (event) => {
+      if (event.target !== event.currentTarget) return;
+      handleClose();
+    },
+    [handleClose]
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -577,406 +648,446 @@ export default function NuevoTurnoPanel({
   }
 
   return (
-    <div className="nuevo-turno-overlay" role="dialog" aria-modal="true">
-      <div className="nuevo-turno-panel">
-        <div className="nuevo-turno-header">
-          <h2>Crear nuevo turno</h2>
-          <button type="button" className="close-button" onClick={onClose} aria-label="Cerrar">
+    <div
+      className="nuevo-turno-overlay"
+      role="dialog"
+      aria-modal="true"
+      onClick={handleOverlayClick}
+    >
+      <div
+        className="nuevo-turno-modal"
+        ref={modalRef}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="nuevo-turno-head">
+          <h2 className="nuevo-turno-title">Crear nuevo turno</h2>
+          <button
+            type="button"
+            className="nuevo-turno-close"
+            onClick={handleClose}
+            aria-label="Cerrar"
+          >
             ×
           </button>
         </div>
 
-        {isLoadingForm ? (
-          <div className="nuevo-turno-loading">Cargando información…</div>
-        ) : (
-          <form className="nuevo-turno-form" onSubmit={handleSubmit}>
-            {errorMessage && <div className="nuevo-turno-alert error">{errorMessage}</div>}
-            {successMessage && <div className="nuevo-turno-alert success">{successMessage}</div>}
-            {Array.isArray(prefillData?.profesionales_resumen) &&
-              prefillData.profesionales_resumen.length > 0 && (
-                <div className="nuevo-turno-alert info">
-                  {serviciosResumen && (
-                    <p className="multi-turno-services">
-                      Servicios incluidos: <strong>{serviciosResumen}</strong>
-                    </p>
-                  )}
-                  <div className="multi-turno-title">Profesionales confirmados</div>
-                  <ul className="multi-turno-list">
-                    {prefillData.profesionales_resumen.map((prof) => (
-                      <li key={prof.id_profesional}>
-                        <strong>{prof.nombre_completo}</strong>
-                        {Array.isArray(prof.departamentos) && prof.departamentos.length > 0 && (
-                          <span className="multi-turno-departamentos">
-                            {" "}
-                            · {prof.departamentos.join(", ")}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  {Array.isArray(prefillData.departamentos_resumen) &&
-                    prefillData.departamentos_resumen.length > 1 && (
-                      <p className="multi-turno-hint">
-                        Este turno reúne {prefillData.departamentos_resumen.length} servicios simultáneamente.
+        <div className="nuevo-turno-body">
+          {isLoadingForm ? (
+            <div className="nuevo-turno-loading">Cargando información…</div>
+          ) : (
+            <form className="nuevo-turno-form" onSubmit={handleSubmit}>
+              {errorMessage && <div className="nuevo-turno-alert error">{errorMessage}</div>}
+              {successMessage && <div className="nuevo-turno-alert success">{successMessage}</div>}
+
+              {Array.isArray(prefillData?.profesionales_resumen) &&
+                prefillData.profesionales_resumen.length > 0 && (
+                  <div className="nuevo-turno-alert info">
+                    {serviciosResumen && (
+                      <p className="multi-turno-services">
+                        Servicios incluidos: <strong>{serviciosResumen}</strong>
                       </p>
                     )}
-                </div>
-              )}
-
-            <div className="form-section">
-              <label htmlFor="nino">Niño/a</label>
-              <div className="autocomplete-wrapper">
-                <input
-                  id="nino"
-                  type="text"
-                  value={ninoQuery}
-                  onChange={(event) => {
-                    setNinoQuery(event.target.value);
-                    resetMessages();
-                  }}
-                  placeholder="Buscar por nombre, apellido o DNI"
-                  autoComplete="off"
-                  disabled={ninoBloqueado}
-                  readOnly={ninoBloqueado}
-                />
-                {selectedNino && !ninoBloqueado && (
-                  <button
-                    type="button"
-                    className="clear-button"
-                    onClick={handleClearNino}
-                    aria-label="Quitar niño seleccionado"
-                  >
-                    ×
-                  </button>
-                )}
-                {!isSearchingNinos && ninoResultados.length > 0 && (
-                  <ul className="autocomplete-list">
-                    {ninoResultados.map((nino) => {
-                      const descuentoValor = clampDiscount(
-                        nino.paciente_obra_social_descuento ?? nino.obra_social?.descuento
-                      );
-                      const obraSocialNombre =
-                        nino.paciente_obra_social ||
-                        nino.obra_social?.nombre_obra_social ||
-                        'Sin obra social';
-                      const descuentoLabel =
-                        descuentoValor > 0 ? `${Math.round(descuentoValor * 100)}% OFF` : null;
-
-                      return (
-                        <li key={nino.paciente_id || nino.id_nino}>
-                          <button type="button" onClick={() => handleSelectNino(nino)}>
-                            <span className="nombre">
-                              {[
-                                nino.paciente_nombre,
-                                nino.paciente_apellido,
-                              ]
-                                .filter(Boolean)
-                                .join(' ')
-                                .trim() || 'Sin nombre'}
-                            </span>
-                            <span className="detalle">
-                              DNI: {nino.paciente_dni || '—'} · Obra social: {obraSocialNombre}
-                              {descuentoLabel && (
-                                <span className="detalle-descuento"> · {descuentoLabel}</span>
-                              )}
-                            </span>
-                          </button>
+                    <div className="multi-turno-title">Profesionales confirmados</div>
+                    <ul className="multi-turno-list">
+                      {prefillData.profesionales_resumen.map((prof) => (
+                        <li key={prof.id_profesional}>
+                          <strong>{prof.nombre_completo}</strong>
+                          {Array.isArray(prof.departamentos) && prof.departamentos.length > 0 && (
+                            <span className="multi-turno-departamentos"> · {prof.departamentos.join(', ')}</span>
+                          )}
                         </li>
-                      );
-                    })}
-                  </ul>
+                      ))}
+                    </ul>
+                    {Array.isArray(prefillData.departamentos_resumen) &&
+                      prefillData.departamentos_resumen.length > 1 && (
+                        <p className="multi-turno-hint">
+                          Este turno reúne {prefillData.departamentos_resumen.length} servicios simultáneamente.
+                        </p>
+                      )}
+                  </div>
                 )}
-              </div>
-              {isSearchingNinos && <p className="autocomplete-hint">Buscando…</p>}
-              {selectedNino && (
-                <div className="selected-nino-details">
-                  <p>
-                    <strong>Obra social:</strong>{' '}
-                    {selectedNino.paciente_obra_social || 'Sin obra social'}
-                    {obraSocialDescuento > 0 && (
-                      <span className="selected-nino-discount">
-                        {' '}
-                        ({porcentajeDescuento}% de descuento)
-                      </span>
-                    )}
-                  </p>
-                  <p>
-                    <strong>Responsables:</strong>{' '}
-                    {selectedNino.paciente_responsables
-                      ?.map((resp) => {
-                        const nombre = [resp.nombre, resp.apellido]
-                          .filter(Boolean)
-                          .join(' ')
-                          .trim();
-                        if (nombre && resp.parentesco) {
-                          return `${nombre} (${resp.parentesco})`;
-                        }
-                        return nombre || resp.parentesco || null;
-                      })
-                      .filter(Boolean)
-                      .join(', ') || 'Sin responsables registrados'}
-                  </p>
-                  {selectedNino.paciente_cud && selectedNino.paciente_cud !== 'No posee' && (
-                    <p className="badge">Posee CUD</p>
+
+              <div className="form-section">
+                <label htmlFor="nino">Niño/a</label>
+                <div className="autocomplete-wrapper">
+                  <input
+                    id="nino"
+                    type="text"
+                    value={ninoQuery}
+                    onChange={(event) => {
+                      setNinoQuery(event.target.value);
+                      resetMessages();
+                    }}
+                    placeholder="Buscar por nombre, apellido o DNI"
+                    autoComplete="off"
+                    disabled={ninoBloqueado}
+                    readOnly={ninoBloqueado}
+                  />
+                  {selectedNino && !ninoBloqueado && (
+                    <button
+                      type="button"
+                      className="clear-button"
+                      onClick={handleClearNino}
+                      aria-label="Quitar niño seleccionado"
+                    >
+                      ×
+                    </button>
+                  )}
+                  {!isSearchingNinos && ninoResultados.length > 0 && (
+                    <ul className="autocomplete-list">
+                      {ninoResultados.map((nino) => {
+                        const descuentoValor = clampDiscount(
+                          nino.paciente_obra_social_descuento ?? nino.obra_social?.descuento
+                        );
+                        const obraSocialNombre =
+                          nino.paciente_obra_social ||
+                          nino.obra_social?.nombre_obra_social ||
+                          'Sin obra social';
+                        const descuentoLabel =
+                          descuentoValor > 0 ? `${Math.round(descuentoValor * 100)}% OFF` : null;
+
+                        return (
+                          <li key={nino.paciente_id || nino.id_nino}>
+                            <button type="button" onClick={() => handleSelectNino(nino)}>
+                              <span className="nombre">
+                                {[
+                                  nino.paciente_nombre,
+                                  nino.paciente_apellido,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')
+                                  .trim() || 'Sin nombre'}
+                              </span>
+                              <span className="detalle">
+                                DNI: {nino.paciente_dni || '—'} · Obra social: {obraSocialNombre}
+                                {descuentoLabel && (
+                                  <span className="detalle-descuento"> · {descuentoLabel}</span>
+                                )}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </div>
-              )}
-            </div>
+                {isSearchingNinos && <p className="autocomplete-hint">Buscando…</p>}
+                {selectedNino && (
+                  <div className="selected-nino-details">
+                    <p>
+                      <strong>Obra social:</strong>{' '}
+                      {selectedNino.paciente_obra_social || 'Sin obra social'}
+                      {obraSocialDescuento > 0 && (
+                        <span className="selected-nino-discount">
+                          {' '}
+                          ({porcentajeDescuento}% de descuento)
+                        </span>
+                      )}
+                    </p>
+                    <p>
+                      <strong>Responsables:</strong>{' '}
+                      {selectedNino.paciente_responsables
+                        ?.map((resp) => {
+                          const nombre = [resp.nombre, resp.apellido]
+                            .filter(Boolean)
+                            .join(' ')
+                            .trim();
+                          if (nombre && resp.parentesco) {
+                            return `${nombre} (${resp.parentesco})`;
+                          }
+                          return nombre || resp.parentesco || null;
+                        })
+                        .filter(Boolean)
+                        .join(', ') || 'Sin responsables registrados'}
+                    </p>
+                    {selectedNino.paciente_cud && selectedNino.paciente_cud !== 'No posee' && (
+                      <p className="badge">Posee CUD</p>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            <div className="form-grid">
-              {!departamentoBloqueado && (
+              <div className="form-grid">
+                {!departamentoBloqueado && (
+                  <div className="form-section">
+                    <label htmlFor="departamento_id">Servicio</label>
+                    <select
+                      id="departamento_id"
+                      name="departamento_id"
+                      value={formData.departamento_id}
+                      onChange={(event) => {
+                        handleInputChange(event);
+                        resetMessages();
+                      }}
+                      required
+                    >
+                      <option value="">Seleccionar servicio</option>
+                      {formOptions.departamentos.map((dep) => (
+                        <option key={dep.id_departamento} value={dep.id_departamento}>
+                          {dep.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {formData.departamento_id && (
+                      <p className="field-hint">
+                        Duración sugerida: {
+                          formOptions.departamentos.find(
+                            (dep) => String(dep.id_departamento) === String(formData.departamento_id)
+                          )?.duracion_default_min || '—'
+                        }{' '}
+                        minutos
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="form-section">
-                  <label htmlFor="departamento_id">Servicio</label>
+                  <label htmlFor="consultorio_id">Consultorio</label>
                   <select
-                    id="departamento_id"
-                    name="departamento_id"
-                    value={formData.departamento_id}
+                    id="consultorio_id"
+                    name="consultorio_id"
+                    value={formData.consultorio_id}
+                    onChange={(event) => {
+                      handleInputChange(event);
+                      resetMessages();
+                    }}
+                    disabled={departamentoBloqueado}
+                  >
+                    <option value="">Sin asignar</option>
+                    {formOptions.consultorios.map((consultorio) => (
+                      <option key={consultorio.id} value={consultorio.id}>
+                        {consultorio.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {departamentoBloqueado && formData.consultorio_id && (
+                    <p className="field-hint">
+                      Este consultorio se mantendrá para el turno combinado.
+                    </p>
+                  )}
+                </div>
+
+                <div className="form-section">
+                  <label htmlFor="date">Fecha</label>
+                  <input
+                    id="date"
+                    name="date"
+                    type="date"
+                    value={formData.date}
                     onChange={(event) => {
                       handleInputChange(event);
                       resetMessages();
                     }}
                     required
-                  >
-                    <option value="">Seleccionar servicio</option>
-                    {formOptions.departamentos.map((dep) => (
-                      <option key={dep.id_departamento} value={dep.id_departamento}>
-                        {dep.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  {formData.departamento_id && (
-                    <p className="field-hint">
-                      Duración sugerida: {
-                        formOptions.departamentos.find(
-                          (dep) => String(dep.id_departamento) === String(formData.departamento_id)
-                        )?.duracion_default_min || '—'
-                      }{' '}
-                      minutos
-                    </p>
-                  )}
+                  />
                 </div>
-              )}
 
-              <div className="form-section">
-                <label htmlFor="consultorio_id">Consultorio</label>
-                <select
-                  id="consultorio_id"
-                  name="consultorio_id"
-                  value={formData.consultorio_id}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                  disabled={departamentoBloqueado}
-                >
-                  <option value="">Sin asignar</option>
-                  {formOptions.consultorios.map((consultorio) => (
-                    <option key={consultorio.id} value={consultorio.id}>
-                      {consultorio.nombre}
-                    </option>
-                  ))}
-                </select>
-                {departamentoBloqueado && formData.consultorio_id && (
-                  <p className="field-hint">
-                    Este consultorio se mantendrá para el turno combinado.
-                  </p>
-                )}
-              </div>
-
-              <div className="form-section">
-                <label htmlFor="date">Fecha</label>
-                <input
-                  id="date"
-                  name="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                  required
-                />
-              </div>
-
-              <div className="form-section">
-                <label htmlFor="startTime">Hora de inicio</label>
-                <input
-                  id="startTime"
-                  name="startTime"
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                  required
-                />
-              </div>
-
-              <div className="form-section">
-                <label htmlFor="duracion_min">Duración (minutos)</label>
-                <input
-                  id="duracion_min"
-                  name="duracion_min"
-                  type="number"
-                  min="5"
-                  step="5"
-                  value={formData.duracion_min}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                  required
-                />
-              </div>
-
-              {!departamentoBloqueado && (
                 <div className="form-section">
-                  <label>Profesionales</label>
-                  <div className="profesionales-list">
-                    {profesionalesFiltrados.length === 0 ? (
-                      <p className="field-hint">No hay profesionales para este servicio.</p>
-                    ) : (
-                      profesionalesFiltrados.map((prof) => (
-                        <label key={prof.id_profesional} className="checkbox-item">
-                          <input
-                            type="checkbox"
-                            value={prof.id_profesional}
-                            checked={formData.profesional_ids.includes(Number(prof.id_profesional))}
-                            onChange={() => {
-                              toggleProfesional(Number(prof.id_profesional));
-                              resetMessages();
-                            }}
-                          />
-                          <span>{prof.nombre_completo}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="form-grid">
-              <div className="form-section">
-                <label htmlFor="estado">Estado</label>
-                <select
-                  id="estado"
-                  name="estado"
-                  value={formData.estado}
-                  onChange={(event) => {
-                    handleInputChange(event);
-                    resetMessages();
-                  }}
-                >
-                  {ESTADOS_TURNO.map((estado) => (
-                    <option key={estado.value} value={estado.value}>
-                      {estado.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-section">
-                <label htmlFor="precio">Precio</label>
-                <input
-                  id="precio"
-                  name="precio"
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.precio}
-                  onChange={(event) => {
-                    handleNumeroChange(event);
-                    resetMessages();
-                  }}
-                  placeholder="Ej: 4500"
-                />
-                {selectedNino && obraSocialDescuento > 0 && precioOriginalNumber !== null && (
-                  <div className="price-discount-preview">
-                    <span className="price-original">
-                      {formatCurrency(precioOriginalNumber)}
-                    </span>
-                    <span className="price-arrow" aria-hidden="true">→</span>
-                    <span className="price-discounted">
-                      {formatCurrency(precioConDescuento)}
-                    </span>
-                    <span className="price-discount-note">
-                      {porcentajeDescuento}% OFF por obra social
-                    </span>
-                    {ahorroCalculado !== null && (
-                      <span className="price-savings">
-                        Ahorro: {formatCurrency(ahorroCalculado)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {!departamentoBloqueado && (
-              <div className="form-section">
-                <label htmlFor="repetir_semanas">Repetir semanalmente</label>
-                <div className="repeat-weekly-inputs">
+                  <label htmlFor="startTime">Hora de inicio</label>
                   <input
-                    id="repetir_semanas"
-                    name="repetir_semanas"
-                    type="number"
-                    min="0"
-                    max="52"
-                    step="1"
-                    value={formData.repetir_semanas}
+                    id="startTime"
+                    name="startTime"
+                    type="time"
+                    value={formData.startTime}
                     onChange={(event) => {
                       handleInputChange(event);
                       resetMessages();
                     }}
-                    placeholder="0"
+                    required
                   />
-                  <label className="repeat-checkbox" htmlFor="semana_por_medio">
-                    <input
-                      id="semana_por_medio"
-                      name="semana_por_medio"
-                      type="checkbox"
-                      checked={Boolean(formData.semana_por_medio)}
-                      onChange={(event) => {
-                        handleInputChange(event);
-                        resetMessages();
-                      }}
-                    />
-                    Crear semana por medio
-                  </label>
-                  <span className="repeat-hint">
-                    Semanas adicionales después de la fecha seleccionada (0 = sin repetición). Si marcas
-                    «Semana por medio» se crearán cada dos semanas.
-                  </span>
+                </div>
+
+                <div className="form-section">
+                  <label htmlFor="duracion_min">Duración (minutos)</label>
+                  <input
+                    id="duracion_min"
+                    name="duracion_min"
+                    type="number"
+                    min="5"
+                    step="5"
+                    value={formData.duracion_min}
+                    onChange={(event) => {
+                      handleInputChange(event);
+                      resetMessages();
+                    }}
+                    required
+                  />
+                </div>
+
+                {!departamentoBloqueado && (
+                  <div className="form-section">
+                    <label htmlFor="profesional_id">Seleccionar Profesional</label>
+                    <select
+                      id="profesional_id"
+                      name="profesional_id"
+                      value={
+                        formData.profesional_ids.length > 0
+                          ? String(formData.profesional_ids[0])
+                          : ''
+                      }
+                      onChange={handleProfesionalChange}
+                      disabled={dropdownDisabled}
+                    >
+                      <option value="">Sin asignar</option>
+                      {profesionalesFiltrados.map((profesional) => (
+                        <option
+                          key={profesional.id_profesional}
+                          value={profesional.id_profesional}
+                        >
+                          {profesional.nombre_completo}
+                        </option>
+                      ))}
+                    </select>
+                    {dropdownDisabled && (
+                      <p className="field-hint">No hay profesionales para este servicio.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-grid">
+                <div className="form-section">
+                  <label htmlFor="estado">Estado</label>
+                  <select
+                    id="estado"
+                    name="estado"
+                    value={formData.estado}
+                    onChange={(event) => {
+                      handleInputChange(event);
+                      resetMessages();
+                    }}
+                  >
+                    {ESTADOS_TURNO.map((estado) => (
+                      <option key={estado.value} value={estado.value}>
+                        {estado.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-section">
+                  <label htmlFor="precio">Precio</label>
+                  <input
+                    id="precio"
+                    name="precio"
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.precio}
+                    onChange={(event) => {
+                      handleNumeroChange(event);
+                      resetMessages();
+                    }}
+                    placeholder="Ej: 4500"
+                  />
+                  {selectedNino && obraSocialDescuento > 0 && precioOriginalNumber !== null && (
+                    <div className="price-discount-preview">
+                      <span className="price-original">
+                        {formatCurrency(precioOriginalNumber)}
+                      </span>
+                      <span className="price-arrow" aria-hidden="true">→</span>
+                      <span className="price-discounted">
+                        {formatCurrency(precioConDescuento)}
+                      </span>
+                      <span className="price-discount-note">
+                        {porcentajeDescuento}% cubierto por obra social
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
 
-            <div className="form-section">
-              <label htmlFor="notas">Notas</label>
-              <textarea
-                id="notas"
-                name="notas"
-                rows={3}
-                value={formData.notas}
-                onChange={(event) => {
-                  handleInputChange(event);
-                  resetMessages();
-                }}
-                placeholder="Observaciones adicionales para el turno"
-              />
-            </div>
+              {!departamentoBloqueado && (
+                <div className="form-section">
+                  <div className="repeat-weekly-section">
+                    <div className="repeat-weekly-header">
+                      <div className="repeat-toggle">
+                        <input
+                          id="repeat_enabled"
+                          type="checkbox"
+                          checked={repeatEnabled}
+                          onChange={handleRepeatToggle}
+                        />
+                        <label htmlFor="repeat_enabled">Repetir semanalmente</label>
+                      </div>
+                      {repeatEnabled && (
+                        <div className="repeat-count">
+                          <input
+                            id="repetir_semanas"
+                            name="repetir_semanas"
+                            type="number"
+                            min="1"
+                            max="52"
+                            step="1"
+                            value={formData.repetir_semanas}
+                            onChange={(event) => {
+                              handleInputChange(event);
+                              resetMessages();
+                            }}
+                            placeholder="1"
+                          />
+                          <span>semanas</span>
+                        </div>
+                      )}
+                    </div>
+                    {repeatEnabled && (
+                      <>
+                        <div className="repeat-checkbox">
+                          <input
+                            id="semana_por_medio"
+                            name="semana_por_medio"
+                            type="checkbox"
+                            checked={Boolean(formData.semana_por_medio)}
+                            onChange={(event) => {
+                              handleInputChange(event);
+                              resetMessages();
+                            }}
+                          />
+                          <label htmlFor="semana_por_medio">Crear semana por medio</label>
+                        </div>
+                        <span className="repeat-hint">
+                          Cantidad de semanas adicionales después de la fecha seleccionada. Si marcás «Semana por
+                          medio» se crearán cada dos semanas.
+                        </span>
+                        {repeatSummaryText && (
+                          <p className="repeat-summary">{repeatSummaryText}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
-            <div className="nuevo-turno-actions">
-              <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? 'Creando…' : 'Crear turno'}
-              </button>
-            </div>
-          </form>
-        )}
+              <div className="form-section">
+                <label htmlFor="notas">Notas</label>
+                <textarea
+                  id="notas"
+                  name="notas"
+                  rows={3}
+                  value={formData.notas}
+                  onChange={(event) => {
+                    handleInputChange(event);
+                    resetMessages();
+                  }}
+                  placeholder="Observaciones adicionales para el turno"
+                />
+              </div>
+
+              <div className="nuevo-turno-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creando…' : 'Crear turno'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
