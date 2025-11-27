@@ -279,9 +279,11 @@ export default function EquipoEstimular() {
                 </option>
               ))}
             </select>
-            <button className="btn primary" onClick={() => setModalOpen(true)}>
-              <MdGroupAdd /> Nuevo integrante
-            </button>
+            {isAdmin && (
+              <button className="btn primary" onClick={() => setModalOpen(true)}>
+                <MdGroupAdd /> Nuevo integrante
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -837,7 +839,7 @@ export default function EquipoEstimular() {
         )}
       </div>
 
-      {modalOpen && (
+      {modalOpen && isAdmin && (
         <CrearIntegrante
           onClose={() => setModalOpen(false)}
           onCreated={async () => {

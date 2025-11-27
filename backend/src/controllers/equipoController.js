@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../config/db');
 const {
 	resolveStorageAsset,
@@ -12,6 +13,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const RECEPCION_ROLE_NAMES = ['Recepción', 'Recepcion', 'Recepcionista', 'Secretario', 'Secretaria'];
 const PROFESSIONAL_ROLE_NAMES = ['Profesional', 'PROFESIONAL'];
 const PASSWORD_FORBIDDEN_PATTERNS = [/("|'|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 
 function normalize(value) {
 	if (value === undefined || value === null) return '';
@@ -20,6 +22,10 @@ function normalize(value) {
 		.replace(/[\u0300-\u036f]/g, '')
 		.toLowerCase()
 		.trim();
+}
+
+function isAdminRoleName(value) {
+	return normalize(value).includes('admin');
 }
 
 function normalizeTipo(value) {
@@ -59,6 +65,31 @@ function normalizePhone(phone) {
 	if (phone === undefined || phone === null) return null;
 	const trimmed = String(phone).trim();
 	return trimmed || null;
+}
+
+function extractToken(req) {
+	const auth = req.headers?.authorization || '';
+	return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+async function userIsAdmin(userId) {
+	if (!userId) return false;
+	try {
+		const { data, error } = await supabaseAdmin
+			.from('usuario_roles')
+			.select('rol:roles ( id_rol, nombre_rol )')
+			.eq('usuario_id', Number(userId));
+
+		if (error) {
+			console.error('userIsAdmin roles error:', error);
+			return false;
+		}
+
+		return (data || []).some((row) => isAdminRoleName(row?.rol?.nombre_rol));
+	} catch (err) {
+		console.error('userIsAdmin exception:', err);
+		return false;
+	}
 }
 
 async function ensureDniAvailable(dni, excludeUserId) {
@@ -537,6 +568,40 @@ async function crearIntegrante(req, res) {
 		esAdmin,
 		admin,
 	} = body;
+
+	const token = extractToken(req);
+	let requesterId = null;
+	if (token) {
+		try {
+			const payload = jwt.verify(token, JWT_SECRET);
+			requesterId = payload?.id ?? null;
+		} catch (err) {
+			console.warn('crearIntegrante token inválido:', err.message);
+		}
+	}
+
+	if (!requesterId) {
+		const headerIdRaw = req.headers['x-user-id'];
+		const parsedHeaderId = Number.parseInt(headerIdRaw, 10);
+		if (!Number.isNaN(parsedHeaderId)) {
+			requesterId = parsedHeaderId;
+		}
+	}
+
+	if (!requesterId) {
+		return res.status(401).json({
+			success: false,
+			message: 'Credenciales no válidas para crear integrantes',
+		});
+	}
+
+	const requesterIsAdmin = await userIsAdmin(requesterId);
+	if (!requesterIsAdmin) {
+		return res.status(403).json({
+			success: false,
+			message: 'No tiene permisos para crear integrantes',
+		});
+	}
 
 	if (!nombre || !apellido || !dni || !contrasena || !fecha_nacimiento) {
 		return res.status(400).json({
