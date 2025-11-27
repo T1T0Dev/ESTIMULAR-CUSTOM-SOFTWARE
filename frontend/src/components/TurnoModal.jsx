@@ -227,7 +227,7 @@ export default function TurnoModal({
               <div className="modal-actions-grid">
                 <button
                   className="btn-confirm"
-                  onClick={createStatusHandler("completado")}
+                  onClick={createStatusHandler("completado", true)}
                   disabled={turno.estado === "completado" || turno.estado === "confirmado"}
                 >
                   Confirmar Asistencia
