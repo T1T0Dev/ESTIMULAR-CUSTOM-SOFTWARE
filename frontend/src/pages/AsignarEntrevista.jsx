@@ -334,6 +334,8 @@ export default function AsignarEntrevista() {
 
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+  const isProfesional = user?.roles?.some(role => role.nombre?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === 'profesional');
 
   const loggedInProfesionalId = useMemo(() => {
     if (profile?.id_profesional) {
@@ -927,27 +929,31 @@ export default function AsignarEntrevista() {
                           </td>
                           <td className="col-actions">
                             <div className="row-actions">
-                              <button
-                                className="icon-btn success"
-                                title={asig ? "Cambiar turno" : "Asignar turno"}
-                                onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
-                              >
-                                {asig ? (
-                                  <MdChangeCircle size={20} />
-                                ) : (
-                                  <MdEventAvailable size={20} />
-                                )}
-                              </button>
-                              {asig && (
-                                <button
-                                  className="icon-btn danger"
-                                  title="Quitar asignación"
-                                  onClick={() =>
-                                    quitarAsignacion(asig.id, c.id_nino)
-                                  }
-                                >
-                                  <MdDelete size={18} />
-                                </button>
+                              {(isAdmin || isProfesional) && (
+                                <>
+                                  <button
+                                    className="icon-btn success"
+                                    title={asig ? "Cambiar turno" : "Asignar turno"}
+                                    onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
+                                  >
+                                    {asig ? (
+                                      <MdChangeCircle size={20} />
+                                    ) : (
+                                      <MdEventAvailable size={20} />
+                                    )}
+                                  </button>
+                                  {asig && (
+                                    <button
+                                      className="icon-btn danger"
+                                      title="Quitar asignación"
+                                      onClick={() =>
+                                        quitarAsignacion(asig.id, c.id_nino)
+                                      }
+                                    >
+                                      <MdDelete size={18} />
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </div>
                           </td>

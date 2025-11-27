@@ -85,7 +85,7 @@ const registrarUsuario = async (req, res) => {
 
     const { data: usuarioInsertado, error: insertError } = await supabase
       .from("usuarios")
-      .insert({ dni, password_hash: hash })
+      .insert({ dni, password_hash: hash, primer_registro_completado: false })
       .select("id_usuario, dni, activo")
       .single();
 

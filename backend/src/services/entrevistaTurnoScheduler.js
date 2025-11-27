@@ -1,7 +1,7 @@
 const { supabaseAdmin } = require('../config/db');
 
 const EXCLUDED_DEPARTMENT_STATES = new Set(['finalizado', 'finalizada', 'cerrado', 'cerrada', 'cancelado', 'cancelada', 'baja']);
-const ACTIVE_TURNO_STATES = new Set(['pendiente', 'confirmado']);
+const ACTIVE_TURNO_STATES = new Set(['pendiente']);
 const IGNORE_TURNO_STATES = new Set(['cancelado', 'cancelada']);
 
 const DEFAULT_SLOT_MINUTES = 30;

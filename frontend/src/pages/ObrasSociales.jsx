@@ -6,6 +6,7 @@ import { MdEdit, MdDelete } from "react-icons/md";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import CrearObraSocial from "../components/CrearObraSocial";
 import API_BASE_URL from "../constants/api";
+import useAuthStore from "../store/useAuthStore";
 
 const sanitizeNombreObra = (value) => {
   if (!value) return "";
@@ -32,6 +33,9 @@ function useDebounce(value, delay) {
 }
 
 export default function ObrasSociales() {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -154,15 +158,17 @@ export default function ObrasSociales() {
                 </option>
               ))}
             </select>
-            <button
-              className="btn primary"
-              onClick={() => {
-                setModalData(null);
-                setModalOpen(true);
-              }}
-            >
-              + Agregar obra social
-            </button>
+            {isAdmin && (
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setModalData(null);
+                  setModalOpen(true);
+                }}
+              >
+                + Agregar obra social
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -366,70 +372,74 @@ export default function ObrasSociales() {
                               </>
                             ) : (
                               <>
-                                <button
-                                  className="icon-btn edit"
-                                  title="Editar"
-                                  onClick={() => {
-                                    setEditId(o.id_obra_social);
-                                    setEditData({
-                                      nombre_obra_social: sanitizeNombreObra(
-                                        o.nombre_obra_social
-                                      ),
-                                      estado: o.estado,
-                                    });
-                                  }}
-                                >
-                                  <MdEdit size={20} />
-                                </button>
-                                <button
-                                  className="icon-btn delete"
-                                  title="Eliminar"
-                                  onClick={async () => {
-                                    const result = await Swal.fire({
-                                      title: "¿Eliminar?",
-                                      text: "Esta acción no se puede deshacer.",
-                                      icon: "warning",
-                                      showCancelButton: true,
-                                      confirmButtonText: "Sí, eliminar",
-                                      cancelButtonText: "Cancelar",
-                                    });
-                                    if (result.isConfirmed) {
-                                      try {
-                                        Swal.fire({
-                                          title: "Eliminando...",
-                                          allowOutsideClick: false,
-                                          didOpen: () => Swal.showLoading(),
+                                {isAdmin && (
+                                  <>
+                                    <button
+                                      className="icon-btn edit"
+                                      title="Editar"
+                                      onClick={() => {
+                                        setEditId(o.id_obra_social);
+                                        setEditData({
+                                          nombre_obra_social: sanitizeNombreObra(
+                                            o.nombre_obra_social
+                                          ),
+                                          estado: o.estado,
                                         });
-                                        await axios.delete(
-                                          `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`
-                                        );
-                                        await fetchObras(
-                                          busqueda,
-                                          page,
-                                          estado
-                                        );
-                                        Swal.close();
-                                        Swal.fire({
-                                          icon: "success",
-                                          title: "Eliminado",
-                                          timer: 1200,
-                                          showConfirmButton: false,
+                                      }}
+                                    >
+                                      <MdEdit size={20} />
+                                    </button>
+                                    <button
+                                      className="icon-btn delete"
+                                      title="Eliminar"
+                                      onClick={async () => {
+                                        const result = await Swal.fire({
+                                          title: "¿Eliminar?",
+                                          text: "Esta acción no se puede deshacer.",
+                                          icon: "warning",
+                                          showCancelButton: true,
+                                          confirmButtonText: "Sí, eliminar",
+                                          cancelButtonText: "Cancelar",
                                         });
-                                      } catch (err) {
-                                        Swal.close();
-                                        Swal.fire({
-                                          icon: "error",
-                                          title: "Error",
-                                          text:
-                                            err?.response?.data?.message ||
-                                            "No se pudo eliminar",
-                                        });
-                                      }
-                                    }
-                                  }}
-                                >
-                                  <MdDelete size={20} />
-                                </button>
+                                        if (result.isConfirmed) {
+                                          try {
+                                            Swal.fire({
+                                              title: "Eliminando...",
+                                              allowOutsideClick: false,
+                                              didOpen: () => Swal.showLoading(),
+                                            });
+                                            await axios.delete(
+                                              `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`
+                                            );
+                                            await fetchObras(
+                                              busqueda,
+                                              page,
+                                              estado
+                                            );
+                                            Swal.close();
+                                            Swal.fire({
+                                              icon: "success",
+                                              title: "Eliminado",
+                                              timer: 1200,
+                                              showConfirmButton: false,
+                                            });
+                                          } catch (err) {
+                                            Swal.close();
+                                            Swal.fire({
+                                              icon: "error",
+                                              title: "Error",
+                                              text:
+                                                err?.response?.data?.message ||
+                                                "No se pudo eliminar",
+                                            });
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <MdDelete size={20} />
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>

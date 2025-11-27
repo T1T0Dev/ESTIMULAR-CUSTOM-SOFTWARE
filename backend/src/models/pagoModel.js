@@ -10,15 +10,22 @@ async function getPagosByTurnoId(turnoId) {
   return data;
 }
 
-async function updatePagoStatus(pagoId, estado) {
+async function updatePago(pagoId, updates = {}) {
+  const payload = { ...updates };
+  if (!payload || Object.keys(payload).length === 0) {
+    throw new Error('No fields to update for pago');
+  }
+
+  payload.actualizado_en = new Date().toISOString();
+
   const { data, error } = await supabase
-    .from("pagos")
-    .update({ estado })
-    .eq("id", pagoId)
-    .select("id");
+    .from('pagos')
+    .update(payload)
+    .eq('id', pagoId)
+    .select('id');
 
   if (error) throw error;
-  return { affectedRows: data ? data.length : 0 };
+  return { affectedRows: Array.isArray(data) ? data.length : 0 };
 }
 
 async function updateTurnoEstadoPago(turnoId, estado_pago) {
@@ -52,8 +59,44 @@ async function updateTurnoEstadoPago(turnoId, estado_pago) {
   return { affectedRows: data ? data.length : 0 };
 }
 
+async function getPagosPendientesByPacienteDni(pacienteDni) {
+  // First get turnos for this paciente
+  const { data: turnosData, error: turnosError } = await supabase
+    .from("turnos")
+    .select("id")
+    .eq("paciente_dni", pacienteDni);
+
+  if (turnosError) throw turnosError;
+  
+  if (!turnosData || turnosData.length === 0) {
+    return [];
+  }
+
+  const turnoIds = turnosData.map(t => t.id);
+
+  // Then get pagos pendientes for these turnos
+  const { data, error } = await supabase
+    .from("pagos")
+    .select(`
+      *,
+      turno:turnos!pagos_turno_id_fkey (
+        id,
+        paciente_dni,
+        paciente_nombre,
+        paciente_apellido,
+        fecha:DATE(inicio)
+      )
+    `)
+    .eq("estado", "pendiente")
+    .in("turno_id", turnoIds);
+
+  if (error) throw error;
+  return data || [];
+}
+
 module.exports = {
   getPagosByTurnoId,
-  updatePagoStatus,
+  updatePago,
   updateTurnoEstadoPago,
+  getPagosPendientesByPacienteDni,
 };

@@ -222,6 +222,14 @@
 
 .integrante-grid--credentials {
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.85rem 1.4rem;
+}
+
+.integrante-grid--roles {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.6rem 1.35rem;
+  align-items: stretch;
+  margin-top: 0.55rem;
 }
 
 @media (min-width: 1200px) {
@@ -363,6 +371,18 @@
   justify-content: center;
 }
 
+.integrante-summary--left {
+  justify-content: flex-start;
+}
+
+.integrante-helper--roles {
+  margin-top: 0.15rem;
+}
+
+.integrante-summary--roles {
+  margin-top: 0.5rem;
+}
+
 .integrante-chip {
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
@@ -385,6 +405,42 @@
   align-items: center;
   gap: 0.75rem;
   margin-top: 0.25rem;
+}
+
+.integrante-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 182, 193, 0.25);
+  border-radius: 999px;
+}
+
+.integrante-toggle-btn {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 182, 193, 0.35);
+  background: rgba(255, 182, 193, 0.12);
+  color: var(--color-text, #f2f2f2);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease,
+    background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.integrante-toggle-btn:hover {
+  border-color: var(--color-rosa1, #ff69b4);
+  background: rgba(255, 182, 193, 0.2);
+  box-shadow: 0 12px 24px rgba(255, 6, 176, 0.18);
+  transform: translateY(-1px);
+}
+
+.integrante-toggle-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-rosa2, #ff1493);
+  box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.28);
 }
 
 .integrante-btn {

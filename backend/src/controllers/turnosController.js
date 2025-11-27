@@ -1,4 +1,7 @@
 const { supabaseAdmin } = require('../config/db');
+const { sendCancellationEmail } = require('../services/emailService');
+const moment = require('moment');  // Agrega este require
+const path = require('path');  // Agrega esto si no está
 
 /**
  * Listar turnos con filtros.
@@ -96,4 +99,119 @@ const assignTurnosForCandidato = async (req, res) => {
     }
 };
 
-module.exports = { listTurnos, updateTurno, assignTurnosForCandidato };
+const cancelarTurno = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, body } = req.body;
+    if (!id || !subject || !body) return res.status(400).json({ success: false, message: 'Faltan datos' });
+
+    // Primero, obtener detalles del turno
+    const { data: turnoCompleto, error: turnoError } = await supabaseAdmin
+      .from('turnos')
+      .select('id, nino_id, inicio, fin')
+      .eq('id', Number(id))
+      .single();
+    if (turnoError || !turnoCompleto) return res.status(400).json({ success: false, message: 'Error obteniendo detalles del turno: ' + turnoError?.message });
+
+    // Actualizar turno a 'cancelado'
+    const { data, error } = await supabaseAdmin
+      .from('turnos')
+      .update({ estado: 'cancelado' })
+      .eq('id', Number(id))
+      .select('id, nino_id')
+      .single();
+    if (error) throw error;
+
+    // Obtener email y nombre del responsable a través de la tabla intermedia
+    const { data: relacion, error: relError } = await supabaseAdmin
+      .from('nino_responsables')
+      .select('id_responsable')
+      .eq('id_nino', data.nino_id)
+      .eq('es_principal', true);
+    if (relError) return res.status(400).json({ success: false, message: 'Error obteniendo relación nino-responsable: ' + relError.message });
+    if (!relacion || relacion.length === 0) return res.status(400).json({ success: false, message: 'No se encontró responsable principal para el niño' });
+
+    const responsableId = relacion[0].id_responsable;
+
+    const { data: responsable, error: respError } = await supabaseAdmin
+      .from('responsables')
+      .select('email, nombre, apellido')  // Agrega nombre y apellido
+      .eq('id_responsable', responsableId)
+      .single();
+    if (respError || !responsable?.email) return res.status(400).json({ success: false, message: 'Error obteniendo email del responsable: ' + respError?.message });
+
+    // Construir el HTML del email con estilos rosados, logo y diseño detallado
+    const htmlBody = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cancelación de Turno - Estimular</title>
+      </head>
+      <body style="margin: 20px; padding: 0; font-family: 'Arial', sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background: #f093c2ec; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+          <!-- Header con gradiente y logo -->
+          <div style="background: linear-gradient(45deg, #ff1493, #ff69b4); padding: 30px 20px; text-align: center; color: #fff;">
+            <img src="cid:logo" alt="Logo Estimular" style="width: 80px; height: 80px; border-radius: 50%; background: #fff; padding: 5px; margin-bottom: 15px;" />
+            <h1 style="margin: 0; font-size: 32px; font-weight: bold;">Estimular</h1>
+            <p style="margin: 5px 0; font-size: 18px;">Centro de Terapia y Desarrollo</p>
+          </div>
+          
+          <!-- Contenido principal -->
+          <div style="padding: 30px 20px;">
+            <h2 style="color: #ff1493; text-align: center; font-size: 24px; margin-bottom: 20px;">Notificación de Cancelación de Turno</h2>
+            
+            <div style="background: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #ff1493;">  <!-- Agrega border rosado -->
+              <h3 style="color: #333; margin-top: 0;">Detalles del Turno Cancelado</h3>
+              <p style="margin: 5px 0;"><strong>Fecha del Turno:</strong> ${moment(turnoCompleto.inicio).format('DD/MM/YYYY')}</p>
+              <p style="margin: 5px 0;"><strong>Hora del Turno:</strong> ${moment(turnoCompleto.inicio).format('HH:mm')}</p>
+              <p style="margin: 5px 0;"><strong>Responsable:</strong> ${responsable.nombre} ${responsable.apellido}</p>
+            </div>
+            
+            <div style="background: rgba(255, 255, 255, 0.9); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #ff1493;">  <!-- Quita background gradiente, agrega border -->
+              <h3 style="color: #ff1493; margin-top: 0;">Motivo de la Cancelación</h3>
+              <p style="margin: 0; line-height: 1.6; color: #333;">${body}</p>
+            </div>
+            
+            <p style="text-align: center; font-size: 16px; color: #666; margin-bottom: 20px;">
+              Lamentamos cualquier inconveniente causado. Si necesita reprogramar el turno o tiene preguntas, no dude en contactarnos.
+            </p>
+            
+            <div style="text-align: center;">
+              <a href="mailto:contacto@estimular.com" style="background: linear-gradient(45deg, #ff1493, #ff69b4); color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">Contactar a Estimular</a>
+            </div>
+          </div>
+          
+          <!-- Footer -->
+          <div style="background: linear-gradient(45deg, #ffb6c1, #ffc0cb); padding: 20px; text-align: center; color: #fff;">
+            <p style="margin: 0; font-size: 14px;">© 2025 Estimular. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: responsable.email,
+      subject: subject,
+      html: htmlBody,
+      attachments: [
+        {
+          filename: 'esitmular_logo.png',
+          path: path.join(__dirname, '../../../docs/esitmular_logo.png'),  // Verifica que la ruta sea correcta
+          cid: 'logo'
+        }
+      ]
+    };
+
+    await sendCancellationEmail(mailOptions);  // Pasa mailOptions completo
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error en cancelarTurno:', err);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { listTurnos, updateTurno, cancelarTurno, assignTurnosForCandidato };

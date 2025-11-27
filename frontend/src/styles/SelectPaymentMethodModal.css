@@ -1,0 +1,107 @@
+.select-payment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+}
+
+.select-payment-modal {
+  background: #ffffff;
+  width: min(360px, 92vw);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.select-payment-modal-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.select-payment-modal-description {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.select-payment-modal-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.select-payment-modal-select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid #d1d5db;
+  font-size: 1rem;
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.select-payment-modal-select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+}
+
+.select-payment-modal-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.select-payment-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.select-payment-modal-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.select-payment-modal-btn.primary {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(236, 72, 153, 0.35);
+}
+
+.select-payment-modal-btn.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 38px rgba(236, 72, 153, 0.45);
+}
+
+.select-payment-modal-btn.secondary {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.select-payment-modal-btn.secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(55, 65, 81, 0.18);
+}
+
+.select-payment-modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

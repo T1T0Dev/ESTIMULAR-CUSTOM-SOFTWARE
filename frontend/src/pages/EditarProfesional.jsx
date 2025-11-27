@@ -84,6 +84,13 @@ export default function EditarProfesional() {
 
   useEffect(() => {
     if (!profile) return;
+    const profesionId =
+      profile.profesion_id ??
+      profile.departamento_id ??
+      profile.profession_id ??
+      profile.professionId ??
+      profile.departamento?.id_departamento ??
+      null;
     setForm({
       nombre: normalizeString(profile.nombre),
       apellido: normalizeString(profile.apellido),
@@ -92,9 +99,7 @@ export default function EditarProfesional() {
       fecha_nacimiento: profile.fecha_nacimiento
         ? normalizeString(profile.fecha_nacimiento).slice(0, 10)
         : "",
-      profesionId: normalizeString(
-        profile.departamento_id || profile.departamento?.id_departamento
-      ),
+      profesionId: normalizeString(profesionId),
       dni: normalizeString(user?.dni ?? ""),
       nuevaContrasena: "",
       confirmarContrasena: "",

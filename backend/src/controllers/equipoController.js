@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../config/db');
 const {
 	resolveStorageAsset,
@@ -12,6 +13,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const RECEPCION_ROLE_NAMES = ['Recepción', 'Recepcion', 'Recepcionista', 'Secretario', 'Secretaria'];
 const PROFESSIONAL_ROLE_NAMES = ['Profesional', 'PROFESIONAL'];
 const PASSWORD_FORBIDDEN_PATTERNS = [/("|'|--|;|\/\*|\*\/|xp_|exec|union|select|insert|delete|update|drop|alter|create|shutdown)/i];
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 
 function normalize(value) {
 	if (value === undefined || value === null) return '';
@@ -20,6 +22,10 @@ function normalize(value) {
 		.replace(/[\u0300-\u036f]/g, '')
 		.toLowerCase()
 		.trim();
+}
+
+function isAdminRoleName(value) {
+	return normalize(value).includes('admin');
 }
 
 function normalizeTipo(value) {
@@ -59,6 +65,31 @@ function normalizePhone(phone) {
 	if (phone === undefined || phone === null) return null;
 	const trimmed = String(phone).trim();
 	return trimmed || null;
+}
+
+function extractToken(req) {
+	const auth = req.headers?.authorization || '';
+	return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+async function userIsAdmin(userId) {
+	if (!userId) return false;
+	try {
+		const { data, error } = await supabaseAdmin
+			.from('usuario_roles')
+			.select('rol:roles ( id_rol, nombre_rol )')
+			.eq('usuario_id', Number(userId));
+
+		if (error) {
+			console.error('userIsAdmin roles error:', error);
+			return false;
+		}
+
+		return (data || []).some((row) => isAdminRoleName(row?.rol?.nombre_rol));
+	} catch (err) {
+		console.error('userIsAdmin exception:', err);
+		return false;
+	}
 }
 
 async function ensureDniAvailable(dni, excludeUserId) {
@@ -538,10 +569,44 @@ async function crearIntegrante(req, res) {
 		admin,
 	} = body;
 
-	if (!nombre || !apellido || !dni || !contrasena || !fecha_nacimiento) {
+	const token = extractToken(req);
+	let requesterId = null;
+	if (token) {
+		try {
+			const payload = jwt.verify(token, JWT_SECRET);
+			requesterId = payload?.id ?? null;
+		} catch (err) {
+			console.warn('crearIntegrante token inválido:', err.message);
+		}
+	}
+
+	if (!requesterId) {
+		const headerIdRaw = req.headers['x-user-id'];
+		const parsedHeaderId = Number.parseInt(headerIdRaw, 10);
+		if (!Number.isNaN(parsedHeaderId)) {
+			requesterId = parsedHeaderId;
+		}
+	}
+
+	if (!requesterId) {
+		return res.status(401).json({
+			success: false,
+			message: 'Credenciales no válidas para crear integrantes',
+		});
+	}
+
+	const requesterIsAdmin = await userIsAdmin(requesterId);
+	if (!requesterIsAdmin) {
+		return res.status(403).json({
+			success: false,
+			message: 'No tiene permisos para crear integrantes',
+		});
+	}
+
+	if (!dni || !contrasena) {
 		return res.status(400).json({
 			success: false,
-			message: 'Faltan datos obligatorios (nombre, apellido, dni, contrasena, fecha_nacimiento)',
+			message: 'Faltan datos obligatorios (dni, contrasena)',
 		});
 	}
 
@@ -553,23 +618,13 @@ async function crearIntegrante(req, res) {
 		return res.status(400).json({ success: false, message: 'Contraseña inválida o insegura.' });
 	}
 
-	if (!isValidDate(fecha_nacimiento)) {
+	if (fecha_nacimiento && !isValidDate(fecha_nacimiento)) {
 		return res.status(400).json({ success: false, message: 'fecha_nacimiento debe tener formato YYYY-MM-DD' });
 	}
 
 	const normalizedTipo = normalizeTipo(tipo) === 'todos' ? 'profesional' : normalizeTipo(tipo);
 	const adminFlag = es_admin ?? esAdmin ?? admin ?? false;
 
-	if (
-		normalizedTipo === 'profesional' &&
-		profesionId === undefined &&
-		departamento_id === undefined
-	) {
-		return res.status(400).json({
-			success: false,
-			message: 'profesionId es obligatorio para profesionales',
-		});
-	}
 
 	let persona = null;
 	let usuario = null;
@@ -588,12 +643,21 @@ async function crearIntegrante(req, res) {
 			}
 		}
 
+		const nombreSanitizado = typeof nombre === 'string' ? nombre.trim() : '';
+		const apellidoSanitizado = typeof apellido === 'string' ? apellido.trim() : '';
+		const fechaSanitizada = typeof fecha_nacimiento === 'string' ? fecha_nacimiento.trim() : '';
+		const nombreFinal = nombreSanitizado || 'Pendiente';
+		const apellidoFinal = apellidoSanitizado || 'Integrante';
+		const fechaFinal = fechaSanitizada
+			? new Date(fechaSanitizada).toISOString().slice(0, 10)
+			: null;
+
 		const personaPayload = {
-			nombre: String(nombre).trim(),
-			apellido: String(apellido).trim(),
+			nombre: nombreFinal,
+			apellido: apellidoFinal,
 			telefono: normalizePhone(telefono),
-			email: normalizeEmail(email),
-			fecha_nacimiento: new Date(fecha_nacimiento).toISOString().slice(0, 10),
+			email: emailNormalized,
+			fecha_nacimiento: fechaFinal,
 			foto_perfil: null,
 		};
 
@@ -620,6 +684,7 @@ async function crearIntegrante(req, res) {
 					dni: Number(dni),
 					password_hash: hash,
 					activo: true,
+					primer_registro_completado: false,
 					persona_id: persona.id,
 				},
 			])

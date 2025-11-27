@@ -474,8 +474,11 @@ async function getTurnoById(turnoId) {
   const { ids, nombres, detalle } = formatProfesionales(data.profesionales, profesionalesDetails);
   const paciente = formatNinoDetails(data.nino);
 
+  const estadoTurno = data?.estado ?? null;
+
   return {
     ...data,
+    estado: estadoTurno,
     ...paciente,
     profesional_ids: ids,
     profesional_nombres: nombres,
@@ -593,8 +596,6 @@ async function createTurno({
   estado = 'pendiente',
   profesional_ids = [],
   precio = null,
-  moneda = 'ARS',
-  metodo_pago = 'efectivo',
 }) {
   if (!departamento_id || !inicio || !nino_id) {
     throw new Error('Los campos departamento_id, inicio y nino_id son obligatorios.');
@@ -611,6 +612,8 @@ async function createTurno({
   let turnoId = null;
 
   try {
+    const estadoTurno = estado ?? 'pendiente';
+
     const { data: turnoInserted, error: turnoError } = await supabase
       .from('turnos')
       .insert({
@@ -622,7 +625,7 @@ async function createTurno({
         notas: notas || null,
         creado_por,
         nino_id,
-        estado,
+        estado: estadoTurno,
       })
       .select('id')
       .single();
@@ -674,8 +677,8 @@ async function createTurno({
       const pagoPayload = {
         turno_id: turnoId,
         monto: montoFinal,
-        moneda: moneda || 'ARS',
-        metodo: metodo_pago || 'efectivo',
+        moneda: 'ARS',
+        metodo: 'por_definir',
         estado: 'pendiente',
         nino_id,
       };

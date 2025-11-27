@@ -113,3 +113,37 @@
   padding: 2rem;
   color: #777;
 }
+
+/* Estilos para el estado de deuda */
+.deuda-status {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.deuda-status.debe {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.deuda-status.al-dia {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.deuda-status.error {
+  background-color: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.deuda-alert {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.al-dia {
+  color: #16a34a;
+  font-weight: bold;
+}

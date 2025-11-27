@@ -8,6 +8,8 @@ import {
   MdAssignment,
   MdLocalHospital,
   MdFamilyRestroom,
+  MdAttachMoney,
+  MdAccountBalanceWallet,
 } from "react-icons/md";
 import "../styles/SidebarDashboard.css";
 import useAuthStore from "../store/useAuthStore";
@@ -35,6 +37,36 @@ export default function SidebarDashboard() {
       .map((value) => value.toLowerCase())
       .some((value) => value.includes("admin") || value.includes("administr"));
   }, [profile?.es_admin, user?.es_admin, user?.rol_nombre, user?.roles]);
+
+  const isProfesional = React.useMemo(() => {
+    const names = [];
+    if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (Array.isArray(user?.roles)) {
+      names.push(
+        ...user.roles
+          .map((r) => r?.nombre)
+          .filter((value) => typeof value === "string")
+      );
+    }
+    return names
+      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
+      .some((value) => value === 'profesional');
+  }, [user?.rol_nombre, user?.roles]);
+
+  const isRecepcion = React.useMemo(() => {
+    const names = [];
+    if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (Array.isArray(user?.roles)) {
+      names.push(
+        ...user.roles
+          .map((r) => r?.nombre)
+          .filter((value) => typeof value === "string")
+      );
+    }
+    return names
+      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
+      .some((value) => value === 'recepcion');
+  }, [user?.rol_nombre, user?.roles]);
 
   const fullName = React.useMemo(() => {
     return [profile?.nombre, profile?.apellido]
@@ -160,14 +192,16 @@ export default function SidebarDashboard() {
           <MdEventAvailable size={18} /> <span>Turnos</span>
         </NavLink>
 
-        <NavLink
-          to="/dashboard/profesionales"
-          className={({ isActive }) =>
-            isActive ? "sd-link active" : "sd-link"
-          }
-        >
-          <MdGroups size={18} /> <span>Equipo Estimular</span>
-        </NavLink>
+        {esAdmin && (
+          <NavLink
+            to="/dashboard/profesionales"
+            className={({ isActive }) =>
+              isActive ? "sd-link active" : "sd-link"
+            }
+          >
+            <MdGroups size={18} /> <span>Equipo Estimular</span>
+          </NavLink>
+        )}
 
         {/* Entidades relacionadas entre sí */}
         <NavLink
@@ -205,7 +239,28 @@ export default function SidebarDashboard() {
         >
           <MdLocalHospital size={18} /> <span>Obras sociales</span>
         </NavLink>
-      </nav>
+
+        {esAdmin && (
+          <NavLink
+            to="/dashboard/pagos"
+            className={({ isActive }) =>
+              isActive ? "sd-link active" : "sd-link"
+            }
+          >
+            <MdAccountBalanceWallet size={18} /> <span>Pagos</span>
+          </NavLink>
+        )}
+
+        {esAdmin && (
+          <NavLink
+            to="/dashboard/panel-financiero"
+            className={({ isActive }) =>
+              isActive ? "sd-link active" : "sd-link"
+            }
+          >
+            <MdAttachMoney size={18} /> <span>Panel financiero</span>
+          </NavLink>
+        )}      </nav>
 
       <div className="sd-footer">
         <div className="sd-user-card">

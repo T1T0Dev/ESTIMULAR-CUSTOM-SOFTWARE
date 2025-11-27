@@ -15,6 +15,7 @@ import {
 import { formatDateDMY } from "../utils/date";
 import API_BASE_URL from "../constants/api";
 import { parseNinosResponse } from "../utils/ninoResponse";
+import useAuthStore from "../store/useAuthStore";
 
 function calcularEdad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
@@ -29,6 +30,9 @@ function calcularEdad(fechaNacimiento) {
 }
 
 export default function Ninos() {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -430,15 +434,17 @@ export default function Ninos() {
               <option value="candidato">Candidatos</option>
               <option value="paciente">Pacientes</option>
             </select>
-            <button
-              className="btn primary"
-              onClick={() => {
-                setModalData(null);
-                setModalOpen(true);
-              }}
-            >
-              + Agregar niño
-            </button>
+            {isAdmin && (
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setModalData(null);
+                  setModalOpen(true);
+                }}
+              >
+                + Agregar niño
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -780,75 +786,79 @@ export default function Ninos() {
                               </>
                             ) : (
                               <>
-                                <button
-                                  className="icon-btn edit"
-                                  title="Editar"
-                                  onClick={() => {
-                                    setEditId(c.id_nino);
-                                    setEditData({
-                                      nombre: c.nombre,
-                                      apellido: c.apellido,
-                                      dni: c.dni,
-                                      fecha_nacimiento: c.fecha_nacimiento
-                                        ? String(c.fecha_nacimiento).slice(
-                                            0,
-                                            10
-                                          )
-                                        : "",
-                                      certificado_discapacidad:
-                                        !!c.certificado_discapacidad,
-                                      id_obra_social: c.id_obra_social ?? null,
-                                      tipo: c.tipo,
-                                    });
-                                  }}
-                                >
-                                  <MdEdit size={20} />
-                                </button>
-                                <button
-                                  className="icon-btn delete"
-                                  title="Eliminar"
-                                  onClick={async () => {
-                                    const result = await Swal.fire({
-                                      title: "¿Eliminar?",
-                                      text: "Esta acción no se puede deshacer.",
-                                      icon: "warning",
-                                      showCancelButton: true,
-                                      confirmButtonText: "Sí, eliminar",
-                                      cancelButtonText: "Cancelar",
-                                    });
-                                    if (result.isConfirmed) {
-                                      try {
-                                        Swal.fire({
-                                          title: "Eliminando...",
-                                          allowOutsideClick: false,
-                                          didOpen: () => Swal.showLoading(),
+                                {isAdmin && (
+                                  <>
+                                    <button
+                                      className="icon-btn edit"
+                                      title="Editar"
+                                      onClick={() => {
+                                        setEditId(c.id_nino);
+                                        setEditData({
+                                          nombre: c.nombre,
+                                          apellido: c.apellido,
+                                          dni: c.dni,
+                                          fecha_nacimiento: c.fecha_nacimiento
+                                            ? String(c.fecha_nacimiento).slice(
+                                                0,
+                                                10
+                                              )
+                                            : "",
+                                          certificado_discapacidad:
+                                            !!c.certificado_discapacidad,
+                                          id_obra_social: c.id_obra_social ?? null,
+                                          tipo: c.tipo,
                                         });
-                                        await axios.delete(
-                                          `${API_BASE_URL}/api/ninos/${c.id_nino}`
-                                        );
-                                        await fetchNinos(busqueda, page, tipo);
-                                        Swal.close();
-                                        Swal.fire({
-                                          icon: "success",
-                                          title: "Eliminado",
-                                          timer: 1200,
-                                          showConfirmButton: false,
+                                      }}
+                                    >
+                                      <MdEdit size={20} />
+                                    </button>
+                                    <button
+                                      className="icon-btn delete"
+                                      title="Eliminar"
+                                      onClick={async () => {
+                                        const result = await Swal.fire({
+                                          title: "¿Eliminar?",
+                                          text: "Esta acción no se puede deshacer.",
+                                          icon: "warning",
+                                          showCancelButton: true,
+                                          confirmButtonText: "Sí, eliminar",
+                                          cancelButtonText: "Cancelar",
                                         });
-                                      } catch (err) {
-                                        Swal.close();
-                                        Swal.fire({
-                                          icon: "error",
-                                          title: "Error",
-                                          text:
-                                            err?.response?.data?.message ||
-                                            "No se pudo eliminar",
-                                        });
-                                      }
-                                    }
-                                  }}
-                                >
-                                  <MdDelete size={20} />
-                                </button>
+                                        if (result.isConfirmed) {
+                                          try {
+                                            Swal.fire({
+                                              title: "Eliminando...",
+                                              allowOutsideClick: false,
+                                              didOpen: () => Swal.showLoading(),
+                                            });
+                                            await axios.delete(
+                                              `${API_BASE_URL}/api/ninos/${c.id_nino}`
+                                            );
+                                            await fetchNinos(busqueda, page, tipo);
+                                            Swal.close();
+                                            Swal.fire({
+                                              icon: "success",
+                                              title: "Eliminado",
+                                              timer: 1200,
+                                              showConfirmButton: false,
+                                            });
+                                          } catch (err) {
+                                            Swal.close();
+                                            Swal.fire({
+                                              icon: "error",
+                                              title: "Error",
+                                              text:
+                                                err?.response?.data?.message ||
+                                                "No se pudo eliminar",
+                                            });
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <MdDelete size={20} />
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
@@ -999,7 +1009,7 @@ export default function Ninos() {
                           <th>DNI</th>
                           <th>Contacto</th>
                           <th>Parentesco</th>
-                          <th>Principal</th>
+                          {isAdmin && <th>Principal</th>}
                           <th className="col-actions">Acciones</th>
                         </tr>
                       </thead>
@@ -1031,40 +1041,47 @@ export default function Ninos() {
                                 {rel.responsable?.email || "—"}
                               </span>
                             </td>
-                            <td data-label="Parentesco">
-                              <input
-                                className="table-input"
-                                value={rel.parentescoDraft ?? ""}
-                                onChange={(e) =>
-                                  cambiarParentescoLocal(
-                                    rel.id_nino_responsable,
-                                    e.target.value
-                                  )
-                                }
-                                onBlur={() => guardarParentesco(rel)}
-                                placeholder="Ej: madre"
-                              />
-                            </td>
-                            <td data-label="Principal">
-                              <label className="inline-check">
+                            {true && (
+                              <td data-label="Parentesco">
                                 <input
-                                  type="checkbox"
-                                  checked={!!rel.es_principal}
-                                  onChange={() => marcarPrincipal(rel)}
-                                  aria-label="Marcar como principal"
+                                  className="table-input"
+                                  value={rel.parentescoDraft ?? ""}
+                                  onChange={(e) =>
+                                    cambiarParentescoLocal(
+                                      rel.id_nino_responsable,
+                                      e.target.value
+                                    )
+                                  }
+                                  onBlur={() => guardarParentesco(rel)}
+                                  placeholder="Ej: madre"
+                                  disabled={!isAdmin}
                                 />
-                                {rel.es_principal ? "Sí" : "No"}
-                              </label>
-                            </td>
+                              </td>
+                            )}
+                            {isAdmin && (
+                              <td data-label="Principal">
+                                <label className="inline-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!rel.es_principal}
+                                    onChange={() => marcarPrincipal(rel)}
+                                    aria-label="Marcar como principal"
+                                  />
+                                  {rel.es_principal ? "Sí" : "No"}
+                                </label>
+                              </td>
+                            )}
                             <td className="col-actions" data-label="Acciones">
                               <div className="row-actions">
-                                <button
-                                  className="icon-btn danger"
-                                  title="Quitar responsable"
-                                  onClick={() => quitarResponsable(rel)}
-                                >
-                                  <FaUnlink size={18} />
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    className="icon-btn danger"
+                                    title="Quitar responsable"
+                                    onClick={() => quitarResponsable(rel)}
+                                  >
+                                    <FaUnlink size={18} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

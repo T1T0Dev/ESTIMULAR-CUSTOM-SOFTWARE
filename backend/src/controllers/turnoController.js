@@ -24,6 +24,12 @@ function isAdminRoleName(value) {
   return normalized.includes('admin');
 }
 
+function isRecepcionRoleName(value) {
+  if (!value) return false;
+  const normalized = String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return normalized.includes('recepcion') || normalized.includes('secretaria');
+}
+
 async function userIsAdmin(userId) {
   if (!userId) return false;
   try {
@@ -47,6 +53,29 @@ async function userIsAdmin(userId) {
   }
 }
 
+async function userIsRecepcion(userId) {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('usuario_roles')
+      .select('rol:roles ( id_rol, nombre_rol )')
+      .eq('usuario_id', Number(userId));
+
+    if (error) {
+      console.error('userIsRecepcion roles error:', error);
+      return false;
+    }
+
+    return (data || [])
+      .map((row) => row?.rol?.nombre_rol)
+      .filter(Boolean)
+      .some((name) => isRecepcionRoleName(name));
+  } catch (err) {
+    console.error('userIsRecepcion exception:', err);
+    return false;
+  }
+}
+
 /**
  * Maneja la solicitud para obtener los turnos de una fecha específica.
  */
@@ -57,12 +86,16 @@ async function handleGetTurnos(req, res) {
     try {
       let query = supabaseAdmin
         .from('turnos')
-        .select('id, departamento_id, inicio, fin, duracion_min, consultorio_id, estado, nino_id', { count: 'exact' })
+        .select('id, departamento_id, inicio, fin, duracion_min, consultorio_id, estado, nino_id, citacion', { count: 'exact' })
         .order('inicio', { ascending: true })
         .limit(Number(limit) || 50);
 
       if (estado) query = query.eq('estado', estado);
       if (nino_id) query = query.eq('nino_id', Number(nino_id));
+      if (req.query.citacion) query = query.eq('citacion', req.query.citacion);
+      if (req.query.departamentoId) query = query.eq('departamento_id', Number(req.query.departamentoId));
+
+      console.log('turnos query params:', { estado, nino_id, citacion: req.query.citacion, departamentoId: req.query.departamentoId });
 
       if (String(disponible) === 'true') {
         query = query.is('nino_id', null);
@@ -84,6 +117,8 @@ async function handleGetTurnos(req, res) {
       }
 
       const { data, error, count } = await query;
+
+      // console.log('turnos data:', data, 'count:', count);
       if (error) throw error;
 
       return res.json({
@@ -130,8 +165,6 @@ async function handleCreateTurno(req, res) {
     notas,
     profesional_ids,
     precio,
-    moneda,
-    metodo_pago,
     estado,
   } = req.body || {};
 
@@ -153,8 +186,6 @@ async function handleCreateTurno(req, res) {
       notas,
       profesional_ids,
       precio,
-      moneda,
-      metodo_pago,
       estado,
       creado_por: loggedInUserId,
     });
@@ -196,6 +227,8 @@ async function handleUpdateTurno(req, res) {
 
   try {
     const adminOverride = adminHeaderOverride || await userIsAdmin(loggedInUserId);
+    const recepcionOverride = await userIsRecepcion(loggedInUserId);
+    
     // Permisos para actualizar
     const turno = await turnoModel.getTurnoById(id);
     if (!turno) {
@@ -203,8 +236,39 @@ async function handleUpdateTurno(req, res) {
     }
 
     const profesionalIds = extractProfesionalIds(turno.profesional_ids);
-    if (!adminOverride && !profesionalIds.includes(String(loggedInUserId))) {
+    const isAssignedProfesional = profesionalIds.includes(String(loggedInUserId));
+    
+    // Verificar permisos
+    if (!adminOverride && !isAssignedProfesional && !recepcionOverride) {
       return res.status(403).json({ success: false, message: 'No tiene permisos para modificar este turno.' });
+    }
+
+    // Restricciones para recepción: solo pueden cambiar el estado
+    if (recepcionOverride && !adminOverride && !isAssignedProfesional) {
+      const allowedFields = ['estado'];
+      const requestedFields = Object.keys(dataToUpdate);
+      const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
+      
+      if (hasUnauthorizedFields) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Como usuario de recepción, solo puede cambiar el estado del turno.' 
+        });
+      }
+    }
+
+    // Restricciones para profesionales asignados: solo pueden cambiar el estado (igual que recepción)
+    if (isAssignedProfesional && !adminOverride && !recepcionOverride) {
+      const allowedFields = ['estado'];
+      const requestedFields = Object.keys(dataToUpdate);
+      const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
+      
+      if (hasUnauthorizedFields) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Como profesional asignado, solo puede cambiar el estado del turno.' 
+        });
+      }
     }
 
     const result = await turnoModel.updateTurno(id, dataToUpdate);
@@ -220,10 +284,11 @@ async function handleUpdateTurno(req, res) {
 
       switch (dataToUpdate.estado) {
         case 'completado':
-          mensaje = `Llego ${fullName}`;
+        case 'asistido':
+          mensaje = `Llegó ${fullName}`;
           break;
-        case 'no_presento':
-          mensaje = `No se presento ${fullName}`;
+        case 'ausente':
+          mensaje = `No se presentó ${fullName}`;
           break;
         case 'cancelado':
           mensaje = `Cancelado el turno de ${fullName}`;
@@ -298,8 +363,6 @@ async function handleAutoScheduleEntrevista(req, res) {
     base_inicio: baseInicioRaw,
     replace_existing: replaceExistingRaw,
   } = req.body || {};
-  const loggedInUserIdHeader = req.headers['x-user-id'];
-  const loggedInUserId = loggedInUserIdHeader ? Number.parseInt(loggedInUserIdHeader, 10) : null;
 
   const parsedNinoId = parseNumericId(ninoIdRaw);
   if (!parsedNinoId) {

@@ -17,6 +17,7 @@ const turnosRoutes = require('./src/routes/turnosRoutes');
 const equipoRoutes = require('./src/routes/equipoRoutes');
 const profesionesRoutes = require('./src/routes/profesionesRoutes');
 const loginRoutes = require('./src/routes/loginRoutes');
+const finanzasRoutes = require('./src/routes/finanzasRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,6 +51,7 @@ app.use('/api/turnos', turnosRoutes);
 app.use('/api/equipo', equipoRoutes);
 app.use('/api/profesiones', profesionesRoutes);
 app.use('/api/login', loginRoutes);
+app.use('/api', finanzasRoutes);
 
 app.listen(PORT, () => {
 	console.log(`Servidor backend escuchando en puerto ${PORT}`);
