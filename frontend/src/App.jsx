@@ -26,9 +26,10 @@ import PagosDashboard from "./pages/PagosDashboard";
 import useAuthStore from "./store/useAuthStore";
 import { NotificacionProvider } from "./context/NotificacionContext";
 
-function ProtectedRoute({ children, allowIncompleteProfile = false }) {
+function ProtectedRoute({ children, allowIncompleteProfile = false, allowedRoles = [] }) {
   const token = useAuthStore((state) => state.token);
   const needsProfile = useAuthStore((state) => state.needsProfile);
+  const user = useAuthStore((state) => state.user);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -36,6 +37,18 @@ function ProtectedRoute({ children, allowIncompleteProfile = false }) {
 
   if (!allowIncompleteProfile && needsProfile) {
     return <Navigate to="/primer-registro" replace />;
+  }
+
+  if (user?.es_admin) {
+    return children;
+  }
+
+  if (allowedRoles.length > 0) {
+    const userRoles = (user?.roles || []).map(role => role.nombre?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()).filter(Boolean);
+    const hasAccess = allowedRoles.some(role => userRoles.includes(role));
+    if (!hasAccess) {
+      return <div>No tienes acceso a esta página.</div>;
+    }
   }
 
   return children;
@@ -63,17 +76,38 @@ function DashboardRoutes() {
           path="usuarios"
           element={<div className="p-24">Usuarios (placeholder)</div>}
         />
-        <Route path="profesionales" element={<EquipoEstimular />} />
-        <Route path="entrevistas" element={<AsignarEntrevista />} />
+        <Route path="profesionales" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <EquipoEstimular />
+          </ProtectedRoute>
+        } />
+        <Route path="entrevistas" element={
+          <ProtectedRoute>
+            <AsignarEntrevista />
+          </ProtectedRoute>
+        } />
         <Route path="obras-sociales" element={<ObrasSociales />} />
         <Route path="turnos" element={<Turnos />} />
         <Route
           path="pacientes"
           element={<div className="p-24">Pacientes (placeholder)</div>}
         />
-        <Route path="responsables" element={<Responsables />} />
-        <Route path="pagos" element={<PagosDashboard />} />
-        <Route path="panel-financiero" element={<PanelFinanciero />} />
+        <Route
+          path="pagos"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "profesional", "recepcion"]}>
+              <PagosDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="panel-financiero"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <PanelFinanciero />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </DashboardLayout>
   );

@@ -24,6 +24,12 @@ function isAdminRoleName(value) {
   return normalized.includes('admin');
 }
 
+function isRecepcionRoleName(value) {
+  if (!value) return false;
+  const normalized = String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return normalized.includes('recepcion') || normalized.includes('secretaria');
+}
+
 async function userIsAdmin(userId) {
   if (!userId) return false;
   try {
@@ -43,6 +49,29 @@ async function userIsAdmin(userId) {
       .some((name) => isAdminRoleName(name));
   } catch (err) {
     console.error('userIsAdmin exception:', err);
+    return false;
+  }
+}
+
+async function userIsRecepcion(userId) {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('usuario_roles')
+      .select('rol:roles ( id_rol, nombre_rol )')
+      .eq('usuario_id', Number(userId));
+
+    if (error) {
+      console.error('userIsRecepcion roles error:', error);
+      return false;
+    }
+
+    return (data || [])
+      .map((row) => row?.rol?.nombre_rol)
+      .filter(Boolean)
+      .some((name) => isRecepcionRoleName(name));
+  } catch (err) {
+    console.error('userIsRecepcion exception:', err);
     return false;
   }
 }
@@ -198,6 +227,8 @@ async function handleUpdateTurno(req, res) {
 
   try {
     const adminOverride = adminHeaderOverride || await userIsAdmin(loggedInUserId);
+    const recepcionOverride = await userIsRecepcion(loggedInUserId);
+    
     // Permisos para actualizar
     const turno = await turnoModel.getTurnoById(id);
     if (!turno) {
@@ -205,8 +236,39 @@ async function handleUpdateTurno(req, res) {
     }
 
     const profesionalIds = extractProfesionalIds(turno.profesional_ids);
-    if (!adminOverride && !profesionalIds.includes(String(loggedInUserId))) {
+    const isAssignedProfesional = profesionalIds.includes(String(loggedInUserId));
+    
+    // Verificar permisos
+    if (!adminOverride && !isAssignedProfesional && !recepcionOverride) {
       return res.status(403).json({ success: false, message: 'No tiene permisos para modificar este turno.' });
+    }
+
+    // Restricciones para recepción: solo pueden cambiar el estado
+    if (recepcionOverride && !adminOverride && !isAssignedProfesional) {
+      const allowedFields = ['estado'];
+      const requestedFields = Object.keys(dataToUpdate);
+      const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
+      
+      if (hasUnauthorizedFields) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Como usuario de recepción, solo puede cambiar el estado del turno.' 
+        });
+      }
+    }
+
+    // Restricciones para profesionales asignados: solo pueden cambiar el estado (igual que recepción)
+    if (isAssignedProfesional && !adminOverride && !recepcionOverride) {
+      const allowedFields = ['estado'];
+      const requestedFields = Object.keys(dataToUpdate);
+      const hasUnauthorizedFields = requestedFields.some(field => !allowedFields.includes(field));
+      
+      if (hasUnauthorizedFields) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Como profesional asignado, solo puede cambiar el estado del turno.' 
+        });
+      }
     }
 
     const result = await turnoModel.updateTurno(id, dataToUpdate);

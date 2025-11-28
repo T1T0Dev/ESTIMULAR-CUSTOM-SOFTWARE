@@ -97,16 +97,28 @@ export default function MainDashboard() {
   const user = useAuthStore((state) => state.user);
   const needsProfile = useAuthStore((state) => state.needsProfile);
 
-  const isAdmin = user?.es_admin;
-  console.log('isAdmin:', isAdmin, 'user:', user, 'profile:', profile);
+  const normalizedRoles = useMemo(() => {
+    if (!user?.roles?.length) return [];
+    return user.roles
+      .map((role) =>
+        role?.nombre
+          ?.normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+      )
+      .filter(Boolean);
+  }, [user?.roles]);
 
-  const [summary, setSummary] = useState({
+  const isAdmin = Boolean(user?.es_admin || normalizedRoles.includes("admin"));
+  const isProfesional = normalizedRoles.includes("profesional");
+
+  const [summary, setSummary] = useState(() => ({
     professionals: 0,
     children: 0,
     obras: 0,
     turnosPendientes: 0,
-    ...(isAdmin ? { entrevistasPendientes: 0 } : {}),
-  });
+    ...((isAdmin || isProfesional) ? { entrevistasPendientes: 0 } : {}),
+  }));
   const [latestProfessionals, setLatestProfessionals] = useState([]);
   const [latestChildren, setLatestChildren] = useState([]);
   const [upcomingTurnos, setUpcomingTurnos] = useState([]);
@@ -160,12 +172,30 @@ export default function MainDashboard() {
           params: { estado: "pendiente", limit: 8 },
         }),
         axios.get(`${API_BASE_URL}/api/profesiones`),
-        ...(isAdmin ? [axios.get(`${API_BASE_URL}/api/turnos`, {
-          params: { estado: "pendiente", citacion: "Entrevista", ...(profile?.profesion_id ? { departamentoId: profile.profesion_id } : {}), limit: 8 },
-        })] : []),
+        ...((isAdmin || isProfesional)
+          ? [
+              axios.get(`${API_BASE_URL}/api/turnos`, {
+                params: {
+                  estado: "pendiente",
+                  citacion: "Entrevista",
+                  ...(profile?.profesion_id
+                    ? { departamentoId: profile.profesion_id }
+                    : {}),
+                  limit: 8,
+                },
+              }),
+            ]
+          : []),
       ];
 
-      console.log('departamentoId:', profile?.profesion_id, 'isAdmin:', isAdmin);
+      console.log(
+        "departamentoId:",
+        profile?.profesion_id,
+        "isAdmin:",
+        isAdmin,
+        "isProfesional:",
+        isProfesional
+      );
 
       const results = await Promise.allSettled(promises);
 
@@ -173,8 +203,8 @@ export default function MainDashboard() {
       const ninosResult = results[1];
       const obrasResult = results[2];
       const turnosResult = results[3];
-      const profesionesResult = results[4];
-      const entrevistaResult = isAdmin ? results[5] : null;
+  const profesionesResult = results[4];
+  const entrevistaResult = (isAdmin || isProfesional) ? results[5] : null;
 
       if (!activeRef.current) return;
 
@@ -233,11 +263,11 @@ export default function MainDashboard() {
 
       let entrevistasListado = [];
       let entrevistasTotal = 0;
-      if (isAdmin && entrevistaResult && entrevistaResult.status === "fulfilled") {
+      if ((isAdmin || isProfesional) && entrevistaResult && entrevistaResult.status === "fulfilled") {
         const payload = entrevistaResult.value?.data ?? {};
         entrevistasListado = resolveArrayData(payload);
         entrevistasTotal = resolveTotalCount(payload, entrevistasListado.length);
-      } else if (isAdmin) {
+      } else if (isAdmin || isProfesional) {
         errors.push("entrevistas");
       }
 
@@ -270,12 +300,14 @@ export default function MainDashboard() {
           children: childrenTotal,
           obras: obrasTotal,
           turnosPendientes: turnosTotal,
-          ...(isAdmin ? { entrevistasPendientes: entrevistasTotal } : {}),
+          ...((isAdmin || isProfesional)
+            ? { entrevistasPendientes: entrevistasTotal }
+            : {}),
         });
         setLatestProfessionals(profesionalesListado.slice(0, 4));
         setLatestChildren(ninosListado.slice(0, 4));
-        setUpcomingTurnos(upcoming);
-        if (isAdmin) setLatestEntrevistas(upcomingEntrevistas);
+  setUpcomingTurnos(upcoming);
+  if (isAdmin || isProfesional) setLatestEntrevistas(upcomingEntrevistas);
         setError(
           errors.length
             ? `No se pudieron cargar algunos datos (${errors.join(", ")}).`
@@ -298,7 +330,7 @@ export default function MainDashboard() {
         }
       }
     }
-  }, []);
+  }, [isAdmin, isProfesional, profile?.profesion_id]);
 
   useEffect(() => {
     loadDashboard(true);
@@ -306,14 +338,18 @@ export default function MainDashboard() {
 
   const cards = useMemo(
     () => [
-      {
-        id: "professionals",
-        label: "Profesionales activos",
-        value: summary.professionals,
-        icon: <MdGroups size={24} />,
-        to: "/dashboard/profesionales",
-        hint: `${latestProfessionals.length} recientes`,
-      },
+      ...(isAdmin
+        ? [
+            {
+              id: "professionals",
+              label: "Profesionales activos",
+              value: summary.professionals,
+              icon: <MdGroups size={24} />,
+              to: "/dashboard/profesionales",
+              hint: `${latestProfessionals.length} recientes`,
+            },
+          ]
+        : []),
       {
         id: "children",
         label: "Niños registrados",
@@ -338,16 +374,22 @@ export default function MainDashboard() {
         to: "/dashboard/turnos",
         hint: `${upcomingTurnos.length} próximos`,
       },
-      ...(isAdmin ? [{
-        id: "entrevistas",
-        label: "Entrevistas pendientes",
-        value: summary.entrevistasPendientes,
-        icon: <MdSchedule size={24} />,
-        to: "/dashboard/entrevistas",
-        hint: `${latestEntrevistas.length} próximas`,
-      }] : []),
+      ...((isAdmin || isProfesional)
+        ? [
+            {
+              id: "entrevistas",
+              label: "Entrevistas pendientes",
+              value: summary.entrevistasPendientes,
+              icon: <MdSchedule size={24} />,
+              to: "/dashboard/entrevistas",
+              hint: `${latestEntrevistas.length} próximas`,
+            },
+          ]
+        : []),
     ],
     [
+      isAdmin,
+      isProfesional,
       summary.professionals,
       latestProfessionals.length,
       summary.children,

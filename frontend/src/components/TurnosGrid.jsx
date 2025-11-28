@@ -134,7 +134,7 @@ const TimeSlotWrapper = ({ children, value }) => {
 
 // Componente Principal
 
-export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, currentUserId = null }) {
+export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isRecepcion = false, currentUserId = null }) {
   const [events, setEvents] = useState([]);
   const [consultoriosTurnos, setConsultoriosTurnos] = useState([]);
   const [todosConsultorios, setTodosConsultorios] = useState([]);
@@ -349,6 +349,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
   };
 
   const handleSelectSlot = useCallback((slotInfo) => {
+    if (!isAdmin) return; // Only admins can create new turnos by clicking empty slots
     if (!slotInfo) return;
     const { start, end, resourceId } = slotInfo;
     if (intersectsLunchBreak(start, end)) return;
@@ -374,7 +375,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
     };
 
     handleOpenNuevoTurno(prefill);
-  }, [handleOpenNuevoTurno]);
+  }, [isAdmin, handleOpenNuevoTurno]);
 
   const slotPropGetter = useCallback((date) => {
     if (intersectsLunchBreak(date)) {
@@ -458,6 +459,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
           onOpenPaciente={handleOpenPaciente}
           loggedInProfesionalId={loggedInProfesionalId}
           isAdmin={isAdmin}
+          isRecepcion={isRecepcion}
         />
       )}
       {turnoForPago && (
@@ -472,13 +474,15 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, cur
           onClose={handleClosePacienteModal}
         />
       )}
-      <button
-        type="button"
-        className="floating-create-turno-btn"
-        onClick={() => handleOpenNuevoTurno(null)}
-      >
-        + Nuevo turno
-      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          className="floating-create-turno-btn"
+          onClick={() => handleOpenNuevoTurno(null)}
+        >
+          + Nuevo turno
+        </button>
+      )}
       <NuevoTurnoPanel
         isOpen={mostrarNuevoTurno}
         onClose={handleCloseNuevoTurno}

@@ -19,6 +19,7 @@ export default function TurnoModal({
   onOpenPaciente,
   loggedInProfesionalId,
   isAdmin = false,
+  isRecepcion = false,
 }) {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -37,7 +38,7 @@ export default function TurnoModal({
   const { data: turno } = event;
   const profesionalIds = parseProfesionalIds(turno.profesional_ids);
   const isMyEvent = profesionalIds.includes(String(loggedInProfesionalId));
-  const canManageTurno = isAdmin || isMyEvent;
+  const canManageTurno = isAdmin || isMyEvent || isRecepcion;
   const canDeleteTurno = isAdmin && typeof onDelete === "function";
 
   const handleTimeSave = () => {
@@ -127,13 +128,16 @@ export default function TurnoModal({
     const subject = `Cancelación de turno ${moment(event.start).format("DD/MM/YYYY")}`;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/turnos/cancelar/${turnoId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ subject, body: cancelTexto }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/turnos/cancelar/${turnoId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subject, body: cancelTexto }),
+        }
+      );
 
       const result = await response.json();
       if (result?.success) {
@@ -167,7 +171,6 @@ export default function TurnoModal({
     setShowCancelModal(false);
     setCancelTexto("");
   };
-
   const handleDeleteTurno = async () => {
     if (!canDeleteTurno) return;
 
@@ -261,28 +264,32 @@ export default function TurnoModal({
                 </button>
               </div>
 
-              <h3>Reagendar</h3>
-              <div className="modal-form-inline">
-                <div className="time-inputs">
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                  <span>-</span>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                  />
-                </div>
-                <button className="btn-save" onClick={handleTimeSave}>
-                  Guardar Hora
-                </button>
-              </div>
-              <button className="btn-change-day" onClick={handleChangeDay}>
-                Cambiar Día
-              </button>
+              {!isRecepcion && (
+                <>
+                  <h3>Reagendar</h3>
+                  <div className="modal-form-inline">
+                    <div className="time-inputs">
+                      <input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                      />
+                      <span>-</span>
+                      <input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                      />
+                    </div>
+                    <button className="btn-save" onClick={handleTimeSave}>
+                      Guardar Hora
+                    </button>
+                  </div>
+                  <button className="btn-change-day" onClick={handleChangeDay}>
+                    Cambiar Día
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <p>No tiene permisos para modificar este turno.</p>

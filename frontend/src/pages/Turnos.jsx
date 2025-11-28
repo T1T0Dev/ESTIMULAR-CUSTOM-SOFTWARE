@@ -10,6 +10,9 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
     if (overrideProfesionalId !== undefined && overrideProfesionalId !== null) {
       return overrideProfesionalId;
     }
+    if (profile?.persona_id) {
+      return profile.persona_id;
+    }
     if (profile?.id_profesional) {
       return profile.id_profesional;
     }
@@ -20,7 +23,7 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
       return user.id;
     }
     return null;
-  }, [overrideProfesionalId, profile?.id_profesional, user?.id_profesional, user?.id]);
+  }, [overrideProfesionalId, profile?.persona_id, profile?.id_profesional, user?.id_profesional, user?.id]);
 
   const isAdmin = useMemo(() => {
     if (profile?.es_admin || user?.es_admin) {
@@ -35,10 +38,42 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
           .filter((value) => typeof value === "string")
       );
     }
-    return names
-      .map((value) => value.toLowerCase())
-      .some((value) => value.includes("admin") || value.includes("administr"));
+    const result = names
+      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
+      .some((value) => value === 'admin' || value === 'administrador');
+    return result;
   }, [profile?.es_admin, user?.es_admin, user?.rol_nombre, user?.roles]);
+
+  const isProfesional = useMemo(() => {
+    const names = [];
+    if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (Array.isArray(user?.roles)) {
+      names.push(
+        ...user.roles
+          .map((role) => role?.nombre)
+          .filter((value) => typeof value === "string")
+      );
+    }
+    return names
+      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
+      .some((value) => value === 'profesional');
+  }, [user?.rol_nombre, user?.roles]);
+
+  const isRecepcion = useMemo(() => {
+    const names = [];
+    if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (Array.isArray(user?.roles)) {
+      names.push(
+        ...user.roles
+          .map((role) => role?.nombre)
+          .filter((value) => typeof value === "string")
+      );
+    }
+    const result = names
+      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
+      .some((value) => value === 'recepcion' || value === 'secretaria');
+    return result;
+  }, [user?.rol_nombre, user?.roles]);
 
   const currentUserId = user?.id ?? null;
 
@@ -47,6 +82,7 @@ export default function Turnos({ loggedInProfesionalId: overrideProfesionalId })
       <TurnosGrid
         loggedInProfesionalId={loggedInProfesionalId}
         isAdmin={isAdmin}
+        isRecepcion={isRecepcion}
         currentUserId={currentUserId}
       />
     </div>

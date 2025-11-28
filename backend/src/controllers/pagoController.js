@@ -15,7 +15,6 @@ function toNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
-
 function formatResponsableLink(link) {
   if (!link || typeof link !== 'object') return null;
   const responsable = link.responsable || null;
@@ -30,7 +29,6 @@ function formatResponsableLink(link) {
     es_principal: !!link.es_principal,
   };
 }
-
 function pickPrimaryResponsable(responsables = []) {
   if (!Array.isArray(responsables)) return null;
   const principal = responsables.find(
@@ -56,6 +54,33 @@ async function handleGetPagos(req, res) {
     res.json({ success: true, data: pagos });
   } catch (error) {
     console.error('Error al obtener los pagos:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+  }
+}
+
+async function handleGetPacienteDeudaStatus(req, res) {
+  const { paciente_dni } = req.query;
+  if (!paciente_dni) {
+    return res.status(400).json({ success: false, message: "El parámetro 'paciente_dni' es requerido." });
+  }
+  try {
+    // Obtener todos los pagos pendientes del paciente
+    const pagosPendientes = await pagoModel.getPagosPendientesByPacienteDni(paciente_dni);
+    
+    const totalDeuda = pagosPendientes.reduce((sum, pago) => sum + toNumber(pago.monto), 0);
+    const cantidadPagosPendientes = pagosPendientes.length;
+    
+    res.json({ 
+      success: true, 
+      data: {
+        tiene_deuda: totalDeuda > 0,
+        total_deuda: totalDeuda,
+        cantidad_pagos_pendientes: cantidadPagosPendientes,
+        pagos_pendientes: pagosPendientes
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener estado de deuda del paciente:', error);
     res.status(500).json({ success: false, message: 'Error interno del servidor.' });
   }
 }
@@ -363,8 +388,45 @@ async function handleGetPagosDashboardDeudas(req, res) {
   }
 }
 
+async function handleGetPacienteDeudaStatus(req, res) {
+  const { paciente_dni } = req.query;
+  
+  if (!paciente_dni) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "El parámetro 'paciente_dni' es requerido." 
+    });
+  }
+
+  try {
+    const pagosPendientes = await pagoModel.getPagosPendientesByPacienteDni(paciente_dni);
+    
+    const totalDeuda = pagosPendientes.reduce((sum, pago) => sum + toNumber(pago.monto), 0);
+    const cantidadPagosPendientes = pagosPendientes.length;
+    
+    return res.json({
+      success: true,
+      data: {
+        paciente_dni,
+        tiene_deuda: totalDeuda > 0,
+        total_deuda: Number(totalDeuda.toFixed(2)),
+        cantidad_pagos_pendientes: cantidadPagosPendientes,
+        pagos_pendientes: pagosPendientes
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener estado de deuda del paciente:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener estado de deuda del paciente.',
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   handleGetPagos,
   handleUpdatePago,
   handleGetPagosDashboardDeudas,
+  handleGetPacienteDeudaStatus,
 };

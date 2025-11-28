@@ -59,8 +59,44 @@ async function updateTurnoEstadoPago(turnoId, estado_pago) {
   return { affectedRows: data ? data.length : 0 };
 }
 
+async function getPagosPendientesByPacienteDni(pacienteDni) {
+  // First get turnos for this paciente
+  const { data: turnosData, error: turnosError } = await supabase
+    .from("turnos")
+    .select("id")
+    .eq("paciente_dni", pacienteDni);
+
+  if (turnosError) throw turnosError;
+  
+  if (!turnosData || turnosData.length === 0) {
+    return [];
+  }
+
+  const turnoIds = turnosData.map(t => t.id);
+
+  // Then get pagos pendientes for these turnos
+  const { data, error } = await supabase
+    .from("pagos")
+    .select(`
+      *,
+      turno:turnos!pagos_turno_id_fkey (
+        id,
+        paciente_dni,
+        paciente_nombre,
+        paciente_apellido,
+        fecha:DATE(inicio)
+      )
+    `)
+    .eq("estado", "pendiente")
+    .in("turno_id", turnoIds);
+
+  if (error) throw error;
+  return data || [];
+}
+
 module.exports = {
   getPagosByTurnoId,
   updatePago,
   updateTurnoEstadoPago,
+  getPagosPendientesByPacienteDni,
 };

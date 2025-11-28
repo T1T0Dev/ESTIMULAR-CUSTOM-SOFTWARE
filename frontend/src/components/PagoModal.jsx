@@ -54,32 +54,92 @@ export default function PagoModal({ turno, onClose }) {
   const [pagos, setPagos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMetodos, setSelectedMetodos] = useState({});
+  const [deudaStatus, setDeudaStatus] = useState(null);
+  const [loadingDeuda, setLoadingDeuda] = useState(true);
 
   const fetchPagos = useCallback(async () => {
     if (!turno) return;
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/pagos?turno_id=${turno.id}`);
+      const res = await axios.get(
+        `${API_BASE_URL}/api/pagos?turno_id=${turno.id}`
+      );
       const data = Array.isArray(res.data?.data) ? res.data.data : [];
       setPagos(data);
       setSelectedMetodos(() => {
         const initial = {};
         data.forEach((pago) => {
-          const metodo = typeof pago.metodo === 'string' ? pago.metodo.trim() : '';
-          initial[pago.id] = metodo && metodo !== UNASSIGNED_PAYMENT_METHOD ? metodo : '';
+          const metodo =
+            typeof pago.metodo === "string" ? pago.metodo.trim() : "";
+          initial[pago.id] =
+            metodo && metodo !== UNASSIGNED_PAYMENT_METHOD ? metodo : "";
         });
         return initial;
       });
     } catch (error) {
       console.error("Error fetching pagos:", error);
-      alert('No se pudieron cargar los pagos.');
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+        alert(
+          `Error al cargar pagos: ${
+            error.response.data?.message || "Error del servidor"
+          }`
+        );
+      } else if (error.request) {
+        console.error("No response received - backend might not be running");
+        alert(
+          "No se pudieron cargar los pagos. El servidor backend no está disponible."
+        );
+      } else {
+        console.error("Request setup error:", error.message);
+        alert("Error al configurar la solicitud de pagos.");
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [turno]);
+
+  const fetchDeudaStatus = useCallback(async () => {
+    if (!turno?.paciente_dni) {
+      setDeudaStatus(null);
+      setLoadingDeuda(false);
+      return;
+    }
+    setLoadingDeuda(true);
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/pagos/paciente-deuda?paciente_dni=${turno.paciente_dni}`
+      );
+      if (res.data?.success) {
+        setDeudaStatus(res.data.data);
+      } else {
+        console.warn("API response not successful:", res.data);
+        setDeudaStatus(null);
+      }
+    } catch (error) {
+      console.error("Error fetching deuda status:", error);
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      } else if (error.request) {
+        console.error("No response received - backend might not be running");
+        setDeudaStatus({ error: "Backend no disponible" });
+      } else {
+        console.error("Request setup error:", error.message);
+      }
+    } finally {
+      setLoadingDeuda(false);
+    }
+  }, [turno?.paciente_dni]);
 
   useEffect(() => {
     fetchPagos();
   }, [fetchPagos]);
+
+  useEffect(() => {
+    fetchDeudaStatus();
+  }, [fetchDeudaStatus]);
 
   const handleMetodoChange = useCallback((pagoId, metodo) => {
     setSelectedMetodos((prev) => ({ ...prev, [pagoId]: metodo }));
@@ -121,6 +181,26 @@ export default function PagoModal({ turno, onClose }) {
               <p className="obra-social-label">
                 Obra social: <strong>{turno.paciente_obra_social}</strong>
               </p>
+            )}
+            {!loadingDeuda && deudaStatus && !deudaStatus.error && (
+              <div className={`deuda-status ${deudaStatus.tiene_deuda ? 'debe' : 'al-dia'}`}>
+                <p>
+                  <strong>Estado de cuenta:</strong> 
+                  {deudaStatus.tiene_deuda ? (
+                    <span className="deuda-alert">
+                      Debe ${formatCurrency(deudaStatus.total_deuda)} 
+                      ({deudaStatus.cantidad_pagos_pendientes} pago{deudaStatus.cantidad_pagos_pendientes !== 1 ? 's' : ''} pendiente{deudaStatus.cantidad_pagos_pendientes !== 1 ? 's' : ''})
+                    </span>
+                  ) : (
+                    <span className="al-dia">Al día</span>
+                  )}
+                </p>
+              </div>
+            )}
+            {!loadingDeuda && deudaStatus?.error && (
+              <div className="deuda-status error">
+                <p><em>No se pudo verificar el estado de cuenta</em></p>
+              </div>
             )}
           </div>
         </div>

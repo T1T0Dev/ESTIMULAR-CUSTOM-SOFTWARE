@@ -6,6 +6,7 @@ import { FaChild, FaStar, FaUserPlus, FaUnlink } from "react-icons/fa";
 import { MdEdit, MdDelete, MdCheck, MdClose } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
 import API_BASE_URL from "../constants/api";
+import useAuthStore from "../store/useAuthStore";
 
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -17,6 +18,9 @@ function useDebounce(value, delay) {
 }
 
 export default function Responsables() {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -623,21 +627,25 @@ export default function Responsables() {
                                 >
                                   <FaChild size={20} />
                                 </button>
-                                <button
-                                  className="icon-btn edit"
-                                  title="Editar"
-                                  onClick={() => startEdit(r)}
-                                >
-                                  <MdEdit size={20} />
-                                </button>
+                                {isAdmin && (
+                                  <>
+                                    <button
+                                      className="icon-btn edit"
+                                      title="Editar"
+                                      onClick={() => startEdit(r)}
+                                    >
+                                      <MdEdit size={20} />
+                                    </button>
 
-                                <button
-                                  className="icon-btn danger"
-                                  title="Eliminar"
-                                  onClick={() => deleteResponsable(r)}
-                                >
-                                  <MdDelete size={20} />
-                                </button>
+                                    <button
+                                      className="icon-btn danger"
+                                      title="Eliminar"
+                                      onClick={() => deleteResponsable(r)}
+                                    >
+                                      <MdDelete size={20} />
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
@@ -771,8 +779,8 @@ export default function Responsables() {
                         <tr>
                           <th>Nombre</th>
                           <th>DNI</th>
-                          <th>Parentesco</th>
-                          <th>Principal</th>
+                          {isAdmin && <th>Parentesco</th>}
+                          {isAdmin && <th>Principal</th>}
                           <th>Fecha nacimiento</th>
                           <th>Tipo</th>
                           <th className="col-actions">Acciones</th>
@@ -798,31 +806,35 @@ export default function Responsables() {
                               </div>
                             </td>
                             <td data-label="DNI">{rel.nino?.dni || "—"}</td>
-                            <td data-label="Parentesco">
-                              <input
-                                className="table-input"
-                                value={rel.parentescoDraft ?? ""}
-                                onChange={(e) =>
-                                  cambiarParentescoLocal(
-                                    rel.id_nino_responsable,
-                                    e.target.value
-                                  )
-                                }
-                                onBlur={() => guardarParentesco(rel)}
-                                placeholder="Ej: hijo"
-                              />
-                            </td>
-                            <td data-label="Principal">
-                              <label className="inline-check">
+                            {isAdmin && (
+                              <td data-label="Parentesco">
                                 <input
-                                  type="checkbox"
-                                  checked={!!rel.es_principal}
-                                  onChange={() => togglePrincipal(rel)}
-                                  aria-label="Marcar como principal"
+                                  className="table-input"
+                                  value={rel.parentescoDraft ?? ""}
+                                  onChange={(e) =>
+                                    cambiarParentescoLocal(
+                                      rel.id_nino_responsable,
+                                      e.target.value
+                                    )
+                                  }
+                                  onBlur={() => guardarParentesco(rel)}
+                                  placeholder="Ej: hijo"
                                 />
-                                {rel.es_principal ? "Sí" : "No"}
-                              </label>
-                            </td>
+                              </td>
+                            )}
+                            {isAdmin && (
+                              <td data-label="Principal">
+                                <label className="inline-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!rel.es_principal}
+                                    onChange={() => togglePrincipal(rel)}
+                                    aria-label="Marcar como principal"
+                                  />
+                                  {rel.es_principal ? "Sí" : "No"}
+                                </label>
+                              </td>
+                            )}
                             <td data-label="Fecha nacimiento">
                               {rel.nino?.fecha_nacimiento
                                 ? formatDateDMY(rel.nino.fecha_nacimiento)
@@ -831,13 +843,15 @@ export default function Responsables() {
                             <td data-label="Tipo">{rel.nino?.tipo || "—"}</td>
                             <td className="col-actions" data-label="Acciones">
                               <div className="row-actions">
-                                <button
-                                  className="icon-btn danger"
-                                  title="Quitar niño"
-                                  onClick={() => quitarNino(rel)}
-                                >
-                                  <FaUnlink size={18} />
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    className="icon-btn danger"
+                                    title="Quitar niño"
+                                    onClick={() => quitarNino(rel)}
+                                  >
+                                    <FaUnlink size={18} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
