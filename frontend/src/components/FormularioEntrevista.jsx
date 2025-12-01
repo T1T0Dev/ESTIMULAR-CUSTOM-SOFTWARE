@@ -9,6 +9,7 @@ import {
   isPhoneValid,
   PHONE_INPUT_HELPER,
 } from "../utils/phone";
+import fallbackObraLogo from "../assets/logo_estimular.png";
 const Alerta = withReactContent(Swal);
 
 /* ─────────────── Helpers ─────────────── */
@@ -21,6 +22,32 @@ const normalizeObraName = (value) =>
         .toLowerCase()
         .trim()
     : "";
+
+const normalizeObraComparable = (value) =>
+  normalizeObraName(value).replace(/[^a-z0-9\s-]/g, "");
+
+const getObraNombre = (obra) =>
+  String(obra?.nombre_obra_social || obra?.nombre || "").trim();
+
+const getObraId = (obra) => {
+  const rawId =
+    obra?.id_obra_social ?? obra?.id ?? obra?.uuid ?? obra?.id_obra ?? null;
+  return rawId !== undefined && rawId !== null ? String(rawId) : "";
+};
+
+const getObraSlug = (obra) => {
+  const nombreNormalizado = normalizeObraName(getObraNombre(obra));
+  return nombreNormalizado
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+};
+
+const getObraLogoUrl = (obra) => {
+  const slug = getObraSlug(obra);
+  return slug ? `/os/${slug}.png` : null;
+};
 
 const VALIDADORES = {
   requerido:
@@ -141,8 +168,10 @@ const EntradaTexto = (props) => (
 );
 
 const SelectorSiNo = ({ etiqueta, activo, onSi, onNo }) => (
-  <div className="field">
-    <label className="label-entrevista">{etiqueta}</label>
+  <div className="field field--selector-sino">
+    <label className="label-entrevista label-entrevista--center">
+      {etiqueta}
+    </label>
     <div className="entrevista__radio-group">
       <button
         type="button"
@@ -209,11 +238,13 @@ const GrupoCheckbox = ({
 
 /* ───────── Componente principal ───────── */
 export default function FormularioEntrevista() {
-  const { listaObras } = useObrasSociales();
+  const { listaObras, cargando } = useObrasSociales();
   const { listaProfesiones, cargandoProfesiones } = useProfesiones();
   const [responsableExistente, setResponsableExistente] = useState(null);
   const [responsableLookupEstado, setResponsableLookupEstado] = useState("idle");
   const lookupResponsableRef = useRef({ dni: null, status: null, data: null, timeoutId: null });
+  const [obraBusqueda, setObraBusqueda] = useState("");
+  const [obraManualActiva, setObraManualActiva] = useState(false);
 
   const { fechaMinima, fechaMaxima } = useMemo(() => {
     const hoy = new Date();
@@ -287,35 +318,68 @@ export default function FormularioEntrevista() {
     const targetId = String(datos.id_obra_social);
     return (
       obrasActivas.find((obra) => {
-        const obraId = obra?.id_obra_social ?? obra?.id ?? obra?.uuid;
-        return (
-          obraId !== undefined &&
-          obraId !== null &&
-          String(obraId) === targetId
-        );
+        const obraId = getObraId(obra);
+        return obraId && obraId === targetId;
       }) || null
     );
   }, [datos.id_obra_social, obrasActivas]);
 
-  const obraInputValue = useMemo(() => {
-    if (matchedObra?.nombre_obra_social) return matchedObra.nombre_obra_social;
-    if (matchedObra?.nombre) return matchedObra.nombre;
-    return datos.obra_social_texto || "";
-  }, [matchedObra, datos.obra_social_texto]);
+  const usarOtraObra = datos.tiene_obra_social && obraManualActiva;
 
-  const obraManualNombre = useMemo(
-    () => (datos.id_obra_social ? "" : (datos.obra_social_texto || "").trim()),
-    [datos.id_obra_social, datos.obra_social_texto]
+  const [errores, setErrores] = useState({});
+
+  const limpiarErrorObraSocial = useCallback(() => {
+    setErrores((prev) => {
+      if (!prev.obra_social) return prev;
+      const { obra_social, ...resto } = prev;
+      return resto;
+    });
+  }, []);
+
+  const handleSeleccionObra = useCallback(
+    (obra) => {
+      const obraId = getObraId(obra);
+      if (!obraId) return;
+      setDatos((prev) => ({
+        ...prev,
+        id_obra_social: obraId,
+        obra_social_texto: "",
+      }));
+      setObraManualActiva(false);
+      limpiarErrorObraSocial();
+    },
+    [limpiarErrorObraSocial]
   );
 
-  const usarOtraObra = datos.tiene_obra_social && !datos.id_obra_social;
+  const limpiarObraSeleccion = useCallback(() => {
+    setDatos((prev) => ({
+      ...prev,
+      id_obra_social: "",
+      obra_social_texto: "",
+    }));
+    setObraManualActiva(false);
+    limpiarErrorObraSocial();
+  }, [limpiarErrorObraSocial]);
+
+  const activarObraManual = useCallback(() => {
+    setObraManualActiva(true);
+    setDatos((prev) => ({
+      ...prev,
+      id_obra_social: "",
+    }));
+  }, []);
 
   const handleObraInputChange = useCallback(
     (valor) => {
       const texto = valor ?? "";
-      const normalizado = normalizeObraName(texto);
+      const normalizado = normalizeObraComparable(texto);
+      const coincidencia = obrasActivas.find((obra) => {
+        const nombre = normalizeObraComparable(getObraNombre(obra));
+        return nombre && normalizado && nombre === normalizado;
+      });
+
       setDatos((prev) => {
-        if (!normalizado) {
+        if (!texto.trim()) {
           if (!prev.id_obra_social && !prev.obra_social_texto) return prev;
           return {
             ...prev,
@@ -323,28 +387,18 @@ export default function FormularioEntrevista() {
             obra_social_texto: "",
           };
         }
-        const coincidencia = obrasActivas.find((obra) => {
-          const nombre = normalizeObraName(
-            obra?.nombre_obra_social || obra?.nombre || ""
-          );
-          return nombre && nombre === normalizado;
-        });
+
         if (coincidencia) {
-          const obraId =
-            coincidencia.id_obra_social ??
-            coincidencia.id ??
-            coincidencia.uuid ??
-            "";
-          const obraIdStr =
-            obraId !== undefined && obraId !== null ? String(obraId) : "";
-          if (prev.id_obra_social === obraIdStr && prev.obra_social_texto === "")
+          const obraId = getObraId(coincidencia);
+          if (prev.id_obra_social === obraId && prev.obra_social_texto === "")
             return prev;
           return {
             ...prev,
-            id_obra_social: obraIdStr,
+            id_obra_social: obraId,
             obra_social_texto: "",
           };
         }
+
         if (prev.id_obra_social === "" && prev.obra_social_texto === texto)
           return prev;
         return {
@@ -353,8 +407,13 @@ export default function FormularioEntrevista() {
           obra_social_texto: texto,
         };
       });
+
+      setObraManualActiva(!coincidencia && texto.trim().length > 0);
+      if (coincidencia || texto.trim().length > 0) {
+        limpiarErrorObraSocial();
+      }
     },
-    [obrasActivas]
+    [obrasActivas, limpiarErrorObraSocial]
   );
 
   const handleObraBlur = useCallback(
@@ -363,6 +422,14 @@ export default function FormularioEntrevista() {
     },
     [handleObraInputChange]
   );
+
+  const obrasFiltradas = useMemo(() => {
+    const termino = normalizeObraComparable(obraBusqueda);
+    if (!termino) return obrasActivas;
+    return obrasActivas.filter((obra) =>
+      normalizeObraComparable(getObraNombre(obra)).includes(termino)
+    );
+  }, [obraBusqueda, obrasActivas]);
 
   const serviciosOpciones = useMemo(() => {
     const registros = Array.isArray(listaProfesiones) ? listaProfesiones : [];
@@ -505,7 +572,6 @@ export default function FormularioEntrevista() {
     };
   }, [datos.dni_responsable]);
 
-  const [errores, setErrores] = useState({});
   const validarTodo = () => {
     const hoy = new Date();
     const fechaMin = new Date(
@@ -869,59 +935,144 @@ export default function FormularioEntrevista() {
               <SelectorSiNo
                 etiqueta="¿El niño/a posee obra social?"
                 activo={datos.tiene_obra_social}
-                onSi={() => actualizarCampo("tiene_obra_social", true)}
+                onSi={() => {
+                  actualizarCampo("tiene_obra_social", true);
+                  setObraManualActiva(false);
+                  limpiarErrorObraSocial();
+                }}
                 onNo={() => {
                   actualizarCampo("tiene_obra_social", false);
                   actualizarCampo("id_obra_social", "");
                   actualizarCampo("obra_social_texto", "");
+                  setObraBusqueda("");
+                  setObraManualActiva(false);
+                  limpiarErrorObraSocial();
                 }}
               />
               {datos.tiene_obra_social && (
-                <Campo
-                  id="obra_social"
-                  etiqueta="Obra social"
-                  error={errores.obra_social}
-                >
-                  <input
-                    id="obra_social"
-                    className="entrevista__input"
-                    type="text"
-                    list="obras-sociales-activas"
-                    placeholder="Buscá o escribí una obra social"
-                    value={obraInputValue}
-                    onChange={(e) => handleObraInputChange(e.target.value)}
-                    onBlur={(e) => handleObraBlur(e.target.value)}
-                  />
-                  <datalist id="obras-sociales-activas">
-                    {obrasActivas
-                      .filter(
-                        (obra) =>
-                          (obra?.nombre_obra_social || obra?.nombre || "")
-                            .trim().length > 0
-                      )
-                      .map((obra) => {
-                        const nombre =
-                          (obra?.nombre_obra_social || obra?.nombre || "")
-                            .trim();
-                        const optionKey = String(
-                          obra?.id_obra_social ??
-                            obra?.id ??
-                            obra?.uuid ??
-                            nombre
+                <div className="obra-social-selector">
+                  <Campo
+                    id="obra_social_search"
+                    etiqueta="Buscá tu obra social"
+                    error={
+                      !usarOtraObra && !datos.id_obra_social
+                        ? errores.obra_social
+                        : null
+                    }
+                  >
+                    <div className="obra-social-search-controls">
+                      <input
+                        id="obra_social_search"
+                        type="search"
+                        className="entrevista__input"
+                        placeholder="Ingresá al menos 2 letras para filtrar"
+                        value={obraBusqueda}
+                        onChange={(e) => setObraBusqueda(e.target.value)}
+                        onBlur={(e) =>
+                          setObraBusqueda(e.target.value.trim())
+                        }
+                      />
+                      {datos.id_obra_social && (
+                        <button
+                          type="button"
+                          className="obra-social-clear-btn"
+                          onClick={limpiarObraSeleccion}
+                        >
+                          Limpiar selección
+                        </button>
+                      )}
+                    </div>
+                  </Campo>
+
+                  <div
+                    className="obra-social-grid"
+                    role="list"
+                    aria-label="Obras sociales disponibles"
+                  >
+                    {cargando ? (
+                      <span className="obra-social-empty" role="status">
+                        Cargando obras sociales…
+                      </span>
+                    ) : obrasFiltradas.length === 0 ? (
+                      <span className="obra-social-empty">
+                        No encontramos resultados para "{obraBusqueda}".
+                      </span>
+                    ) : (
+                      obrasFiltradas.map((obra) => {
+                        const obraId = getObraId(obra);
+                        const seleccionado =
+                          datos.id_obra_social &&
+                          obraId === String(datos.id_obra_social);
+                        const logoSrc = getObraLogoUrl(obra) || fallbackObraLogo;
+                        return (
+                          <button
+                            key={obraId || getObraNombre(obra)}
+                            type="button"
+                            className={`obra-social-card ${
+                              seleccionado ? "selected" : ""
+                            }`}
+                            onClick={() => handleSeleccionObra(obra)}
+                            aria-pressed={seleccionado}
+                          >
+                            <img
+                              src={logoSrc}
+                              alt={`Logo de ${getObraNombre(obra)}`}
+                              className="obra-social-card__logo"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = fallbackObraLogo;
+                              }}
+                            />
+                            <span className="obra-social-card__name">
+                              {getObraNombre(obra)}
+                            </span>
+                          </button>
                         );
-                        return <option key={optionKey} value={nombre} />;
-                      })}
-                  </datalist>
-                  <span className="muted">
-                    Seleccioná una obra social existente o escribí una nueva.
-                    Las nuevas se registrarán como pendientes.
-                  </span>
-                  {usarOtraObra && obraManualNombre ? (
-                    <span className="muted">
-                      Se registrará "{obraManualNombre}" como pendiente.
+                      })
+                    )}
+
+                    <button
+                      type="button"
+                      className={`obra-social-card obra-social-card--manual ${
+                        usarOtraObra ? "selected" : ""
+                      }`}
+                      onClick={activarObraManual}
+                      aria-pressed={usarOtraObra}
+                    >
+                      <span className="obra-social-card__icon">＋</span>
+                      <span className="obra-social-card__name">
+                        Mi obra social no aparece
+                      </span>
+                      <span className="obra-social-card__hint">
+                        Escribí el nombre manualmente
+                      </span>
+                    </button>
+                  </div>
+
+                  {!usarOtraObra && matchedObra && (
+                    <span className="muted obra-social-selected">
+                      Seleccionaste "{getObraNombre(matchedObra)}".
                     </span>
-                  ) : null}
-                </Campo>
+                  )}
+
+                  {usarOtraObra && (
+                    <Campo
+                      id="obra_social_manual"
+                      etiqueta="Nombre de la obra social"
+                      error={errores.obra_social}
+                    >
+                      <input
+                        id="obra_social_manual"
+                        className="entrevista__input"
+                        type="text"
+                        placeholder="Ej: Obra Social Ejemplo"
+                        value={datos.obra_social_texto}
+                        onChange={(e) => handleObraInputChange(e.target.value)}
+                        onBlur={(e) => handleObraBlur(e.target.value)}
+                      />
+                    </Campo>
+                  )}
+                </div>
               )}
             </fieldset>
           )}
