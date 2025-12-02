@@ -127,26 +127,48 @@ function cleanObject(source) {
 async function fetchUserRoles(idUsuario) {
   if (!idUsuario) return [];
   try {
+    // Consulta simplificada para evitar problemas con relaciones
     const { data, error } = await supabaseAdmin
       .from('usuario_roles')
-      .select(`
-        usuario_id,
-        rol_id,
-        rol:roles ( id_rol, nombre_rol )
-      `)
+      .select('usuario_id, rol_id')
       .eq('usuario_id', Number(idUsuario));
+
     if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('fetchUserRoles error:', error);
-      }
+      console.error('fetchUserRoles error:', error);
       return [];
     }
-    const roles = (data || [])
+
+    if (!data || data.length === 0) {
+      console.log('No roles found for user:', idUsuario);
+      return [];
+    }
+
+    // Obtener información de roles por separado
+    const roleIds = data.map(row => row.rol_id).filter(id => id);
+    if (roleIds.length === 0) {
+      console.log('No valid role IDs found');
+      return [];
+    }
+
+    const { data: rolesData, error: rolesError } = await supabaseAdmin
+      .from('roles')
+      .select('id_rol, nombre_rol')
+      .in('id_rol', roleIds);
+
+    if (rolesError) {
+      console.error('fetchUserRoles roles lookup error:', rolesError);
+      return [];
+    }
+
+    const rolesMap = new Map(rolesData?.map(role => [role.id_rol, role]) || []);
+
+    const roles = data
       .map((row) => {
-        const rawName = row.rol?.nombre_rol ?? null;
+        const roleInfo = rolesMap.get(row.rol_id);
+        const rawName = roleInfo?.nombre_rol ?? null;
         const normalized = normalizeText(rawName);
         return {
-          id: row.rol_id ?? row.rol?.id_rol ?? null,
+          id: row.rol_id ?? null,
           nombre: mapRoleDisplayName(rawName),
           _normalized: normalized,
         };
@@ -295,35 +317,82 @@ async function fetchPersonaProfesion(personaId) {
 }
 
 async function fetchUserProfile(idUsuario, rolesHint = null, prefetchedSnapshot = null) {
-  const snapshot = prefetchedSnapshot || (await fetchUserAndPersona(idUsuario));
-  if (!snapshot) return null;
+  try {
+    // Consulta simplificada del usuario y persona
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from('usuarios')
+      .select(`
+        id_usuario,
+        dni,
+        activo,
+        primer_registro_completado,
+        persona_id
+      `)
+      .eq('id_usuario', Number(idUsuario))
+      .maybeSingle();
 
-  const { user, persona, personaId } = snapshot;
-  if (!personaId || !persona) return null;
+    if (userError || !userData) {
+      console.error('fetchUserProfile user lookup error:', userError);
+      return null;
+    }
 
-  const roles = rolesHint || (await fetchUserRoles(idUsuario));
-  const profesion = await fetchPersonaProfesion(personaId);
-  const foto = await resolveStorageAsset(persona.foto_perfil);
-  const tipo = determineTipoFromRoles(roles, !!profesion?.id_departamento);
-  const esAdmin = hasAdminRole(roles);
+    if (!userData.persona_id) {
+      console.log('User has no persona_id');
+      return null;
+    }
 
-  return {
-    tipo,
-    es_admin: esAdmin,
-    id_usuario: user.id_usuario,
-    persona_id: personaId,
-    primer_registro_completado: user.primer_registro_completado ?? null,
-    nombre: persona.nombre ?? null,
-    apellido: persona.apellido ?? null,
-    telefono: persona.telefono ?? null,
-    email: persona.email ?? null,
-    fecha_nacimiento: persona.fecha_nacimiento ?? null,
-    foto_perfil: foto.signedUrl || persona.foto_perfil || null,
-    foto_perfil_url: foto.signedUrl || null,
-    foto_perfil_path: foto.path,
-    profesion: profesion?.nombre ?? (tipo === 'recepcion' ? 'Recepción' : null),
-    profesion_id: profesion?.id_departamento ?? null,
-  };
+    // Consulta de persona por separado
+    const { data: personaData, error: personaError } = await supabaseAdmin
+      .from('personas')
+      .select(`
+        id,
+        nombre,
+        apellido,
+        telefono,
+        email,
+        fecha_nacimiento,
+        foto_perfil
+      `)
+      .eq('id', Number(userData.persona_id))
+      .maybeSingle();
+
+    if (personaError) {
+      console.error('fetchUserProfile persona lookup error:', personaError);
+      return null;
+    }
+
+    if (!personaData) {
+      console.log('Persona not found for user');
+      return null;
+    }
+
+    const roles = rolesHint || (await fetchUserRoles(idUsuario));
+    const profesion = await fetchPersonaProfesion(userData.persona_id);
+    const foto = await resolveStorageAsset(personaData.foto_perfil);
+    const tipo = determineTipoFromRoles(roles, !!profesion?.id_departamento);
+    const esAdmin = hasAdminRole(roles);
+
+    return {
+      tipo,
+      es_admin: esAdmin,
+      id_usuario: userData.id_usuario,
+      persona_id: userData.persona_id,
+      primer_registro_completado: userData.primer_registro_completado ?? null,
+      nombre: personaData.nombre ?? null,
+      apellido: personaData.apellido ?? null,
+      telefono: personaData.telefono ?? null,
+      email: personaData.email ?? null,
+      fecha_nacimiento: personaData.fecha_nacimiento ?? null,
+      foto_perfil: foto.signedUrl || personaData.foto_perfil || null,
+      foto_perfil_url: foto.signedUrl || null,
+      foto_perfil_path: foto.path,
+      profesion: profesion?.nombre ?? (tipo === 'recepcion' ? 'Recepción' : null),
+      profesion_id: profesion?.id_departamento ?? null,
+    };
+  } catch (err) {
+    console.error('fetchUserProfile exception:', err);
+    return null;
+  }
 }
 
 function computeNeedsProfile(perfil) {
@@ -586,11 +655,15 @@ const registrarUsuario = async (req, res) => {
 
 const loginUsuario = async (req, res) => {
   try {
+    console.log('🔍 Login attempt:', { dni: req.body?.dni, hasPassword: !!req.body?.contrasena });
+
     const { dni, contrasena } = req.body || {};
     if (!dni || !contrasena) {
+      console.log('❌ Missing credentials');
       return res.status(400).json({ error: 'Faltan credenciales' });
     }
 
+    console.log('🔍 Looking up user with DNI:', dni);
     const { data: user, error: findErr } = await supabaseAdmin
       .from('usuarios')
       .select('id_usuario, dni, password_hash, activo')
@@ -598,47 +671,74 @@ const loginUsuario = async (req, res) => {
       .maybeSingle();
 
     if (findErr) {
-      console.error('loginUsuario lookup error:', findErr);
+      console.error('❌ Database lookup error:', findErr);
       return res.status(500).json({ error: 'Error interno' });
     }
+
     if (!user) {
+      console.log('❌ User not found');
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
+
     if (user.activo === false) {
+      console.log('❌ User inactive');
       return res.status(403).json({ error: 'Usuario inactivo' });
     }
 
+    console.log('✅ User found:', { id: user.id_usuario, hasPasswordHash: !!user.password_hash });
     let credentialsValid = false;
+
     if (!user.password_hash) {
+      console.log('🔍 No password hash, checking default password');
       if (String(contrasena) === DEFAULT_PASSWORD) {
+        console.log('✅ Default password valid, creating hash');
         const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
         const { error: initErr } = await supabaseAdmin
           .from('usuarios')
           .update({ password_hash: hash })
           .eq('id_usuario', user.id_usuario);
         if (initErr) {
-          console.error('loginUsuario default password hash error:', initErr);
+          console.error('❌ Error creating password hash:', initErr);
           return res.status(500).json({ error: 'No se pudo validar credenciales' });
         }
         credentialsValid = true;
+        console.log('✅ Password hash created successfully');
+      } else {
+        console.log('❌ Default password invalid');
       }
     } else {
-      credentialsValid = await bcrypt.compare(String(contrasena), user.password_hash || '');
+      console.log('🔍 Comparing password with hash');
+      try {
+        credentialsValid = await bcrypt.compare(String(contrasena), user.password_hash || '');
+        console.log('✅ Password comparison result:', credentialsValid);
+      } catch (bcryptErr) {
+        console.error('❌ Bcrypt comparison error:', bcryptErr);
+        return res.status(500).json({ error: 'Error al validar credenciales' });
+      }
     }
 
     if (!credentialsValid) {
+      console.log('❌ Invalid credentials');
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
+    console.log('🔍 Generating JWT token');
     const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
     const token = jwt.sign({ id: user.id_usuario, dni: user.dni }, secret, { expiresIn: '8h' });
 
+    console.log('🔍 Fetching user roles');
     const roles = await fetchUserRoles(user.id_usuario);
+    console.log('✅ Roles fetched:', roles.length);
+
+    console.log('🔍 Fetching user profile');
     const perfil = await fetchUserProfile(user.id_usuario, roles);
+    console.log('✅ Profile fetched:', !!perfil);
+
     const esAdmin = hasAdminRole(roles);
     const needsProfile = computeNeedsProfile(perfil);
     const firstLogin = !perfil?.primer_registro_completado || String(contrasena) === DEFAULT_PASSWORD;
 
+    console.log('✅ Login successful for user:', user.dni);
     return res.json({
       success: true,
       token,
@@ -655,7 +755,7 @@ const loginUsuario = async (req, res) => {
       needsProfile,
     });
   } catch (err) {
-    console.error('loginUsuario exception:', err);
+    console.error('❌ loginUsuario exception:', err);
     return res.status(500).json({ error: err.message || 'Error al iniciar sesión' });
   }
 };

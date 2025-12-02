@@ -898,6 +898,9 @@ export default function Ninos() {
       {modalOpen && modalData && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-info" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-mobile" onClick={closeModal}>
+              ✕ Cerrar
+            </button>
             <button className="modal-close" onClick={closeModal}>
               &times;
             </button>

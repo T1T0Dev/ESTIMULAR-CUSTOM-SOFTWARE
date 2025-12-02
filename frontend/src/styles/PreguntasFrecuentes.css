@@ -41,3 +41,55 @@
   font-weight: bold;
   text-decoration: underline;
 }
+
+/* Media Queries para Responsividad */
+@media (max-width: 768px) {
+  #footer-preguntas-titulo {
+    font-size: 1.2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .footer-pregunta {
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .footer-pregunta::marker {
+    font-size: 1.1rem;
+  }
+
+  .footer-respuesta {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin-left: 1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .footer-enlace-entrevista {
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #footer-preguntas-titulo {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-pregunta {
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .footer-pregunta::marker {
+    font-size: 1rem;
+  }
+
+  .footer-respuesta {
+    font-size: 0.9rem;
+    line-height: 1.3;
+    margin-left: 0.8rem;
+    margin-bottom: 0.3rem;
+  }
+}

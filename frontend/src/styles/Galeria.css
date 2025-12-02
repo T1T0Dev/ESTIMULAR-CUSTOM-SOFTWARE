@@ -39,8 +39,53 @@
   background: var(--color-rojo1);
 }
 
+/* Media Queries para Responsividad */
+@media (max-width: 1024px) {
+  .gallery-section {
+    padding: 2.5rem 1rem;
+  }
+
+  .gallery-title {
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+  }
+
+  .gallery-item {
+    height: 200px;
+  }
+}
+
 @media (max-width: 768px) {
+  .gallery-section {
+    padding: 2rem 1rem;
+  }
+
+  .gallery-title {
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+  }
+
   .gallery-item {
     height: 180px;
+  }
+
+  .gallery-swiper {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery-section {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .gallery-title {
+    font-size: 1.4rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .gallery-item {
+    height: 150px;
+    border-radius: 8px;
   }
 }

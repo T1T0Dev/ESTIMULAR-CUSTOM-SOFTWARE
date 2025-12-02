@@ -287,6 +287,33 @@
   color: var(--accent-red);
   cursor: pointer;
 }
+
+.modal-close-mobile {
+  display: none; /* Solo visible en móviles */
+}
+
+/* Estilos para móviles */
+@media (max-width: 720px) {
+  .modal-close-mobile {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-rosa2);
+    color: white;
+    border: none;
+    padding: 18px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .modal-close-mobile:hover {
+    background: #d81b60;
+  }
+}
 .modal-info h2 {
   font-size: 1.4rem;
   font-weight: 800;
@@ -628,19 +655,26 @@ input[type="date"].edit-input {
     font-size: 1.5rem;
   }
 }
-@media (max-width: 720px) {
-  .modal-info {
-    min-width: unset;
-    width: 95vw;
-    max-width: 95vw;
-    padding: 1.4rem 1rem 1rem 1rem;
+@media (max-width: 1024px) {
+
+  .dashboard-table-wrapper {
+    margin: 0 !important;
+  }
+
+  .table {
+    font-size: 0.8rem !important;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 4px !important;
   }
   .modal-grid {
     grid-template-columns: 1fr;
     gap: 8px 0;
   }
   .card.ninos-card {
-    padding: 1rem;
+    padding: 1.5rem 1rem; /* Mejor espaciado para móviles */
   }
   .ninos-top {
     flex-direction: column;
@@ -681,14 +715,14 @@ input[type="date"].edit-input {
   }
   .table tbody {
     display: grid;
-    gap: 12px;
+    gap: 16px;
   }
   .table tbody tr {
     display: grid;
-    gap: 10px;
-    padding: 14px 16px;
+    gap: 16px;
+    padding: 20px;
     border: 1px solid var(--neutral-300);
-    border-radius: 14px;
+    border-radius: 16px;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
     background: #fff;
   }
@@ -697,27 +731,40 @@ input[type="date"].edit-input {
     padding-left: 18px;
   }
   .table tbody tr td {
-    padding: 4px 0;
+    padding: 8px 0;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     border: 0;
+    width: 100%;
+    min-height: 24px; /* Asegurar altura mínima */
+    color: var(--color-text); /* Asegurar color de texto */
   }
   .table tbody tr td::before {
     content: attr(data-label);
     font-weight: 700;
     color: var(--muted);
-    flex: 0 0 45%;
-    max-width: 45%;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.75rem;
+    margin-bottom: 2px;
   }
   .table tbody tr td[data-label="Acciones"],
   .table tbody tr td[data-label="Principal"],
   .table tbody tr td[data-label="Parentesco"] {
-    align-items: flex-start;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+  }
+  .table tbody tr td[data-label="Acciones"],
+  .table tbody tr td[data-label="Principal"],
+  .table tbody tr td[data-label="Parentesco"] {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
   }
   .table-input,
   .row-actions,
@@ -760,12 +807,249 @@ input[type="date"].edit-input {
   .relationship-search input {
     font-size: 0.9rem;
   }
-  .modal-info {
-    width: calc(100vw - 32px);
-    padding: 1.2rem 1rem;
+
+  /* Modal móvil completamente optimizado - VERSIÓN ULTRA GRANDE */
+  .modal-overlay {
+    padding: 4px !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    min-height: 100vh !important;
   }
+
+  .modal-info {
+    width: 98vw !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: 96vh !important;
+    border-radius: 20px !important;
+    padding: 24px !important;
+    display: block !important;
+    flex-direction: unset !important;
+    background: white !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    z-index: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
   .modal-close {
-    top: 12px;
-    right: 12px;
+    display: none !important;
+  }
+
+  .modal-close-mobile {
+    display: block !important;
+    width: 100% !important;
+    padding: 18px 20px !important;
+    background: var(--color-rosa2) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    margin-bottom: 20px !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(229, 0, 125, 0.4) !important;
+  }
+
+  .modal-info h2 {
+    font-size: 1.6rem !important;
+    margin: 0 0 24px 0 !important;
+    padding: 0 8px 0 16px !important;
+    text-align: center !important;
+    color: var(--color-rosa2) !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .modal-section {
+    margin-bottom: 24px !important;
+    padding: 20px 24px !important;
+    background: #f8f9fa !important;
+    border-radius: 16px !important;
+    border: 1px solid #e9ecef !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .modal-section h3 {
+    font-size: 1.3rem !important;
+    margin-bottom: 16px !important;
+    color: var(--color-rosa2) !important;
+    font-weight: 600 !important;
+    border-bottom: 3px solid var(--color-rosa2) !important;
+    padding-bottom: 8px !important;
+    padding-left: 8px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .modal-row {
+    display: block !important;
+    padding: 16px 0 !important;
+    border-bottom: 1px solid #e9ecef !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    hyphens: auto !important;
+    overflow: hidden !important;
+  }
+
+  .modal-row:last-child {
+    border-bottom: none !important;
+  }
+
+  .modal-row span {
+    font-weight: 600 !important;
+    color: var(--color-text) !important;
+    display: block !important;
+    margin-bottom: 6px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.4 !important;
+    font-size: 0.9rem !important;
+    padding-left: 4px !important;
+  }
+
+  .modal-row span:first-child {
+    font-weight: 600 !important;
+    color: var(--muted) !important;
+    margin-bottom: 4px !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding-left: 4px !important;
+  }
+
+  .section-help {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    color: #666 !important;
+    margin-bottom: 20px !important;
+    padding: 16px 20px !important;
+    background: #fff !important;
+    border-radius: 12px !important;
+    border-left: 5px solid var(--color-rosa2) !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .relationship-search {
+    margin-bottom: 20px !important;
+  }
+
+  .relationship-search input {
+    width: 100% !important;
+    padding: 14px 18px !important;
+    border: 3px solid #e9ecef !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    transition: border-color 0.2s ease !important;
+    box-sizing: border-box !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .relationship-search input:focus {
+    border-color: var(--color-rosa2) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 4px rgba(229, 0, 125, 0.15) !important;
+  }
+
+  .relationship-list {
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Sección específica de Obra Social optimizada para móviles */
+  .modal-section:nth-child(3) { /* Obra Social es la tercera sección */
+    margin-bottom: 20px !important;
+  }
+
+  .modal-section:nth-child(3) .modal-row {
+    padding: 16px 0 !important;
+    font-size: 1rem !important;
+  }
+
+  .modal-section:nth-child(3) .modal-row span:first-child {
+    font-size: 0.9rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .modal-section:nth-child(3) .modal-row span:not(:first-child) {
+    word-break: break-all !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Sección de Responsables optimizada para móviles */
+  .modal-section:nth-child(4) { /* Responsables es la cuarta sección */
+    margin-bottom: 24px !important;
+  }
+
+  .modal-section:nth-child(4) .section-help {
+    font-size: 0.9rem !important;
+    line-height: 1.5 !important;
+    padding: 16px 20px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .modal-section:nth-child(4) .relationship-search input {
+    font-size: 0.95rem !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Estilos para elementos de candidato en la tabla principal */
+  .candidatos-table {
+    font-size: 0.9rem !important;
+  }
+
+  .candidatos-table th,
+  .candidatos-table td {
+    padding: 12px 10px !important;
+  }
+
+  .candidatos-table td[data-label="Tipo"] {
+    font-weight: 600 !important;
+    text-transform: capitalize !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* Asegurar que el texto largo se ajuste en todas las secciones */
+  .modal-section .modal-row,
+  .modal-section .section-help,
+  .modal-section h3,
+  .relationship-search input::placeholder {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    hyphens: auto !important;
+  }
+
+  /* Mejorar la legibilidad del texto en secciones específicas */
+  .modal-section .result-info strong,
+  .modal-section .result-info span {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Ajustes adicionales para texto largo */
+  .modal-row span:not(:first-child) {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    padding-left: 8px !important;
   }
 }
+}
+
+/*
+MODAL MÓVIL - MODAL COMPACTO OPTIMIZADO
+Modal responsive optimizado para móviles: 95% ancho, contenido compacto, botón cerrar prominente.
+Hard refresh recomendado: Ctrl+F5
+*/

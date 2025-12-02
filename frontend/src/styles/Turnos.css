@@ -1,5 +1,118 @@
 /* Turnos.css */
 
+/* Botón de alternancia entre vistas */
+.turnos-view-toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: fit-content; /* Ancho automático para centrar */
+  margin: 0 auto; /* Centrar en la página */
+}
+
+.view-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.view-label {
+  font-size: 14px;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.view-label strong {
+  color: var(--color-rosa2);
+  font-weight: 700;
+}
+
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 2px solid var(--color-rosa1);
+  background: linear-gradient(135deg, var(--color-rosa1) 0%, var(--color-rosa2) 100%);
+  color: white;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3);
+  position: relative;
+  overflow: hidden;
+  min-width: 140px;
+  justify-content: center;
+  animation: buttonGlow 0.3s ease-out;
+}
+
+@keyframes buttonGlow {
+  0% {
+    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3), 0 0 0 0 rgba(216, 27, 96, 0.7);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3), 0 0 0 8px rgba(216, 27, 96, 0);
+  }
+  100% {
+    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3), 0 0 0 0 rgba(216, 27, 96, 0);
+  }
+}
+
+.view-toggle-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.view-toggle-btn:hover::before {
+  left: 100%;
+}
+
+.view-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(216, 27, 96, 0.4);
+}
+
+.view-toggle-btn:hover .toggle-icon {
+  transform: scale(1.1);
+}
+
+.view-toggle-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(216, 27, 96, 0.3);
+  animation: buttonPress 0.1s ease-out;
+}
+
+@keyframes buttonPress {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(0) scale(0.95); }
+  100% { transform: translateY(0) scale(0.98); }
+}
+
+.toggle-icon {
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+.toggle-text {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: opacity 0.3s ease;
+}
+
 /* Layout específico de la página de turnos */
 .dashboard-content > .turnos-page,
 .turnos-page {
@@ -28,6 +141,20 @@
   min-height: 28px;
   padding-top: 4px;
   padding-bottom: 4px;
+}
+
+/* Override de la toolbar para mejor control */
+.rbc-toolbar {
+  justify-content: flex-start !important;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rbc-toolbar-label {
+  margin: 0 auto;
+  order: 2;
+  flex: 1;
+  text-align: center;
 }
 
 /* Estilo para los eventos (turnos) */
@@ -261,4 +388,776 @@
 
 .goto-date-actions button[type="submit"]:hover {
   transform: translateY(-1px);
+}
+
+/* Media Queries para Responsividad */
+@media (max-width: 1024px) {
+  .rbc-calendar {
+    font-size: 0.9rem;
+  }
+
+  .rbc-event {
+    font-size: 0.8rem;
+    padding: 1px 4px;
+  }
+
+  .rbc-header {
+    padding: 4px 6px;
+  }
+
+  .rbc-time-slot {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .turnos-page .turnos-grid-container {
+    padding: 0.5rem;
+  }
+
+  .rbc-calendar {
+    font-size: 0.85rem;
+  }
+
+  .rbc-event {
+    font-size: 0.75rem;
+    padding: 1px 3px;
+    min-height: 20px;
+  }
+
+  .rbc-header {
+    padding: 3px 4px;
+    font-size: 0.8rem;
+  }
+
+  .rbc-time-slot {
+    font-size: 0.8rem;
+    min-height: 24px;
+  }
+
+  .rbc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .rbc-toolbar button {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .rbc-toolbar-label {
+    font-size: 1.1rem;
+    margin: 0.25rem 0;
+  }
+
+  .goto-date-dialog {
+    width: 90%;
+    max-width: 350px;
+  }
+
+  .goto-date-dialog .modal-content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .turnos-page .turnos-grid-container {
+    padding: 0.25rem;
+  }
+
+  .rbc-calendar {
+    font-size: 0.8rem;
+  }
+
+  .rbc-event {
+    font-size: 0.7rem;
+    padding: 1px 2px;
+    min-height: 18px;
+  }
+
+  .rbc-header {
+    padding: 2px 3px;
+    font-size: 0.75rem;
+  }
+
+  .rbc-time-slot {
+    font-size: 0.75rem;
+    min-height: 20px;
+  }
+
+  .rbc-toolbar {
+    padding: 0.25rem;
+  }
+
+  .rbc-toolbar button {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .rbc-toolbar-label {
+    font-size: 1rem;
+  }
+
+  .goto-date-dialog {
+    width: 95%;
+    max-width: 320px;
+  }
+
+  .goto-date-dialog .modal-content {
+    padding: 0.75rem;
+  }
+
+  .goto-date-dialog h3 {
+    font-size: 1.1rem;
+  }
+
+  .goto-date-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .goto-date-actions button {
+    width: 100%;
+    padding: 0.6rem;
+  }
+}
+
+/* Media queries adicionales para pantallas muy pequeñas */
+@media (max-width: 480px) {
+  .turnos-grid-container {
+    max-height: 70vh; /* Reducir altura en pantallas muy pequeñas */
+  }
+
+  .rbc-calendar {
+    width: auto;
+    min-width: 800px; /* Reducir ancho mínimo en pantallas pequeñas */
+    height: 100%;
+  }
+
+  /* Columnas más estrechas en pantallas pequeñas */
+  .rbc-time-view .rbc-day-slot {
+    min-width: 120px;
+    max-width: 120px;
+  }
+}
+
+/* Estilos para la vista de lista */
+.turnos-list-view {
+  height: 100%;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  padding: 0 16px;
+}
+
+.turnos-list-header {
+  padding: 24px 20px;
+  background: linear-gradient(135deg, var(--color-rosa1) 0%, var(--color-rosa2) 100%);
+  color: white;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 4px 20px rgba(216, 27, 96, 0.2);
+  margin-bottom: 20px;
+}
+
+.list-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.list-header-content h3 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  flex: 1;
+}
+
+.list-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.list-view-toggle .view-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.list-view-toggle .view-label {
+  font-size: 14px;
+  color: white;
+  font-weight: 500;
+}
+
+.list-view-toggle .view-label strong {
+  color: rgba(255,255,255,0.9);
+  font-weight: 700;
+}
+
+.list-view-toggle .view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  backdrop-filter: blur(10px);
+  min-width: 100px;
+  justify-content: center;
+}
+
+.list-view-toggle .view-toggle-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.5);
+}
+
+.list-view-toggle .toggle-icon {
+  font-size: 16px;
+}
+
+.list-view-toggle .toggle-text {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.no-turnos-message {
+  padding: 60px 20px;
+  text-align: center;
+  color: #666;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  margin: 20px 0;
+}
+
+.no-turnos-message p {
+  font-size: 1.2rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.turnos-list-content {
+  padding: 0;
+}
+
+.turnos-day-group {
+  margin-bottom: 32px;
+}
+
+.turnos-day-title {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-bottom: 3px solid var(--color-rosa2);
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-text);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 80px; /* Debajo del header */
+  z-index: 4;
+}
+
+.turnos-list {
+  padding: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.turno-list-item {
+  display: flex;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.turno-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-rosa1);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.turno-list-item:hover {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  transform: translateX(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  border-radius: 8px;
+  margin: 4px 8px;
+}
+
+.turno-list-item:hover::before {
+  opacity: 1;
+}
+
+.turno-list-item:last-child {
+  border-bottom: none;
+}
+
+.turno-list-item.event-confirmado {
+  border-left: 4px solid var(--color-accent-blue);
+}
+
+.turno-list-item.event-completado {
+  border-left: 4px solid var(--color-verde2);
+}
+
+.turno-list-item.event-pendiente {
+  border-left: 4px solid #78909c;
+}
+
+.turno-list-item.event-cancelado {
+  border-left: 4px solid #f44336;
+}
+
+.turno-time {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-rosa2);
+  min-width: 120px;
+  text-align: center;
+  background: rgba(216, 27, 96, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-right: 16px;
+}
+
+.turno-info {
+  flex: 1;
+  margin-left: 0;
+}
+
+.turno-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.turno-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.turno-consultorio {
+  background: rgba(33, 150, 243, 0.1);
+  color: var(--color-accent-blue);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.turno-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.turno-status.status-confirmado {
+  background: #e3f2fd;
+  color: var(--color-accent-blue);
+}
+
+.turno-status.status-completado {
+  background: #e8f5e8;
+  color: var(--color-verde2);
+}
+
+.turno-status.status-pendiente {
+  background: #f5f5f5;
+  color: #78909c;
+}
+
+.turno-status.status-cancelado {
+  background: #ffebee;
+  color: #f44336;
+}
+
+.turno-actions {
+  margin-left: 16px;
+}
+
+.turno-action-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.turno-action-btn:hover {
+  background: #e9ecef;
+}
+
+/* Media queries para móviles en vista de lista */
+@media (max-width: 768px) {
+  .turnos-view-toggle {
+    padding: 12px 16px;
+    flex-direction: row; /* Mantener en fila en móviles */
+    gap: 12px;
+    align-items: center;
+    justify-content: center; /* Centrar horizontalmente */
+    width: fit-content; /* Ancho automático */
+    margin: 0 auto; /* Centrar en móviles */
+  }
+
+  .view-indicator {
+    justify-content: center;
+    order: 1; /* Cambiar orden para que el indicador esté primero */
+  }
+
+  .view-toggle-btn {
+    order: 2;
+    padding: 10px 20px;
+    font-size: 14px;
+    gap: 6px;
+    min-width: 120px;
+    box-shadow: 0 3px 10px rgba(216, 27, 96, 0.25);
+  }
+
+  .view-toggle-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(216, 27, 96, 0.35);
+  }
+
+  .toggle-icon {
+    font-size: 16px;
+  }
+
+  .toggle-text {
+    font-size: 14px;
+  }
+
+  .view-label {
+    font-size: 13px;
+  }
+
+  .turnos-list-view {
+    padding: 0 8px;
+  }
+
+  .turnos-list-header {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .list-header-content {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .list-header-content h3 {
+    font-size: 1.3rem;
+  }
+
+  .list-view-toggle {
+    gap: 8px;
+  }
+
+  .list-view-toggle .view-label {
+    font-size: 12px;
+  }
+
+  .list-view-toggle .view-toggle-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-width: 80px;
+    gap: 4px;
+  }
+
+  .list-view-toggle .toggle-icon {
+    font-size: 14px;
+  }
+
+  .turnos-day-title {
+    padding: 16px 12px;
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+
+  .turno-list-item {
+    padding: 16px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 2px 4px;
+  }
+
+  .turno-list-item:hover {
+    transform: translateX(4px);
+    margin: 2px 8px;
+  }
+
+  .turno-time {
+    align-self: stretch;
+    min-width: auto;
+    font-size: 0.95rem;
+    text-align: center;
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+
+  .turno-info {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .turno-title {
+    font-size: 1rem;
+  }
+
+  .turno-details {
+    gap: 8px;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+  }
+
+  .turno-consultorio {
+    font-size: 0.8rem;
+    padding: 3px 8px;
+  }
+
+  .turno-status {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+  }
+
+  .turno-actions {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    margin-left: 0;
+  }
+
+  /* Estilos específicos para el calendario en móviles */
+  .rbc-calendar {
+    font-size: 0.8rem;
+  }
+
+  .rbc-header {
+    padding: 4px 2px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .rbc-time-view {
+    overflow-x: auto;
+  }
+
+  .rbc-time-header {
+    display: none; /* Ocultar header de tiempo en móviles */
+  }
+
+  .rbc-time-content {
+    border-top: none;
+  }
+
+  .rbc-time-slot {
+    min-height: 24px;
+    font-size: 0.7rem;
+  }
+
+  .rbc-event {
+    font-size: 0.7rem;
+    padding: 1px 3px;
+    min-height: 20px;
+    border-radius: 3px;
+  }
+
+  .rbc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .rbc-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .rbc-toolbar button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+
+  .rbc-toolbar-label {
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .toolbar-show-consultorios button {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  /* Toggle de vista dentro de la toolbar en móviles */
+  .toolbar-view-toggle {
+    gap: 8px;
+  }
+
+  .toolbar-view-toggle .view-label {
+    font-size: 12px;
+  }
+
+  .toolbar-view-toggle .view-toggle-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-width: 80px;
+    gap: 4px;
+  }
+
+  .toolbar-view-toggle .toggle-icon {
+    font-size: 14px;
+  }
+
+  /* Espaciador para separar el toggle */
+  .toolbar-spacer {
+    flex: 1;
+    order: 3;
+  }
+
+  /* Toggle de vista dentro de la toolbar */
+  .toolbar-view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    order: 4;
+  }
+
+  .toolbar-view-toggle .view-indicator {
+    display: flex;
+    align-items: center;
+  }
+
+  .toolbar-view-toggle .view-label {
+    font-size: 14px;
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .toolbar-view-toggle .view-label strong {
+    color: var(--color-rosa2);
+    font-weight: 700;
+  }
+
+  .toolbar-view-toggle .view-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 2px solid var(--color-rosa1);
+    background: linear-gradient(135deg, var(--color-rosa1) 0%, var(--color-rosa2) 100%);
+    color: white;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(216, 27, 96, 0.3);
+    min-width: 100px;
+    justify-content: center;
+  }
+
+  .toolbar-view-toggle .view-toggle-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(216, 27, 96, 0.4);
+  }
+
+  .toolbar-view-toggle .toggle-icon {
+    font-size: 16px;
+  }
+
+  .toolbar-view-toggle .toggle-text {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Headers de consultorios verticales en móviles para ocupar menos espacio */
+  .rbc-header {
+    padding: 12px 2px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin: 2px;
+    text-align: center;
+    line-height: 1.2;
+    writing-mode: vertical-rl; /* Texto vertical */
+    text-orientation: mixed; /* Orientación mixta para mejor legibilidad */
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    color: var(--color-rosa2);
+    height: 80px; /* Altura fija para texto vertical */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Hacer el contenedor del calendario scrollable horizontalmente */
+  .turnos-grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: 80vh;
+  }
+
+  /* Ajustar el calendario para que sea más ancho que la pantalla */
+  .rbc-calendar {
+    width: auto;
+    min-width: 1000px; /* Ancho mínimo para forzar scroll horizontal */
+    height: 100%;
+  }
+
+  /* Hacer las columnas de consultorios con ancho fijo */
+  .rbc-time-view .rbc-day-slot {
+    min-width: 140px; /* Ancho fijo para columnas */
+    max-width: 140px;
+  }
 }
