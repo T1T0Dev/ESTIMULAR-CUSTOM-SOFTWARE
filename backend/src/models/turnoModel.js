@@ -24,6 +24,29 @@ function clampDiscount(value) {
   return parsed;
 }
 
+function extractFirstNumber(value) {
+  if (value === null || value === undefined) return null;
+  const match = String(value).match(/\d+/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) && !Number.isNaN(parsed) ? parsed : null;
+}
+
+function compareConsultoriosNatural(a, b) {
+  const nombreA = (a?.nombre || '').trim();
+  const nombreB = (b?.nombre || '').trim();
+  const numA = extractFirstNumber(nombreA);
+  const numB = extractFirstNumber(nombreB);
+
+  if (numA !== null && numB !== null && numA !== numB) {
+    return numA - numB;
+  }
+  if (numA !== null && numB === null) return -1;
+  if (numA === null && numB !== null) return 1;
+
+  return nombreA.localeCompare(nombreB, 'es', { numeric: true, sensitivity: 'base' });
+}
+
 async function fetchObraSocialDescuentoByNinoId(ninoId) {
   if (!ninoId) return 0;
   try {
@@ -509,6 +532,10 @@ async function getTurnoFormData() {
   if (rolesCatalogResult.error) throw rolesCatalogResult.error;
   if (profesionalDepartamentosResult.error) throw profesionalDepartamentosResult.error;
 
+  const consultoriosOrdenados = (consultoriosResult.data || [])
+    .slice()
+    .sort(compareConsultoriosNatural);
+
   const rolesCatalog = rolesCatalogResult.data || [];
   const profesionalRoleIds = rolesCatalog
     .filter((row) => typeof row?.nombre_rol === 'string' && row.nombre_rol.toLowerCase().includes('profesional'))
@@ -580,7 +607,7 @@ async function getTurnoFormData() {
 
   return {
     departamentos: departamentosResult.data || [],
-    consultorios: consultoriosResult.data || [],
+    consultorios: consultoriosOrdenados,
     profesionales,
   };
 }
