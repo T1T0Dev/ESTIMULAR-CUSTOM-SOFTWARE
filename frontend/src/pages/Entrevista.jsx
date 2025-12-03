@@ -623,15 +623,30 @@ export default function Entrevista() {
           }
         );
 
-        const propuestas = Array.isArray(response.data)
-          ? response.data
-          : response.data?.propuestas || [];
+        const payload = response?.data;
+        const suggestions = Array.isArray(payload)
+          ? { propuestas: payload }
+          : typeof payload === "object" && payload !== null
+            ? typeof payload.data === "object" && payload.data !== null
+              ? payload.data
+              : payload
+            : {};
+
+        const propuestas = Array.isArray(suggestions?.propuestas)
+          ? suggestions.propuestas
+          : [];
+        const omitidos = Array.isArray(suggestions?.omitidos)
+          ? suggestions.omitidos
+          : [];
 
         if (propuestas.length === 0) {
+          const message = omitidos.length > 0
+            ? "Todas las profesiones requeridas ya tienen turnos pendientes o confirmados."
+            : "No se encontraron turnos disponibles en los próximos lunes.";
           Swal.fire({
-            icon: "info",
+            icon: omitidos.length > 0 ? "info" : "warning",
             title: "Sin disponibilidad",
-            text: "No hay horarios disponibles para este candidato en los próximos días.",
+            text: message,
           });
           return;
         }
@@ -639,7 +654,7 @@ export default function Entrevista() {
         if (propuestas.length === 1) {
           const turnoUnico = mergePropuestasEnTurnoUnico(propuestas);
           if (turnoUnico) {
-            launchTurnoCreationFlow([turnoUnico]);
+            launchTurnoCreationFlow([turnoUnico], omitidos);
           } else {
             Swal.fire({
               icon: "error",
@@ -649,7 +664,7 @@ export default function Entrevista() {
           }
         } else {
           setSelectorPropuestas(propuestas);
-          setSelectorOmitidos([]);
+          setSelectorOmitidos(omitidos);
           setSelectorOpen(true);
         }
       } catch (error) {
