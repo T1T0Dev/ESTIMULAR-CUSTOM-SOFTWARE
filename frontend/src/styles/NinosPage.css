@@ -1273,13 +1273,27 @@ Hard refresh recomendado: Ctrl+F5
   padding: 1rem;
 }
 
+/* Responsive padding for mobile cards container */
+@media (max-width: 768px) {
+  .mobile-cards {
+    padding: 1rem 0.75rem;
+  }
+}
+
 .mobile-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
+  padding: 1.125rem;
   border: 1px solid #e0e0e0;
   transition: all 0.3s ease;
+}
+
+/* Responsive padding for mobile cards */
+@media (max-width: 768px) {
+  .mobile-card {
+    padding: 1.5rem 1rem;
+  }
 }
 
 .mobile-card:hover {
@@ -1289,10 +1303,10 @@ Hard refresh recomendado: Ctrl+F5
 
 .mobile-card-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1322,8 +1336,8 @@ Hard refresh recomendado: Ctrl+F5
 }
 
 .mobile-card-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -1354,6 +1368,16 @@ Hard refresh recomendado: Ctrl+F5
   justify-content: center;
   padding-top: 0.5rem;
   border-top: 1px solid #f0f0f0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Ensure buttons stay in a row on mobile */
+@media (max-width: 768px) {
+  .mobile-card-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
 }
 
 .mobile-card-actions button {
@@ -1364,8 +1388,9 @@ Hard refresh recomendado: Ctrl+F5
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex: 1;
-  max-width: 120px;
+  flex: 0 0 auto;
+  min-width: 80px;
+  white-space: nowrap;
 }
 
 .mobile-card-actions .edit-btn {
@@ -1407,8 +1432,10 @@ Hard refresh recomendado: Ctrl+F5
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  flex: 1;
-  max-width: 120px;
+  flex: 0 0 auto;
+  min-width: 80px;
+  white-space: nowrap;
+}
   justify-content: center;
 }
 
@@ -1455,4 +1482,176 @@ Hard refresh recomendado: Ctrl+F5
 
 .mobile-card-btn.delete:hover {
   background: #c82333;
+}
+
+/* Estilos adicionales para tarjetas móviles en Responsables y Equipo */
+.mobile-card-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.mobile-card-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0;
+  text-align: left;
+  flex: 0 0 auto;
+  min-width: 80px;
+}
+
+.mobile-card-value {
+  font-size: 0.95rem;
+  color: #495057;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-card-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: white;
+  box-sizing: border-box;
+  min-height: 42px;
+  text-align: left;
+}
+
+.mobile-card-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.mobile-card-select {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: white;
+  box-sizing: border-box;
+  min-height: 42px;
+  text-align: left;
+}
+
+.mobile-card-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.mobile-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  min-height: 40px;
+  min-width: 100px;
+}
+
+.mobile-card-btn.save {
+  background: #28a745;
+  color: white;
+}
+
+.mobile-card-btn.save:hover {
+  background: #218838;
+}
+
+.mobile-card-btn.cancel {
+  background: #6c757d;
+  color: white;
+}
+
+.mobile-card-btn.cancel:hover {
+  background: #5a6268;
+}
+
+.mobile-card-btn.edit {
+  background: #007bff;
+  color: white;
+}
+
+.mobile-card-btn.edit:hover {
+  background: #0056b3;
+}
+
+.mobile-card-btn.delete {
+  background: #dc3545;
+  color: white;
+}
+
+.mobile-card-btn.delete:hover {
+  background: #c82333;
+}
+
+.mobile-card-btn.info {
+  background: #17a2b8;
+  color: white;
+}
+
+.mobile-card-btn.info:hover {
+  background: #138496;
+}
+
+.mobile-card-btn.reset {
+  background: #ffc107;
+  color: #212529;
+}
+
+.mobile-card-btn.reset:hover {
+  background: #e0a800;
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .mobile-card-content {
+    gap: 0.75rem;
+  }
+
+  .mobile-card-row {
+    margin-bottom: 0.75rem;
+  }
+
+  .mobile-card-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mobile-card-btn {
+    justify-content: center;
+    width: 100%;
+    min-width: 120px;
+    padding: 0.75rem 1rem;
+  }
 }

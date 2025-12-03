@@ -22,6 +22,19 @@ export default function Responsables() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
 
+  // Detectar si estamos en móvil
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -548,177 +561,344 @@ export default function Responsables() {
             </div>
 
             <div className="dashboard-table-wrapper">
-              <table
-                className="table candidatos-table"
-                role="table"
-                aria-label="Lista de responsables"
-              >
-                <thead>
-                  <tr>
-                    <th className="col-dni">DNI</th>
-                    <th className="col-name">Nombre completo</th>
-                    <th>Teléfono</th>
-                    <th>Email</th>
-                    <th className="col-actions">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
+              {isMobile ? (
+                /* Vista de tarjetas para móviles */
+                <div className="mobile-cards">
                   {items.map((r) => {
                     const isEditing = editId === r.id_responsable;
-                    const nombreCompleto = `${r.nombre || ""} ${
-                      r.apellido || ""
-                    }`
-                      .replace(/\s+/g, " ")
-                      .trim();
-                    const nombreDisplay =
-                      nombreCompleto || r.nombre || r.apellido || "—";
+                    const nombreCompleto = `${r.nombre || ""} ${r.apellido || ""}`.replace(/\s+/g, " ").trim();
+                    const nombreDisplay = nombreCompleto || r.nombre || r.apellido || "—";
                     return (
-                      <tr key={r.id_responsable}>
-                        <td className="col-dni" data-label="DNI">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.dni ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  dni: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
-                          ) : (
-                            r.dni || "—"
-                          )}
-                        </td>
-                        <td className="col-name" data-label="Nombre completo">
-                          {isEditing ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <input
-                                type="text"
-                                value={editDraft.nombre ?? ""}
-                                onChange={(e) =>
-                                  setEditDraft((d) => ({
-                                    ...d,
-                                    nombre: e.target.value,
-                                  }))
-                                }
-                                className="table-input"
-                                placeholder="Nombre"
-                              />
-                              <input
-                                type="text"
-                                value={editDraft.apellido ?? ""}
-                                onChange={(e) =>
-                                  setEditDraft((d) => ({
-                                    ...d,
-                                    apellido: e.target.value,
-                                  }))
-                                }
-                                className="table-input"
-                                placeholder="Apellido"
-                              />
-                            </div>
-                          ) : (
-                            nombreDisplay
-                          )}
-                        </td>
-                        <td data-label="Teléfono">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editDraft.telefono ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  telefono: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
-                          ) : (
-                            r.telefono || "—"
-                          )}
-                        </td>
-                        <td data-label="Email">
-                          {isEditing ? (
-                            <input
-                              type="email"
-                              value={editDraft.email ?? ""}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({
-                                  ...d,
-                                  email: e.target.value,
-                                }))
-                              }
-                              className="table-input"
-                            />
-                          ) : (
-                            r.email || "—"
-                          )}
-                        </td>
-                        <td className="col-actions" data-label="Acciones">
-                          <div className="row-actions">
-                            {isEditing ? (
-                              <>
-                                <button
-                                  className="icon-btn success"
-                                  title="Guardar"
-                                  onClick={() => confirmEdit(r.id_responsable)}
-                                >
-                                  <MdCheck size={20} />
-                                </button>
-                                <button
-                                  className="icon-btn danger"
-                                  title="Cancelar"
-                                  onClick={cancelEdit}
-                                >
-                                  <MdClose size={20} />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  className="icon-btn info"
-                                  title="Niños asociados"
-                                  onClick={() => abrirInfo(r)}
-                                >
-                                  <FaChild size={20} />
-                                </button>
-                                {isAdmin && (
-                                  <>
-                                    <button
-                                      className="icon-btn edit"
-                                      title="Editar"
-                                      onClick={() => startEdit(r)}
-                                    >
-                                      <MdEdit size={20} />
-                                    </button>
-
-                                    <button
-                                      className="icon-btn danger"
-                                      title="Eliminar"
-                                      onClick={() => deleteResponsable(r)}
-                                    >
-                                      <MdDelete size={20} />
-                                    </button>
-                                  </>
-                                )}
-                              </>
-                            )}
+                      <div key={r.id_responsable} className="mobile-card">
+                        <div className="mobile-card-header">
+                          <h3 className="mobile-card-title">{nombreDisplay}</h3>
+                        </div>
+                        <div className="mobile-card-content">
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">DNI:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editDraft.dni ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      dni: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                r.dni || "—"
+                              )}
+                            </span>
                           </div>
-                        </td>
-                      </tr>
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Teléfono:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editDraft.telefono ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      telefono: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                r.telefono || "—"
+                              )}
+                            </span>
+                          </div>
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Email:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="email"
+                                  value={editDraft.email ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      email: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                r.email || "—"
+                              )}
+                            </span>
+                          </div>
+                          {isEditing && (
+                            <div className="mobile-card-row">
+                              <span className="mobile-card-label">Nombre:</span>
+                              <span className="mobile-card-value">
+                                <input
+                                  type="text"
+                                  value={editDraft.nombre ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      nombre: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                  placeholder="Nombre"
+                                />
+                              </span>
+                            </div>
+                          )}
+                          {isEditing && (
+                            <div className="mobile-card-row">
+                              <span className="mobile-card-label">Apellido:</span>
+                              <span className="mobile-card-value">
+                                <input
+                                  type="text"
+                                  value={editDraft.apellido ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      apellido: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                  placeholder="Apellido"
+                                />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mobile-card-actions">
+                          {isEditing ? (
+                            <>
+                              <button
+                                className="mobile-card-btn save"
+                                onClick={() => confirmEdit(r.id_responsable)}
+                              >
+                                <MdCheck size={16} />
+                                Guardar
+                              </button>
+                              <button
+                                className="mobile-card-btn cancel"
+                                onClick={cancelEdit}
+                              >
+                                <MdClose size={16} />
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="mobile-card-btn info"
+                                onClick={() => abrirInfo(r)}
+                              >
+                                <FaChild size={16} />
+                                Niños
+                              </button>
+                              {isAdmin && (
+                                <>
+                                  <button
+                                    className="mobile-card-btn edit"
+                                    onClick={() => startEdit(r)}
+                                  >
+                                    <MdEdit size={16} />
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="mobile-card-btn delete"
+                                    onClick={() => deleteResponsable(r)}
+                                  >
+                                    <MdDelete size={16} />
+                                    Eliminar
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+              ) : (
+                /* Vista de tabla para desktop */
+                <table
+                  className="table candidatos-table"
+                  role="table"
+                  aria-label="Lista de responsables"
+                >
+                  <thead>
+                    <tr>
+                      <th className="col-dni">DNI</th>
+                      <th className="col-name">Nombre completo</th>
+                      <th>Teléfono</th>
+                      <th>Email</th>
+                      <th className="col-actions">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((r) => {
+                      const isEditing = editId === r.id_responsable;
+                      const nombreCompleto = `${r.nombre || ""} ${
+                        r.apellido || ""
+                      }`
+                        .replace(/\s+/g, " ")
+                        .trim();
+                      const nombreDisplay =
+                        nombreCompleto || r.nombre || r.apellido || "—";
+                      return (
+                        <tr key={r.id_responsable}>
+                          <td className="col-dni" data-label="DNI">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editDraft.dni ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    dni: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                              />
+                            ) : (
+                              r.dni || "—"
+                            )}
+                          </td>
+                          <td className="col-name" data-label="Nombre completo">
+                            {isEditing ? (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  value={editDraft.nombre ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      nombre: e.target.value,
+                                    }))
+                                  }
+                                  className="table-input"
+                                  placeholder="Nombre"
+                                />
+                                <input
+                                  type="text"
+                                  value={editDraft.apellido ?? ""}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({
+                                      ...d,
+                                      apellido: e.target.value,
+                                    }))
+                                  }
+                                  className="table-input"
+                                  placeholder="Apellido"
+                                />
+                              </div>
+                            ) : (
+                              nombreDisplay
+                            )}
+                          </td>
+                          <td data-label="Teléfono">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editDraft.telefono ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    telefono: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                              />
+                            ) : (
+                              r.telefono || "—"
+                            )}
+                          </td>
+                          <td data-label="Email">
+                            {isEditing ? (
+                              <input
+                                type="email"
+                                value={editDraft.email ?? ""}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    email: e.target.value,
+                                  }))
+                                }
+                                className="table-input"
+                              />
+                            ) : (
+                              r.email || "—"
+                            )}
+                          </td>
+                          <td className="col-actions" data-label="Acciones">
+                            <div className="row-actions">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    className="icon-btn success"
+                                    title="Guardar"
+                                    onClick={() => confirmEdit(r.id_responsable)}
+                                  >
+                                    <MdCheck size={20} />
+                                  </button>
+                                  <button
+                                    className="icon-btn danger"
+                                    title="Cancelar"
+                                    onClick={cancelEdit}
+                                  >
+                                    <MdClose size={20} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    className="icon-btn info"
+                                    title="Niños asociados"
+                                    onClick={() => abrirInfo(r)}
+                                  >
+                                    <FaChild size={20} />
+                                  </button>
+                                  {isAdmin && (
+                                    <>
+                                      <button
+                                        className="icon-btn edit"
+                                        title="Editar"
+                                        onClick={() => startEdit(r)}
+                                      >
+                                        <MdEdit size={20} />
+                                      </button>
+
+                                      <button
+                                        className="icon-btn danger"
+                                        title="Eliminar"
+                                        onClick={() => deleteResponsable(r)}
+                                      >
+                                        <MdDelete size={20} />
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {totalPages > 1 && (

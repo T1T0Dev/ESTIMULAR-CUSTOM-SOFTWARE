@@ -28,3 +28,35 @@
   color: var(--color-rosa1);
   background: rgba(255, 182, 193, 0.25);
 }
+
+/* Estilos específicos para tarjetas móviles en EquipoEstimular */
+.mobile-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: center;
+}
+
+.mobile-card-header .equipo-avatar {
+  flex-shrink: 0;
+}
+
+.mobile-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+  text-align: center;
+}
+
+.equipo-profesion {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin: 0;
+  text-align: center;
+}

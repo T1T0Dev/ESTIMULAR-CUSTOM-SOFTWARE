@@ -87,6 +87,19 @@ export default function EquipoEstimular() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
 
+  // Detectar si estamos en móvil
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -309,10 +322,308 @@ export default function EquipoEstimular() {
             </div>
 
             <div className="dashboard-table-wrapper">
-              <table
-                className="table candidatos-table"
-                aria-label="Equipo Estimular"
-              >
+              {isMobile ? (
+                /* Vista de tarjetas para móviles */
+                <div className="mobile-cards">
+                  {items.map((p) => {
+                    const tipoNormalized = String(p.tipo || "").toLowerCase();
+                    const rowKey =
+                      p.id_profesional ??
+                      p.id_recepcion ??
+                      p.id_secretario ??
+                      p.id_usuario ??
+                      `${tipoNormalized}-${p.dni ?? ""}-${p.nombre ?? ""}`;
+                    const isProfesional = tipoNormalized === "profesional";
+                    const memberKey =
+                      p.id_usuario ??
+                      p.id_profesional ??
+                      p.id_recepcion ??
+                      p.id_secretario ??
+                      rowKey;
+                    const canEdit = isAdmin;
+                    const isEditing = canEdit && editId === memberKey;
+                    const nombreCompleto = `${p.nombre || ""} ${p.apellido || ""}`.trim();
+                    const fechaValue = p.fecha_nacimiento
+                      ? String(p.fecha_nacimiento).slice(0, 10)
+                      : "";
+                    const selectedDepartamentoId = isEditing
+                      ? editData.profesionId ??
+                        editData.profesion_id ??
+                        p.profesion_id ??
+                        null
+                      : p.profesion_id ?? null;
+                    const departamentoLabel = (() => {
+                      const idCandidates = [
+                        p.profesion_id,
+                        p.id_departamento,
+                        p.departamento_id,
+                      ];
+                      for (const candidate of idCandidates) {
+                        if (candidate === null || candidate === undefined) {
+                          continue;
+                        }
+                        const parsed = Number.parseInt(candidate, 10);
+                        if (Number.isNaN(parsed)) continue;
+                        const found = departamentoMap.get(parsed)?.label;
+                        if (found) return toTitleCase(found);
+                      }
+                      const textFallback = [
+                        p.departamento_nombre,
+                        p.nombre_departamento,
+                        p.profesion_nombre,
+                        p.profesion,
+                      ].find((value) =>
+                        value && String(value).trim().length > 0
+                      );
+                      return textFallback ? toTitleCase(textFallback) : null;
+                    })();
+                    const roleDisplay = departamentoLabel || formatRole(p);
+                    const endpointId =
+                      p.id_usuario ??
+                      p.id_profesional ??
+                      p.id_recepcion ??
+                      p.id_secretario ??
+                      null;
+                    const fotoSrc = p.foto_perfil_url || p.foto_perfil || null;
+
+                    return (
+                      <div key={rowKey} className="mobile-card">
+                        <div className="mobile-card-header">
+                          <div className="equipo-avatar">
+                            {fotoSrc ? (
+                              <img
+                                src={fotoSrc}
+                                loading="lazy"
+                                alt={nombreCompleto || "Foto de perfil"}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const next = e.currentTarget.nextSibling;
+                                  if (next) next.style.display = "grid";
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="equipo-avatar-fallback"
+                              style={{
+                                display: fotoSrc ? "none" : "grid",
+                              }}
+                            >
+                              {`${(p.nombre?.[0] || "").toUpperCase()}${(
+                                p.apellido?.[0] || ""
+                              ).toUpperCase()}` || "U"}
+                            </div>
+                          </div>
+                          <h3 className="mobile-card-title">{nombreCompleto || "Sin nombre"}</h3>
+                          <span className="equipo-profesion">{roleDisplay}</span>
+                        </div>
+                        <div className="mobile-card-content">
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">DNI:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editData.dni ?? p.dni ?? ""}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      dni: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                p.dni || "—"
+                              )}
+                            </span>
+                          </div>
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Email:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="email"
+                                  value={editData.email ?? p.email ?? ""}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      email: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                p.email || "—"
+                              )}
+                            </span>
+                          </div>
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Teléfono:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editData.telefono ?? p.telefono ?? ""}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      telefono: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                p.telefono || "—"
+                              )}
+                            </span>
+                          </div>
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Nacimiento:</span>
+                            <span className="mobile-card-value">
+                              {isEditing ? (
+                                <input
+                                  type="date"
+                                  value={editData.fecha_nacimiento ?? fechaValue}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      fecha_nacimiento: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                />
+                              ) : (
+                                fechaValue ? new Date(fechaValue).toLocaleDateString('es-ES') : "—"
+                              )}
+                            </span>
+                          </div>
+                          {isEditing && (
+                            <div className="mobile-card-row">
+                              <span className="mobile-card-label">Nombre:</span>
+                              <span className="mobile-card-value">
+                                <input
+                                  type="text"
+                                  value={editData.nombre ?? p.nombre ?? ""}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      nombre: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                  placeholder="Nombre"
+                                />
+                              </span>
+                            </div>
+                          )}
+                          {isEditing && (
+                            <div className="mobile-card-row">
+                              <span className="mobile-card-label">Apellido:</span>
+                              <span className="mobile-card-value">
+                                <input
+                                  type="text"
+                                  value={editData.apellido ?? p.apellido ?? ""}
+                                  onChange={(e) =>
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      apellido: e.target.value,
+                                    }))
+                                  }
+                                  className="mobile-card-input"
+                                  placeholder="Apellido"
+                                />
+                              </span>
+                            </div>
+                          )}
+                          {isEditing && isProfesional && (
+                            <div className="mobile-card-row">
+                              <span className="mobile-card-label">Profesión:</span>
+                              <span className="mobile-card-value">
+                                <select
+                                  className="mobile-card-select"
+                                  value={
+                                    selectedDepartamentoId !== null &&
+                                    selectedDepartamentoId !== undefined
+                                      ? String(selectedDepartamentoId)
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const nextValue = e.target.value;
+                                    setEditData((ed) => ({
+                                      ...ed,
+                                      profesionId: nextValue
+                                        ? Number.parseInt(nextValue, 10)
+                                        : null,
+                                    }));
+                                  }}
+                                >
+                                  <option value="">— Seleccionar —</option>
+                                  {departamentoOptions.map((opt) => (
+                                    <option key={opt.id} value={opt.id}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mobile-card-actions">
+                          {isEditing ? (
+                            <>
+                              <button
+                                className="mobile-card-btn save"
+                                onClick={() => confirmEdit(memberKey)}
+                              >
+                                <MdCheck size={16} />
+                                Guardar
+                              </button>
+                              <button
+                                className="mobile-card-btn cancel"
+                                onClick={cancelEdit}
+                              >
+                                <MdClose size={16} />
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {canEdit && (
+                                <>
+                                  <button
+                                    className="mobile-card-btn edit"
+                                    onClick={() => startEdit(memberKey)}
+                                  >
+                                    <MdEdit size={16} />
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="mobile-card-btn delete"
+                                    onClick={() => deleteMember(memberKey)}
+                                  >
+                                    <MdDelete size={16} />
+                                    Eliminar
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                className="mobile-card-btn reset"
+                                onClick={() => openResetModal(p)}
+                              >
+                                🔑 Reset
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <table
+                  className="table candidatos-table"
+                  aria-label="Equipo Estimular"
+                >
                 <thead>
                   <tr>
                     <th>Foto</th>
@@ -812,6 +1123,7 @@ export default function EquipoEstimular() {
                   })}
                 </tbody>
               </table>
+              )}
             </div>
 
             {totalPages > 1 && (
