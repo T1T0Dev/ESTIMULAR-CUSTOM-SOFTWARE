@@ -122,5 +122,107 @@ const getResumenMensual = async (req, res) => {
     }
 };
 
-module.exports = { getResumenMensual };
+// GET /api/finanzas/resumen-mensual-detalle?anio=2025&mesIndex=10
+// Devuelve para un mes concreto el resumen por departamento
+// (solo turnos confirmados/completados), con sumas de deberes y haberes.
+const getResumenMensualDetalle = async (req, res) => {
+    const anio = Number.parseInt(req.query.anio, 10) || new Date().getFullYear();
+    const mesIndex = Number.parseInt(req.query.mesIndex, 10) || 0; // 0-11
+
+    try {
+        const inicioMes = new Date(Date.UTC(anio, mesIndex, 1));
+        const finMes = new Date(Date.UTC(anio, mesIndex + 1, 1));
+
+        const inicioMesIso = inicioMes.toISOString();
+        const finMesIso = finMes.toISOString();
+
+        const { data: pagos, error: pagosError } = await supabaseAdmin
+            .from('pagos')
+            .select(`
+                id,
+                monto,
+                estado,
+                registrado_en,
+                turno:turnos!pagos_turno_id_fkey (
+                    id,
+                    inicio,
+                    estado,
+                    departamento:profesiones!turnos_departamento_id_fkey (
+                        id_departamento,
+                        nombre
+                    )
+                )
+            `)
+            .gte('registrado_en', inicioMesIso)
+            .lt('registrado_en', finMesIso);
+
+        if (pagosError) throw pagosError;
+
+        const now = new Date();
+        const resumenPorDepartamento = new Map();
+
+        (pagos || []).forEach((pago) => {
+            const turno = pago.turno || null;
+            if (!turno) return;
+
+            const estadoTurnoNormalizado = String(turno.estado || '')
+                .normalize('NFD')
+                .replace(/[^\p{L}\p{N}\s]/gu, '')
+                .toLowerCase();
+
+            if (estadoTurnoNormalizado !== 'completado' && estadoTurnoNormalizado !== 'confirmado') {
+                return;
+            }
+
+            const departamento = turno.departamento || {};
+            const depId = departamento.id_departamento || 0;
+            const depNombre = departamento.nombre || 'Sin departamento';
+
+            if (!resumenPorDepartamento.has(depId)) {
+                resumenPorDepartamento.set(depId, {
+                    departamentoId: depId,
+                    departamentoNombre: depNombre,
+                    deberes: 0,
+                    haberes: 0,
+                });
+            }
+
+            const item = resumenPorDepartamento.get(depId);
+            const monto = Number(pago.monto || 0);
+
+            const turnoInicio = turno.inicio ? new Date(turno.inicio) : null;
+            const turnoInicioIso = turnoInicio ? turnoInicio.toISOString() : null;
+
+            const esDelMesActual =
+                turnoInicioIso && turnoInicioIso >= inicioMesIso && turnoInicioIso < finMesIso &&
+                turnoInicioIso <= now.toISOString();
+
+            if (pago.estado === 'pendiente' && esDelMesActual) {
+                item.deberes += monto;
+            }
+
+            if (pago.estado === 'completado') {
+                item.haberes += monto;
+            }
+        });
+
+        const resultado = Array.from(resumenPorDepartamento.values()).sort((a, b) => {
+            return String(a.departamentoNombre || '').localeCompare(String(b.departamentoNombre || ''), 'es');
+        });
+
+        return res.json({
+            success: true,
+            data: resultado,
+        });
+    } catch (err) {
+        console.error('getResumenMensualDetalle error', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener resumen mensual por departamento',
+            error: err.message,
+        });
+    }
+};
+
+module.exports = { getResumenMensual, getResumenMensualDetalle };
 

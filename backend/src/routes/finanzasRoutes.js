@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getResumenMensual } = require('../controllers/finanzasController');
+const { getResumenMensual, getResumenMensualDetalle } = require('../controllers/finanzasController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 const router = Router();
@@ -10,6 +10,14 @@ router.get(
 	authenticate,
 	authorize(['admin', 'recepcion', 'profesional']),
 	getResumenMensual
+);
+
+// GET /api/finanzas/resumen-mensual-detalle?anio=2025&mesIndex=10
+router.get(
+	'/finanzas/resumen-mensual-detalle',
+	authenticate,
+	authorize(['admin', 'recepcion', 'profesional']),
+	getResumenMensualDetalle
 );
 
 module.exports = router;

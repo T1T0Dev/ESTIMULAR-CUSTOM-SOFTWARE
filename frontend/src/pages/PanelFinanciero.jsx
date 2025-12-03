@@ -30,8 +30,11 @@ export default function PanelFinanciero() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(hoy.getFullYear());
   const [mesSeleccionado, setMesSeleccionado] = useState(hoy.getMonth());
   const [filas, setFilas] = useState([]);
+  const [detalleDepartamentos, setDetalleDepartamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [errorDetalle, setErrorDetalle] = useState(null);
 
   const etiquetaMesActual = useMemo(
     () => `${MESES[mesSeleccionado]} ${anioSeleccionado}`,
@@ -65,6 +68,34 @@ export default function PanelFinanciero() {
       cancelado = true;
     };
   }, [anioSeleccionado]);
+
+  useEffect(() => {
+    let cancelado = false;
+    const fetchDetalle = async () => {
+      setLoadingDetalle(true);
+      setErrorDetalle(null);
+      try {
+        const { data } = await axios.get(
+          `${API_BASE_URL}/api/finanzas/resumen-mensual-detalle`,
+          { params: { anio: anioSeleccionado, mesIndex: mesSeleccionado } }
+        );
+        if (cancelado) return;
+        const items = Array.isArray(data?.data) ? data.data : [];
+        setDetalleDepartamentos(items);
+      } catch (err) {
+        if (cancelado) return;
+        console.error("Error cargando detalle financiero por departamento", err);
+        setErrorDetalle("No se pudo cargar el detalle por departamento.");
+      } finally {
+        if (!cancelado) setLoadingDetalle(false);
+      }
+    };
+
+    fetchDetalle();
+    return () => {
+      cancelado = true;
+    };
+  }, [anioSeleccionado, mesSeleccionado]);
 
   const resumenActual = useMemo(() => {
     const encontrada = filas.find((f) => f.mes === etiquetaMesActual);
@@ -217,6 +248,68 @@ export default function PanelFinanciero() {
                         {currencyFormatter.format(
                           fila.cobrosMesesAnteriores || 0
                         )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Detalle por departamento del mes seleccionado */}
+      <div className="panel-financiero-card-wrapper">
+        <div className="panel-card panel-financiero-card">
+          <div className="panel-card-header">
+            <h2>Detalle por departamento - {etiquetaMesActual}</h2>
+            <p className="panel-card-subtitle">
+              Sumas de deberes y haberes para turnos confirmados/completados
+              agrupados por departamento.
+            </p>
+          </div>
+
+          <div className="panel-table-wrapper">
+            <table
+              className="panel-table"
+              aria-label="Detalle financiero por departamento"
+            >
+              <thead>
+                <tr>
+                  <th className="col-mes">Departamento</th>
+                  <th className="col-debe">Deberes</th>
+                  <th className="col-bruta">Ganancia bruta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingDetalle ? (
+                  <tr>
+                    <td colSpan={3} className="col-mes">
+                      Cargando detalle por departamento...
+                    </td>
+                  </tr>
+                ) : errorDetalle ? (
+                  <tr>
+                    <td colSpan={3} className="col-mes">
+                      {errorDetalle}
+                    </td>
+                  </tr>
+                ) : detalleDepartamentos.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="col-mes">
+                      No hay datos por departamento para el mes
+                      seleccionado.
+                    </td>
+                  </tr>
+                ) : (
+                  detalleDepartamentos.map((fila) => (
+                    <tr key={fila.departamentoId || fila.departamentoNombre}>
+                      <td className="col-mes">{fila.departamentoNombre}</td>
+                      <td className="col-debe">
+                        {currencyFormatter.format(fila.deberes || 0)}
+                      </td>
+                      <td className="col-bruta">
+                        {currencyFormatter.format(fila.haberes || 0)}
                       </td>
                     </tr>
                   ))
