@@ -21,6 +21,7 @@ import PagosDashboard from './pages/PagosDashboard';
 import PanelFinanciero from './pages/PanelFinanciero';
 import RegistroUsuario from './pages/RegistroUsuario';
 import PrimerRegistro from './pages/PrimerRegistro';
+import EditarProfesional from './pages/EditarProfesional';
 
 // Components
 import CrearNino from './components/CrearNino';
@@ -157,6 +158,19 @@ function AppContent() {
               isAuthenticated ? (
                 <DashboardLayout title="Panel Financiero">
                   <PanelFinanciero />
+                </DashboardLayout>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/dashboard/editar-profesional"
+            element={
+              isAuthenticated ? (
+                <DashboardLayout title="Editar perfil profesional">
+                  <EditarProfesional />
                 </DashboardLayout>
               ) : (
                 <Navigate to="/login" replace />
