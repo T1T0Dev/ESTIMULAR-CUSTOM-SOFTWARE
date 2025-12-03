@@ -1053,3 +1053,275 @@ MODAL MÓVIL - MODAL COMPACTO OPTIMIZADO
 Modal responsive optimizado para móviles: 95% ancho, contenido compacto, botón cerrar prominente.
 Hard refresh recomendado: Ctrl+F5
 */
+
+/* Estilos para tarjetas móviles */
+.mobile-cards {
+  display: block;
+  padding: 16px;
+}
+
+.mobile-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--neutral-200);
+}
+
+.mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.mobile-card-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--neutral-800);
+  margin-bottom: 4px;
+}
+
+.mobile-card-dni {
+  font-size: 0.85rem;
+  color: var(--neutral-600);
+}
+
+.mobile-card-status {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.mobile-card-status.active {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.mobile-card-status.inactive {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--neutral-100);
+}
+
+.mobile-card-actions .icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+/* Para pantallas muy pequeñas */
+@media (max-width: 480px) {
+  .mobile-card {
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .mobile-card-actions {
+    justify-content: center;
+  }
+}
+
+/* Mobile Cards Styles */
+.mobile-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.mobile-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.mobile-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.mobile-card-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.mobile-card-status.paciente {
+  background: #d4edda;
+  color: #155724;
+}
+
+.mobile-card-status.candidato {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.mobile-card-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mobile-card-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mobile-card-value {
+  font-size: 0.95rem;
+  color: #495057;
+  font-weight: 500;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.mobile-card-actions button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  max-width: 120px;
+}
+
+.mobile-card-actions .edit-btn {
+  background: #007bff;
+  color: white;
+}
+
+.mobile-card-actions .edit-btn:hover {
+  background: #0056b3;
+}
+
+.mobile-card-actions .delete-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.mobile-card-actions .delete-btn:hover {
+  background: #c82333;
+}
+
+.mobile-card-actions .view-btn {
+  background: #28a745;
+  color: white;
+}
+
+.mobile-card-actions .view-btn:hover {
+  background: #218838;
+}
+
+/* Additional mobile card button styles */
+.mobile-card-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  max-width: 120px;
+  justify-content: center;
+}
+
+.mobile-card-btn.info {
+  background: #17a2b8;
+  color: white;
+}
+
+.mobile-card-btn.info:hover {
+  background: #138496;
+}
+
+.mobile-card-btn.save {
+  background: #28a745;
+  color: white;
+}
+
+.mobile-card-btn.save:hover {
+  background: #218838;
+}
+
+.mobile-card-btn.cancel {
+  background: #6c757d;
+  color: white;
+}
+
+.mobile-card-btn.cancel:hover {
+  background: #5a6268;
+}
+
+.mobile-card-btn.edit {
+  background: #007bff;
+  color: white;
+}
+
+.mobile-card-btn.edit:hover {
+  background: #0056b3;
+}
+
+.mobile-card-btn.delete {
+  background: #dc3545;
+  color: white;
+}
+
+.mobile-card-btn.delete:hover {
+  background: #c82333;
+}

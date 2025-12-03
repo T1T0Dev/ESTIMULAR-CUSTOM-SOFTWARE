@@ -97,28 +97,18 @@ export default function MainDashboard() {
   const user = useAuthStore((state) => state.user);
   const needsProfile = useAuthStore((state) => state.needsProfile);
 
-  const normalizedRoles = useMemo(() => {
-    if (!user?.roles?.length) return [];
-    return user.roles
-      .map((role) =>
-        role?.nombre
-          ?.normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-      )
-      .filter(Boolean);
-  }, [user?.roles]);
+  const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+  const isProfesional = user?.roles?.some(role => role.nombre?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === 'profesional');
+  const isRecepcion = user?.roles?.some(role => role.nombre?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === 'recepcion');
+  console.log('isAdmin:', isAdmin, 'isProfesional:', isProfesional, 'isRecepcion:', isRecepcion, 'user:', user, 'profile:', profile);
 
-  const isAdmin = Boolean(user?.es_admin || normalizedRoles.includes("admin"));
-  const isProfesional = normalizedRoles.includes("profesional");
-
-  const [summary, setSummary] = useState(() => ({
+  const [summary, setSummary] = useState({
     professionals: 0,
     children: 0,
     obras: 0,
     turnosPendientes: 0,
     ...((isAdmin || isProfesional) ? { entrevistasPendientes: 0 } : {}),
-  }));
+  });
   const [latestProfessionals, setLatestProfessionals] = useState([]);
   const [latestChildren, setLatestChildren] = useState([]);
   const [upcomingTurnos, setUpcomingTurnos] = useState([]);
@@ -172,30 +162,12 @@ export default function MainDashboard() {
           params: { estado: "pendiente", limit: 8 },
         }),
         axios.get(`${API_BASE_URL}/api/profesiones`),
-        ...((isAdmin || isProfesional)
-          ? [
-              axios.get(`${API_BASE_URL}/api/turnos`, {
-                params: {
-                  estado: "pendiente",
-                  citacion: "Entrevista",
-                  ...(profile?.profesion_id
-                    ? { departamentoId: profile.profesion_id }
-                    : {}),
-                  limit: 8,
-                },
-              }),
-            ]
-          : []),
+        ...((isAdmin || isProfesional) ? [axios.get(`${API_BASE_URL}/api/turnos`, {
+          params: { estado: "pendiente", citacion: "Entrevista", ...(profile?.profesion_id ? { departamentoId: profile.profesion_id } : {}), limit: 8 },
+        })] : []),
       ];
 
-      console.log(
-        "departamentoId:",
-        profile?.profesion_id,
-        "isAdmin:",
-        isAdmin,
-        "isProfesional:",
-        isProfesional
-      );
+      console.log('departamentoId:', profile?.profesion_id, 'isAdmin:', isAdmin, 'isProfesional:', isProfesional, 'isRecepcion:', isRecepcion);
 
       const results = await Promise.allSettled(promises);
 
@@ -203,8 +175,8 @@ export default function MainDashboard() {
       const ninosResult = results[1];
       const obrasResult = results[2];
       const turnosResult = results[3];
-  const profesionesResult = results[4];
-  const entrevistaResult = (isAdmin || isProfesional) ? results[5] : null;
+      const profesionesResult = results[4];
+      const entrevistaResult = (isAdmin || isProfesional) ? results[5] : null;
 
       if (!activeRef.current) return;
 
@@ -286,7 +258,7 @@ export default function MainDashboard() {
           if (!turno?.inicio) return false;
           const start = new Date(turno.inicio);
           if (Number.isNaN(start.getTime())) return false;
-          return start.getTime() >= Date.now() - 5 * 60 * 1000;
+          return start.getTime() >= Date.now();
         })
         .slice(0, 5);
 
@@ -300,14 +272,12 @@ export default function MainDashboard() {
           children: childrenTotal,
           obras: obrasTotal,
           turnosPendientes: turnosTotal,
-          ...((isAdmin || isProfesional)
-            ? { entrevistasPendientes: entrevistasTotal }
-            : {}),
+          ...((isAdmin || isProfesional) ? { entrevistasPendientes: entrevistasTotal } : {}),
         });
         setLatestProfessionals(profesionalesListado.slice(0, 4));
         setLatestChildren(ninosListado.slice(0, 4));
-  setUpcomingTurnos(upcoming);
-  if (isAdmin || isProfesional) setLatestEntrevistas(upcomingEntrevistas);
+        setUpcomingTurnos(upcoming);
+        if (isAdmin || isProfesional) setLatestEntrevistas(upcomingEntrevistas);
         setError(
           errors.length
             ? `No se pudieron cargar algunos datos (${errors.join(", ")}).`
@@ -330,7 +300,7 @@ export default function MainDashboard() {
         }
       }
     }
-  }, [isAdmin, isProfesional, profile?.profesion_id]);
+  }, []);
 
   useEffect(() => {
     loadDashboard(true);
@@ -338,18 +308,14 @@ export default function MainDashboard() {
 
   const cards = useMemo(
     () => [
-      ...(isAdmin
-        ? [
-            {
-              id: "professionals",
-              label: "Profesionales activos",
-              value: summary.professionals,
-              icon: <MdGroups size={24} />,
-              to: "/dashboard/profesionales",
-              hint: `${latestProfessionals.length} recientes`,
-            },
-          ]
-        : []),
+      ...(isAdmin ? [{
+        id: "professionals",
+        label: "Profesionales activos",
+        value: summary.professionals,
+        icon: <MdGroups size={24} />,
+        to: "/dashboard/profesionales",
+        hint: `${latestProfessionals.length} recientes`,
+      }] : []),
       {
         id: "children",
         label: "Niños registrados",
@@ -374,22 +340,16 @@ export default function MainDashboard() {
         to: "/dashboard/turnos",
         hint: `${upcomingTurnos.length} próximos`,
       },
-      ...((isAdmin || isProfesional)
-        ? [
-            {
-              id: "entrevistas",
-              label: "Entrevistas pendientes",
-              value: summary.entrevistasPendientes,
-              icon: <MdSchedule size={24} />,
-              to: "/dashboard/entrevistas",
-              hint: `${latestEntrevistas.length} próximas`,
-            },
-          ]
-        : []),
+      ...((isAdmin || isProfesional) ? [{
+        id: "entrevistas",
+        label: "Entrevistas pendientes",
+        value: summary.entrevistasPendientes,
+        icon: <MdSchedule size={24} />,
+        to: "/dashboard/entrevistas",
+        hint: `${latestEntrevistas.length} próximas`,
+      }] : []),
     ],
     [
-      isAdmin,
-      isProfesional,
       summary.professionals,
       latestProfessionals.length,
       summary.children,
@@ -464,7 +424,7 @@ export default function MainDashboard() {
           </div>
 
           <div className="main-dashboard__panels">
-            <section className="main-dashboard__panel main-dashboard__panel--wide">
+            <section className="main-dashboard__panel">
               <div className="main-dashboard__panel-header">
                 <h2>Próximos turnos</h2>
                 <NavLink to="/dashboard/turnos">Ver todos</NavLink>
@@ -561,65 +521,6 @@ export default function MainDashboard() {
                         </li>
                       );
                     })}
-                  </ul>
-                )}
-              </section>
-            )}
-
-            {isAdmin && (
-              <section className="main-dashboard__panel">
-                <div className="main-dashboard__panel-header">
-                  <h2>Profesionales recientes</h2>
-                  <NavLink to="/dashboard/profesionales">Ver equipo</NavLink>
-                </div>
-                {latestProfessionals.length === 0 ? (
-                  <p className="main-dashboard__empty">
-                    Aún no hay profesionales cargados.
-                  </p>
-                ) : (
-                  <ul className="main-dashboard__list">
-                    {latestProfessionals.map((profesional) => (
-                      <li key={profesional.id_profesional}>
-                        <div className="main-dashboard__list-item">
-                          <div className="main-dashboard__avatar">
-                            {profesional.foto_perfil ? (
-                              <img
-                                src={profesional.foto_perfil}
-                                alt={`${profesional.nombre || ""} ${
-                                  profesional.apellido || ""
-                                }`}
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span>
-                                {getInitials(
-                                  profesional.nombre,
-                                  profesional.apellido
-                                )}
-                              </span>
-                            )}
-                          </div>
-                          <div className="main-dashboard__list-info">
-                            <p className="main-dashboard__list-title">
-                              {[profesional.nombre, profesional.apellido]
-                                .filter(Boolean)
-                                .join(" ") || "Sin nombre"}
-                            </p>
-                            <p className="main-dashboard__list-subtitle">
-                              {profesional.profesion || "Sin asignar"}
-                            </p>
-                          </div>
-                          <div className="main-dashboard__list-meta">
-                            {profesional?.usuario?.dni && (
-                              <span>DNI {profesional.usuario.dni}</span>
-                            )}
-                            {profesional?.email && (
-                              <span>{profesional.email}</span>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
                   </ul>
                 )}
               </section>

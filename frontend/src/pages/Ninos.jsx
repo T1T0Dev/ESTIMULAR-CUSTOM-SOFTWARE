@@ -33,6 +33,19 @@ export default function Ninos() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
 
+  // Detectar si estamos en móvil
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -470,11 +483,214 @@ export default function Ninos() {
             </div>
 
             <div className="dashboard-table-wrapper">
-              <table
-                className="table candidatos-table"
-                role="table"
-                aria-label="Lista de niños"
-              >
+              {isMobile ? (
+                /* Vista de tarjetas para móviles */
+                <div className="mobile-cards">
+                  {items.map((c) => {
+                    const isEditing = editId === c.id_nino;
+                    const obraSocialName =
+                      c.obra_social?.nombre_obra_social || null;
+                    return (
+                      <div key={c.id_nino} className="mobile-card">
+                        <div className="mobile-card-header">
+                          <h3 className="mobile-card-title">
+                            {c.nombre} {c.apellido}
+                          </h3>
+                          <span className={`mobile-card-status ${c.tipo === 'paciente' ? 'paciente' : 'candidato'}`}>
+                            {c.tipo === 'paciente' ? 'Paciente' : 'Candidato'}
+                          </span>
+                        </div>
+
+                        <div className="mobile-card-content">
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">DNI:</span>
+                            <span className="mobile-card-value">{c.dni || "No especificado"}</span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Edad:</span>
+                            <span className="mobile-card-value">
+                              {c.fecha_nacimiento ? `${calcularEdad(c.fecha_nacimiento)} años` : "No especificada"}
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Certificado:</span>
+                            <span className="mobile-card-value">
+                              {c.certificado_discapacidad ? "SI" : "NO"}
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Obra Social:</span>
+                            <span className="mobile-card-value">
+                              {obraSocialName || "No especificada"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mobile-card-actions">
+                          <button
+                            className="mobile-card-btn info"
+                            onClick={() => abrirDetalleNino(c)}
+                          >
+                            <FaInfoCircle size={16} />
+                            Ver detalles
+                          </button>
+                          {isAdmin && (
+                            <>
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    className="mobile-card-btn save"
+                                    onClick={async () => {
+                                      try {
+                                        Swal.fire({
+                                          title: "Guardando...",
+                                          allowOutsideClick: false,
+                                          didOpen: () => Swal.showLoading(),
+                                        });
+                                        // Build payload only with changed fields
+                                        const payload = {};
+                                        if (editData.nombre !== undefined && editData.nombre !== c.nombre) {
+                                          payload.nombre = editData.nombre;
+                                        }
+                                        if (editData.apellido !== undefined && editData.apellido !== c.apellido) {
+                                          payload.apellido = editData.apellido;
+                                        }
+                                        if (editData.dni !== undefined) {
+                                          const newDni = editData.dni !== null && editData.dni !== undefined
+                                            ? String(editData.dni).trim()
+                                            : null;
+                                          if (newDni !== (c.dni ?? null)) payload.dni = newDni;
+                                        }
+                                        if (editData.fecha_nacimiento !== undefined) {
+                                          const newFecha = editData.fecha_nacimiento === "" ? null : editData.fecha_nacimiento;
+                                          const currentFecha = c.fecha_nacimiento ?? null;
+                                          if (newFecha !== currentFecha) payload.fecha_nacimiento = newFecha;
+                                        }
+                                        if (editData.certificado_discapacidad !== undefined) {
+                                          const newCert = !!editData.certificado_discapacidad;
+                                          if (newCert !== !!c.certificado_discapacidad) payload.certificado_discapacidad = newCert;
+                                        }
+                                        if (editData.id_obra_social !== undefined) {
+                                          const newOs = editData.id_obra_social ?? null;
+                                          if ((newOs ?? null) !== (c.id_obra_social ?? null)) payload.id_obra_social = newOs;
+                                        }
+                                        if (editData.tipo !== undefined && editData.tipo !== c.tipo) {
+                                          payload.tipo = editData.tipo;
+                                        }
+                                        await axios.put(`${API_BASE_URL}/api/ninos/${c.id_nino}`, payload);
+                                        setEditId(null);
+                                        setEditData({});
+                                        await fetchNinos(busqueda, page, tipo);
+                                        Swal.close();
+                                        Swal.fire({
+                                          icon: "success",
+                                          title: "Guardado",
+                                          timer: 1200,
+                                          showConfirmButton: false,
+                                        });
+                                      } catch (err) {
+                                        Swal.close();
+                                        Swal.fire({
+                                          icon: "error",
+                                          title: "Error",
+                                          text: err?.response?.data?.message || "No se pudo guardar",
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <FaCheck size={16} />
+                                    Guardar
+                                  </button>
+                                  <button
+                                    className="mobile-card-btn cancel"
+                                    onClick={() => {
+                                      setEditId(null);
+                                      setEditData({});
+                                    }}
+                                  >
+                                    <FaTimes size={16} />
+                                    Cancelar
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    className="mobile-card-btn edit"
+                                    onClick={() => {
+                                      setEditId(c.id_nino);
+                                      setEditData({
+                                        nombre: c.nombre,
+                                        apellido: c.apellido,
+                                        dni: c.dni,
+                                        fecha_nacimiento: c.fecha_nacimiento
+                                          ? String(c.fecha_nacimiento).slice(0, 10)
+                                          : "",
+                                        certificado_discapacidad: !!c.certificado_discapacidad,
+                                        id_obra_social: c.id_obra_social ?? null,
+                                        tipo: c.tipo,
+                                      });
+                                    }}
+                                  >
+                                    <MdEdit size={16} />
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="mobile-card-btn delete"
+                                    onClick={async () => {
+                                      const result = await Swal.fire({
+                                        title: "¿Eliminar?",
+                                        text: "Esta acción no se puede deshacer.",
+                                        icon: "warning",
+                                        showCancelButton: true,
+                                        confirmButtonText: "Sí, eliminar",
+                                        cancelButtonText: "Cancelar",
+                                      });
+                                      if (result.isConfirmed) {
+                                        try {
+                                          Swal.fire({
+                                            title: "Eliminando...",
+                                            allowOutsideClick: false,
+                                            didOpen: () => Swal.showLoading(),
+                                          });
+                                          await axios.delete(`${API_BASE_URL}/api/ninos/${c.id_nino}`);
+                                          await fetchNinos(busqueda, page, tipo);
+                                          Swal.close();
+                                          Swal.fire({
+                                            icon: "success",
+                                            title: "Eliminado",
+                                            timer: 1200,
+                                            showConfirmButton: false,
+                                          });
+                                        } catch (err) {
+                                          Swal.close();
+                                          Swal.fire({
+                                            icon: "error",
+                                            title: "Error",
+                                            text: err?.response?.data?.message || "No se pudo eliminar",
+                                          });
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <MdDelete size={16} />
+                                    Eliminar
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Vista de tabla para desktop */
+                <table
+                  className="table candidatos-table"
+                  role="table"
+                  aria-label="Lista de niños"
+                >
                 <thead>
                   <tr>
                     <th className="col-dni">DNI</th>
@@ -868,6 +1084,7 @@ export default function Ninos() {
                   })}
                 </tbody>
               </table>
+              )}
             </div>
 
             {totalPages > 1 && (

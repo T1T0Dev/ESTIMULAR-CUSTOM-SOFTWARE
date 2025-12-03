@@ -51,6 +51,19 @@ export default function ObrasSociales() {
   const pageSize = 10;
   const skipPageEffectRef = useRef(false);
 
+  // Detectar si estamos en móvil
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const debouncedBusqueda = useDebounce(busqueda, 300);
 
   const fetchEstados = useCallback(async () => {
@@ -193,7 +206,198 @@ export default function ObrasSociales() {
               </div>
             </div>
 
-            <div className="dashboard-table-wrapper">
+            {isMobile ? (
+              /* Vista de tarjetas para móviles */
+              <div className="mobile-cards">
+                {items.map((o) => {
+                  const isEditing = editId === o.id_obra_social;
+                  return (
+                    <div key={o.id_obra_social} className="mobile-card">
+                      <div className="mobile-card-header">
+                        <div>
+                          <div className="mobile-card-name">
+                            {sanitizeNombreObra(o.nombre_obra_social) || "Sin nombre"}
+                          </div>
+                        </div>
+                        <div className={`mobile-card-status ${o.estado ? 'active' : 'inactive'}`}>
+                          {o.estado || 'Sin estado'}
+                        </div>
+                      </div>
+
+                      <div className="mobile-card-actions">
+                        <button
+                          className="icon-btn info"
+                          title="Información"
+                          onClick={() => {
+                            setModalData(o);
+                            setModalOpen(true);
+                          }}
+                        >
+                          <FaInfoCircle size={20} />
+                        </button>
+                        {isEditing ? (
+                          <>
+                            <button
+                              className="icon-btn save"
+                              title="Guardar"
+                              onClick={async () => {
+                                try {
+                                  Swal.fire({
+                                    title: "Guardando...",
+                                    allowOutsideClick: false,
+                                    didOpen: () => Swal.showLoading(),
+                                  });
+                                  const payload = {};
+                                  if (
+                                    editData.nombre_obra_social !==
+                                      undefined &&
+                                    editData.nombre_obra_social !==
+                                      o.nombre_obra_social
+                                  ) {
+                                    const nombreActualizado =
+                                      sanitizeNombreObra(
+                                        editData.nombre_obra_social
+                                      );
+                                    if (!nombreActualizado) {
+                                      Swal.close();
+                                      Swal.fire({
+                                        icon: "warning",
+                                        title: "Nombre requerido",
+                                        text: "El nombre no puede quedar vacío.",
+                                      });
+                                      return;
+                                    }
+                                    const nombreCanonico =
+                                      canonicalNombreObra(
+                                        nombreActualizado
+                                      );
+                                    const duplicado = items.some(
+                                      (item) =>
+                                        item.id_obra_social !==
+                                          o.id_obra_social &&
+                                        canonicalNombreObra(
+                                          item.nombre_obra_social
+                                        ) === nombreCanonico
+                                    );
+                                    if (duplicado) {
+                                      Swal.close();
+                                      Swal.fire({
+                                        icon: "error",
+                                        title: "Duplicado",
+                                        text: "Ya existe otra obra social con ese nombre.",
+                                      });
+                                      return;
+                                    }
+                                    payload.nombre_obra_social =
+                                      nombreActualizado;
+                                  }
+                                  if (
+                                    editData.estado !== undefined &&
+                                    editData.estado !== o.estado
+                                  ) {
+                                    payload.estado = editData.estado;
+                                  }
+                                  await axios.put(
+                                    `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`,
+                                    payload
+                                  );
+                                  setEditId(null);
+                                  setEditData({});
+                                  await fetchObras(busqueda, page, estado);
+                                  Swal.close();
+                                  Swal.fire({
+                                    icon: "success",
+                                    title: "Guardado",
+                                    timer: 1200,
+                                    showConfirmButton: false,
+                                  });
+                                } catch (err) {
+                                  Swal.close();
+                                  Swal.fire({
+                                    icon: "error",
+                                    title: "Error",
+                                    text: "No se pudo guardar los cambios.",
+                                  });
+                                }
+                              }}
+                            >
+                              <FaCheck size={18} />
+                            </button>
+                            <button
+                              className="icon-btn cancel"
+                              title="Cancelar"
+                              onClick={() => {
+                                setEditId(null);
+                                setEditData({});
+                              }}
+                            >
+                              <FaTimes size={18} />
+                            </button>
+                          </>
+                        ) : (
+                          isAdmin && (
+                            <button
+                              className="icon-btn edit"
+                              title="Editar"
+                              onClick={() => {
+                                setEditId(o.id_obra_social);
+                                setEditData({
+                                  nombre_obra_social: o.nombre_obra_social,
+                                  estado: o.estado,
+                                });
+                              }}
+                            >
+                              <MdEdit size={20} />
+                            </button>
+                          )
+                        )}
+                        {isAdmin && !isEditing && (
+                          <button
+                            className="icon-btn danger"
+                            title="Eliminar"
+                            onClick={async () => {
+                              const result = await Swal.fire({
+                                title: "¿Eliminar obra social?",
+                                text: `¿Estás seguro de eliminar "${o.nombre_obra_social}"?`,
+                                icon: "warning",
+                                showCancelButton: true,
+                                confirmButtonColor: "#d33",
+                                cancelButtonColor: "#3085d6",
+                                confirmButtonText: "Sí, eliminar",
+                                cancelButtonText: "Cancelar",
+                              });
+                              if (result.isConfirmed) {
+                                try {
+                                  await axios.delete(
+                                    `${API_BASE_URL}/api/obras-sociales/${o.id_obra_social}`
+                                  );
+                                  await fetchObras(busqueda, page, estado);
+                                  Swal.fire({
+                                    icon: "success",
+                                    title: "Eliminado",
+                                    timer: 1200,
+                                    showConfirmButton: false,
+                                  });
+                                } catch (err) {
+                                  Swal.fire({
+                                    icon: "error",
+                                    title: "Error",
+                                    text: "No se pudo eliminar la obra social.",
+                                  });
+                                }
+                              }
+                            }}
+                          >
+                            <MdDelete size={20} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="dashboard-table-wrapper">
               <table
                 className="table candidatos-table"
                 role="table"
@@ -450,6 +654,7 @@ export default function ObrasSociales() {
                 </tbody>
               </table>
             </div>
+            )}
 
             {totalPages > 1 && (
               <div className="paginacion-sweeper">

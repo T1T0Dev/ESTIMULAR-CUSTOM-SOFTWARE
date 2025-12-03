@@ -1,0 +1,475 @@
+/* Estilos para la página de Entrevistas */
+
+.entrevistas-page {
+  padding: 20px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.entrevistas-header {
+  margin-bottom: 30px;
+}
+
+.entrevistas-header h1 {
+  color: #e5007d;
+  margin-bottom: 10px;
+  font-size: 2rem;
+}
+
+.entrevistas-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.entrevistas-content {
+  margin-top: 20px;
+}
+
+/* Estilos para la búsqueda y controles */
+.ninos-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.ninos-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--neutral-800);
+  margin: 0;
+}
+
+.ninos-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.busqueda-form {
+  display: flex;
+  align-items: center;
+}
+
+.search {
+  position: relative;
+}
+
+.busqueda-input {
+  padding: 10px 16px;
+  border: 2px solid var(--neutral-300);
+  border-radius: 25px;
+  font-size: 0.95rem;
+  width: 300px;
+  transition: border-color 0.2s ease;
+}
+
+.busqueda-input:focus {
+  outline: none;
+  border-color: var(--color-rosa1);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Estilos para la card y tabla */
+.card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.ninos-card {
+  margin-top: 20px;
+}
+
+.loader {
+  text-align: center;
+  padding: 50px;
+  color: var(--neutral-600);
+  font-size: 1.1rem;
+}
+
+.error {
+  text-align: center;
+  padding: 50px;
+  color: #dc3545;
+  font-size: 1.1rem;
+}
+
+.empty {
+  text-align: center;
+  padding: 50px;
+  color: var(--neutral-600);
+  font-size: 1.1rem;
+}
+
+/* Estilos de tabla */
+.table-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--neutral-50);
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.table-tools .left,
+.table-tools .right {
+  display: flex;
+  align-items: center;
+}
+
+.meta {
+  font-size: 0.9rem;
+  color: var(--neutral-600);
+  font-weight: 500;
+}
+
+.dashboard-table-wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.table th {
+  background: var(--neutral-100);
+  font-weight: 600;
+  color: var(--neutral-800);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table tbody tr:hover {
+  background: var(--neutral-50);
+}
+
+/* Columnas específicas */
+.col-dni {
+  width: 100px;
+  text-align: center;
+}
+
+.col-name,
+.col-last {
+  min-width: 120px;
+}
+
+.col-dniNac {
+  min-width: 140px;
+}
+
+.col-os {
+  min-width: 150px;
+}
+
+.col-motivo {
+  min-width: 200px;
+}
+
+.col-turno {
+  min-width: 180px;
+}
+
+.col-actions {
+  width: 120px;
+  text-align: center;
+}
+
+/* Estilos para el motivo */
+.motivo-text {
+  display: block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--neutral-500);
+  font-style: italic;
+}
+
+/* Estilos para el turno asignado */
+.turno-chip {
+  background: #e8f5e8;
+  color: #2e7d32;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Acciones */
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.icon-btn.success {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.icon-btn.success:hover {
+  background: #c8e6c9;
+}
+
+.icon-btn.danger {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.icon-btn.danger:hover {
+  background: #ffcdd2;
+}
+
+/* Paginación */
+.paginacion-sweeper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--neutral-50);
+  border-top: 1px solid var(--neutral-200);
+}
+
+.sweeper-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--neutral-300);
+  background: white;
+  color: var(--neutral-700);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.sweeper-btn:hover:not(:disabled) {
+  background: var(--neutral-100);
+  border-color: var(--neutral-400);
+}
+
+.sweeper-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sweeper-info {
+  font-size: 0.9rem;
+  color: var(--neutral-600);
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .entrevistas-page {
+    padding: 15px;
+  }
+
+  .entrevistas-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .ninos-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ninos-controls {
+    justify-content: center;
+  }
+
+  .busqueda-input {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  /* Vista de tarjetas para móviles */
+}
+
+/* Para pantallas muy pequeñas */
+@media (max-width: 480px) {
+  .mobile-card {
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .mobile-card-info {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mobile-card-actions {
+    justify-content: center;
+  }
+}
+
+/* Estilos para tarjetas móviles */
+.mobile-cards {
+  display: block;
+  padding: 16px;
+}
+
+.mobile-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--neutral-200);
+}
+
+.mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.mobile-card-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--neutral-800);
+  margin-bottom: 4px;
+}
+
+.mobile-card-dni {
+  font-size: 0.85rem;
+  color: var(--neutral-600);
+}
+
+.mobile-card-status {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.mobile-card-status.assigned {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.mobile-card-status.unassigned {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.mobile-card-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mobile-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-card-label {
+  font-size: 0.75rem;
+  color: var(--neutral-500);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mobile-card-value {
+  font-size: 0.9rem;
+  color: var(--neutral-800);
+  font-weight: 500;
+}
+
+.mobile-card-value.muted {
+  color: var(--neutral-500);
+  font-style: italic;
+}
+
+.mobile-card-motivo {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: var(--neutral-50);
+  border-radius: 8px;
+  border-left: 3px solid var(--color-rosa1);
+}
+
+.mobile-card-motivo .mobile-card-label {
+  margin-bottom: 4px;
+}
+
+.mobile-card-motivo .mobile-card-value {
+  line-height: 1.4;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--neutral-100);
+}
+
+.mobile-card-actions .icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.turno-chip {
+  max-width: 120px;
+  font-size: 0.7rem;
+}
+
+.motivo-text {
+  max-width: 150px;
+}

@@ -257,7 +257,7 @@ export default function SidebarDashboard() {
 
         {esAdmin && (
           <NavLink
-            to="/dashboard/panel-financiero"
+            to="/dashboard/finanzas"
             className={({ isActive }) =>
               isActive ? "sd-link active" : "sd-link"
             }
