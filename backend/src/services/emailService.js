@@ -16,6 +16,7 @@ const sendCancellationEmail = async (mailOptions) => {  // Cambia para aceptar m
     console.log('Email de cancelación enviado a:', mailOptions.to);
   } catch (error) {
     console.error('Error enviando email de cancelación:', error);
+    throw error;  // Lanzar la excepción para que sea manejada por el caller
   }
 };
 

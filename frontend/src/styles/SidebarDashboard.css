@@ -146,7 +146,9 @@
 }
 
 @media (max-width: 900px) {
+  /* No ocultar sidebar aquí, dejar que DashboardLayout lo maneje */
   .sd-sidebar {
-    display: none;
+    height: auto; /* Adaptarse al contenedor padre en móviles */
+    position: static; /* No sticky en móviles */
   }
 }

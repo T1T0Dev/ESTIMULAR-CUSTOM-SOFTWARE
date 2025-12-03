@@ -514,4 +514,8 @@ module.exports = {
   handleDeleteTurno,
   handleAutoScheduleEntrevista,
   handleCancelAutoScheduleEntrevista,
+  // Funciones auxiliares
+  userIsAdmin,
+  userIsRecepcion,
+  fetchPersonaIdForUser,
 };

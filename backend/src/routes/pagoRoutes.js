@@ -30,7 +30,7 @@ router.get(
 router.put(
 	'/pagos/:id',
 	authenticate,
-	authorize(['admin', 'recepcion']),
+	authorize(['admin', 'recepcion', 'profesional']),
 	handleUpdatePago
 );
 

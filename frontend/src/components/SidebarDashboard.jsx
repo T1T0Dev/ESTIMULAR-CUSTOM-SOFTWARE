@@ -224,7 +224,16 @@ export default function SidebarDashboard() {
           </NavLink>
         )}
 
-        {(esAdmin || isProfesional) && (
+        <NavLink
+          to="/dashboard/obras-sociales"
+          className={({ isActive }) =>
+            isActive ? "sd-link active" : "sd-link"
+          }
+        >
+          <MdLocalHospital size={18} /> <span>Obras sociales</span>
+        </NavLink>
+
+        {esAdmin && (
           <NavLink
             to="/dashboard/entrevistas"
             className={({ isActive }) =>
@@ -234,15 +243,6 @@ export default function SidebarDashboard() {
             <MdAssignment size={18} /> <span>Entrevistas</span>
           </NavLink>
         )}
-
-        <NavLink
-          to="/dashboard/obras-sociales"
-          className={({ isActive }) =>
-            isActive ? "sd-link active" : "sd-link"
-          }
-        >
-          <MdLocalHospital size={18} /> <span>Obras sociales</span>
-        </NavLink>
 
         {(esAdmin || isProfesional || isRecepcion) && (
           <NavLink
@@ -257,7 +257,7 @@ export default function SidebarDashboard() {
 
         {esAdmin && (
           <NavLink
-            to="/dashboard/panel-financiero"
+            to="/dashboard/finanzas"
             className={({ isActive }) =>
               isActive ? "sd-link active" : "sd-link"
             }

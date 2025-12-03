@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import SidebarDashboard from "../components/SidebarDashboard";
+import BottomNavigation from "../components/BottomNavigation";
 import "../styles/DashboardLayout.css";
 // Importar iconos de apertura/cierre si es necesario
 import { FaBars, FaTimes } from "react-icons/fa";
@@ -13,7 +14,7 @@ export default function DashboardLayout({ children, title }) {
         <SidebarDashboard />
       </aside>
 
-      {/* Toggle tipo "cortina" centrado en el borde del sidebar */}
+      {/* Toggle tipo "cortina" para desktop */}
       <button
         className={`dashboard-toggle-curtain ${
           collapsed ? "is-collapsed" : "is-open"
@@ -28,6 +29,16 @@ export default function DashboardLayout({ children, title }) {
         {collapsed ? <FaBars /> : <FaTimes />}
       </button>
 
+      {/* Botón hamburguesa para móviles */}
+      <button
+        className="dashboard-mobile-menu"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-label="Menú de navegación"
+        type="button"
+      >
+        <FaBars />
+      </button>
+
       <main className="dashboard-main" role="main">
         {title && (
           <div className="dashboard-title">
@@ -36,6 +47,9 @@ export default function DashboardLayout({ children, title }) {
         )}
         <div className="dashboard-content">{children}</div>
       </main>
+
+      {/* Bottom Navigation para móviles */}
+      <BottomNavigation />
     </div>
   );
 }

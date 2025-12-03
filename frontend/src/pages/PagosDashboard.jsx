@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import Swal from "sweetalert2";
 import API_BASE_URL from "../constants/api";
 import SelectPaymentMethodModal from "../components/SelectPaymentMethodModal";
 import {
@@ -419,7 +420,11 @@ export default function PagosDashboard() {
         setPaymentModalState(EMPTY_MODAL_STATE);
       } catch (err) {
         console.error("Error al registrar los pagos seleccionados", err);
-        window.alert("No se pudieron registrar los pagos seleccionados.");
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al registrar pagos',
+          text: 'No se pudieron registrar los pagos seleccionados.'
+        });
       } finally {
         setModalSubmitting(false);
         if (actionKey) {

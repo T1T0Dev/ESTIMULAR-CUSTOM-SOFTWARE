@@ -433,7 +433,11 @@
 
 @media (max-width: 480px) {
   .main-dashboard {
-    gap: 18px;
+    gap: 20px; /* Mejor separación en móviles */
+  }
+
+  .main-dashboard__panels {
+    gap: 20px; /* Mejor separación entre panels */
   }
 
   .main-dashboard__title {
@@ -468,7 +472,12 @@
   }
 
   .main-dashboard__turno-item {
-    padding: 14px;
+    padding: 16px; /* Mejor padding para móviles */
+    font-size: 0.9rem; /* Texto ligeramente más grande en móviles */
+  }
+
+  .main-dashboard__turno-meta {
+    font-size: 0.8rem; /* Mejor legibilidad */
   }
 }
 

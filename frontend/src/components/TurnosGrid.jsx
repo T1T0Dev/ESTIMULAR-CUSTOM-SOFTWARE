@@ -3,6 +3,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import moment from 'moment';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import API_BASE_URL from '../constants/api';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -100,6 +101,8 @@ const CustomToolbar = ({
   canShowAllConsultorios,
   isShowingAll,
   onOpenDatePicker,
+  viewMode,
+  onToggleView,
 }) => {
   return (
     <div className="rbc-toolbar">
@@ -121,6 +124,26 @@ const CustomToolbar = ({
           {isShowingAll ? 'Ver consultorios con turnos' : 'Mostrar todos los consultorios'}
         </button>
       </span>
+      <span className="toolbar-spacer"></span>
+      <span className="toolbar-view-toggle">
+        <span className="view-indicator">
+          <span className="view-label">
+            Vista: <strong>{viewMode === 'calendar' ? 'Calendario' : 'Lista'}</strong>
+          </span>
+        </span>
+        <button 
+          className="view-toggle-btn"
+          onClick={onToggleView}
+          title={`Vista actual: ${viewMode === 'calendar' ? 'Calendario' : 'Lista'} - Click para cambiar`}
+        >
+          <span className="toggle-icon">
+            {viewMode === 'calendar' ? '📋' : '📅'}
+          </span>
+          <span className="toggle-text">
+            {viewMode === 'calendar' ? 'Lista' : 'Calendario'}
+          </span>
+        </button>
+      </span>
     </div>
   );
 };
@@ -136,6 +159,7 @@ const TimeSlotWrapper = ({ children, value }) => {
 
 export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isRecepcion = false, currentUserId = null }) {
   const [events, setEvents] = useState([]);
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
   const identityCandidates = useMemo(() => {
     const ids = [];
     if (currentUserId !== null && currentUserId !== undefined) {
@@ -150,6 +174,19 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
   const [consultoriosTurnos, setConsultoriosTurnos] = useState([]);
   const [todosConsultorios, setTodosConsultorios] = useState([]);
   const [mostrarTodosConsultorios, setMostrarTodosConsultorios] = useState(false);
+
+  // Detectar si es móvil y mostrar todos los consultorios por defecto
+  useEffect(() => {
+    const checkMobile = () => {
+      if (window.innerWidth < 768) {
+        setMostrarTodosConsultorios(true);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [mostrarSelectorFecha, setMostrarSelectorFecha] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -235,7 +272,11 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
       }
     } catch (error) {
       console.error("Error updating turno:", error);
-      alert('Error al actualizar el turno: ' + (error.response?.data?.message || error.message));
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al actualizar turno',
+        text: error.response?.data?.message || error.message
+      });
     }
   }, [currentDate, fetchTurnos, isAdmin, loggedInProfesionalId, currentUserId]);
 
@@ -261,7 +302,11 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
       setSelectedEvent(null);
     } catch (error) {
       console.error('Error deleting turno:', error);
-      alert('Error al eliminar el turno: ' + (error.response?.data?.message || error.message));
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al eliminar turno',
+        text: error.response?.data?.message || error.message
+      });
     }
   }, [currentDate, fetchTurnos, isAdmin, loggedInProfesionalId, currentUserId]);
 
@@ -334,6 +379,10 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
 
   const handleMostrarTodosConsultorios = () => {
     setMostrarTodosConsultorios((prev) => !prev);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'calendar' ? 'list' : 'calendar');
   };
 
   const calendarResources = mostrarTodosConsultorios ? todosConsultorios : consultoriosTurnos;
@@ -420,48 +469,139 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
     timeGutterFormat: 'HH:mm',
   };
 
+  // Componente para vista de lista
+  const TurnosListView = () => {
+    const sortedEvents = [...events].sort((a, b) => {
+      if (a.start.getTime() !== b.start.getTime()) {
+        return a.start.getTime() - b.start.getTime();
+      }
+      return a.resourceId - b.resourceId;
+    });
+
+    const groupedEvents = sortedEvents.reduce((acc, event) => {
+      const dateKey = moment(event.start).format('YYYY-MM-DD');
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(event);
+      return acc;
+    }, {});
+
+    return (
+      <div className="turnos-list-view">
+        <div className="turnos-list-header">
+          <div className="list-header-content">
+            <h3>Turnos del día {moment(currentDate).format('DD/MM/YYYY')}</h3>
+            <div className="list-view-toggle">
+              <span className="view-indicator">
+                <span className="view-label">
+                  Vista: <strong>Lista</strong>
+                </span>
+              </span>
+              <button 
+                className="view-toggle-btn"
+                onClick={toggleViewMode}
+                title="Cambiar a vista Calendario"
+              >
+                <span className="toggle-icon">📅</span>
+                <span className="toggle-text">Calendario</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {Object.keys(groupedEvents).length === 0 ? (
+          <div className="no-turnos-message">
+            <p>No hay turnos programados para este día</p>
+          </div>
+        ) : (
+          <div className="turnos-list-content">
+            {Object.entries(groupedEvents).map(([date, dayEvents]) => (
+              <div key={date} className="turnos-day-group">
+                <h4 className="turnos-day-title">
+                  {moment(date).format('dddd DD/MM')}
+                </h4>
+                <div className="turnos-list">
+                  {dayEvents.map(event => (
+                    <div 
+                      key={event.id} 
+                      className={`turno-list-item event-${event.data.estado}`}
+                      onClick={() => handleSelectEvent(event)}
+                    >
+                      <div className="turno-time">
+                        {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
+                      </div>
+                      <div className="turno-info">
+                        <div className="turno-title">{event.title}</div>
+                        <div className="turno-details">
+                          <span className="turno-consultorio">{event.resourceTitle}</span>
+                          <span className={`turno-status status-${event.data.estado}`}>
+                            {event.data.estado}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="turno-actions">
+                        <button className="turno-action-btn">⋯</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="turnos-grid-container">
-      <DnDCalendar
-        localizer={localizer}
-        events={events}
-        date={currentDate}
-        onNavigate={handleNavigate}
-        onSelectEvent={handleSelectEvent}
-        defaultView="day"
-        views={['day']}
-  resources={calendarResources}
-        resourceIdAccessor="resourceId"
-        resourceTitleAccessor="resourceTitle"
-        startAccessor="start"
-        endAccessor="end"
-        onEventDrop={handleEventDrop}
-        onEventResize={handleEventResize}
-        draggableAccessor={isEventDraggable}
-        resizableAccessor={isEventDraggable}
-        selectable
-  onSelectSlot={handleSelectSlot}
-        step={15}
-        timeslots={2}
-        min={moment(currentDate).set({ h: 9, m: 0 }).toDate()}
-        max={moment(currentDate).set({ h: 20, m: 0 }).toDate()}
-        formats={formats}
-        eventPropGetter={eventPropGetter}
-        slotPropGetter={slotPropGetter}
-        components={{
-          toolbar: (toolbarProps) => (
-            <CustomToolbar
-              {...toolbarProps}
-              onShowAllConsultorios={handleMostrarTodosConsultorios}
-              canShowAllConsultorios={todosConsultorios.length > 0}
-              isShowingAll={mostrarTodosConsultorios}
-              onOpenDatePicker={handleOpenDatePicker}
-            />
-          ),
-          timeSlotWrapper: TimeSlotWrapper,
-          event: SimpleEvent
-        }}
-      />
+      {viewMode === 'calendar' ? (
+        <DnDCalendar
+          localizer={localizer}
+          events={events}
+          date={currentDate}
+          onNavigate={handleNavigate}
+          onSelectEvent={handleSelectEvent}
+          defaultView="day"
+          views={['day']}
+          resources={calendarResources}
+          resourceIdAccessor="resourceId"
+          resourceTitleAccessor="resourceTitle"
+          startAccessor="start"
+          endAccessor="end"
+          onEventDrop={handleEventDrop}
+          onEventResize={handleEventResize}
+          draggableAccessor={isEventDraggable}
+          resizableAccessor={isEventDraggable}
+          selectable
+          onSelectSlot={handleSelectSlot}
+          step={15}
+          timeslots={2}
+          min={moment(currentDate).set({ h: 9, m: 0 }).toDate()}
+          max={moment(currentDate).set({ h: 20, m: 0 }).toDate()}
+          formats={formats}
+          eventPropGetter={eventPropGetter}
+          slotPropGetter={slotPropGetter}
+          components={{
+            toolbar: (toolbarProps) => (
+              <CustomToolbar
+                {...toolbarProps}
+                onShowAllConsultorios={handleMostrarTodosConsultorios}
+                canShowAllConsultorios={todosConsultorios.length > 0}
+                isShowingAll={mostrarTodosConsultorios}
+                onOpenDatePicker={handleOpenDatePicker}
+                viewMode={viewMode}
+                onToggleView={toggleViewMode}
+              />
+            ),
+            timeSlotWrapper: TimeSlotWrapper,
+            event: SimpleEvent
+          }}
+        />
+      ) : (
+        <TurnosListView />
+      )}
       {selectedEvent && (
         <TurnoModal 
           event={selectedEvent} 

@@ -183,3 +183,17 @@ const useAuthStore = create(
 );
 
 export default useAuthStore;
+
+// Add axios interceptor to handle 401 errors
+axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Clear auth on 401 errors with a small delay to prevent flashing
+            setTimeout(() => {
+                useAuthStore.getState().clearAuth();
+            }, 100);
+        }
+        return Promise.reject(error);
+    }
+);

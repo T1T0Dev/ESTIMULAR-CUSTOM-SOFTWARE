@@ -543,3 +543,69 @@ input[type="date"].edit-input {
     min-width: 120px;
   }
 }
+
+/* Media queries para modal en móviles */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 1rem;
+  }
+
+  .modal-info {
+    padding: 1.5rem 1.2rem 1rem 1.2rem;
+    min-width: auto;
+    max-width: 95vw;
+    width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-close {
+    top: 12px;
+    right: 12px;
+    font-size: 1.5rem;
+  }
+
+  .modal-info h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .modal-section h3 {
+    font-size: 1rem;
+  }
+
+  .modal-row {
+    font-size: 0.9rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .pill {
+    font-size: 0.9rem;
+    padding: 6px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-info {
+    padding: 1rem;
+    width: 98vw;
+    max-width: 98vw;
+    border-radius: 12px;
+  }
+
+  .modal-info h2 {
+    font-size: 1.1rem;
+  }
+
+  .modal-row {
+    font-size: 0.85rem;
+  }
+
+  .pill {
+    font-size: 0.85rem;
+    padding: 5px 10px;
+  }
+}

@@ -12,7 +12,7 @@ router.put('/:id', authenticate, authorize(['admin', 'profesional', 'recepcion']
 // (Opcional) Crear/autoasignar turnos para un candidato - Solo admin
 router.post('/assign', authenticate, authorize(['admin']), assignTurnosForCandidato);
 
-// Cancelar turno - Solo admin
-router.put('/cancelar/:id', authenticate, authorize(['admin']), cancelarTurno);
+// Cancelar turno - Admin o profesional asignado (permisos verificados en controlador)
+router.put('/cancelar/:id', authenticate, cancelarTurno);
 
 module.exports = router;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import moment from "moment";
 import Swal from "sweetalert2";
 import API_BASE_URL from "../constants/api";
+import useAuthStore from "../store/useAuthStore";
 import "./../styles/TurnoModal.css";
 
 const parseProfesionalIds = (value) =>
@@ -26,6 +27,8 @@ export default function TurnoModal({
   const [endTime, setEndTime] = useState("");
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelTexto, setCancelTexto] = useState("");
+
+  const { token } = useAuthStore();
 
   useEffect(() => {
     if (event) {
@@ -132,13 +135,25 @@ export default function TurnoModal({
     const subject = `Cancelación de turno ${moment(event.start).format("DD/MM/YYYY")}`;
 
     try {
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      
+      // Agregar header de usuario si está disponible
+      if (currentUserId !== null && currentUserId !== undefined) {
+        headers['X-User-ID'] = currentUserId;
+      }
+      
+      // Agregar header de autorización si hay token
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/api/turnos/cancelar/${turnoId}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({ subject, body: cancelTexto }),
         }
       );

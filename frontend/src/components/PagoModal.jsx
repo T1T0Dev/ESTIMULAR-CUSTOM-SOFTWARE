@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import API_BASE_URL from '../constants/api';
 import {
   PAYMENT_METHODS,
@@ -81,19 +82,25 @@ export default function PagoModal({ turno, onClose }) {
       if (error.response) {
         console.error("Response status:", error.response.status);
         console.error("Response data:", error.response.data);
-        alert(
-          `Error al cargar pagos: ${
-            error.response.data?.message || "Error del servidor"
-          }`
-        );
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al cargar pagos',
+          text: error.response.data?.message || "Error del servidor"
+        });
       } else if (error.request) {
         console.error("No response received - backend might not be running");
-        alert(
-          "No se pudieron cargar los pagos. El servidor backend no está disponible."
-        );
+        Swal.fire({
+          icon: 'error',
+          title: 'Error de conexión',
+          text: "No se pudieron cargar los pagos. El servidor backend no está disponible."
+        });
       } else {
         console.error("Request setup error:", error.message);
-        alert("Error al configurar la solicitud de pagos.");
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: "Error al configurar la solicitud de pagos."
+        });
       }
     } finally {
       setLoading(false);
@@ -146,22 +153,93 @@ export default function PagoModal({ turno, onClose }) {
   }, []);
 
   const handlePay = async (pagoId) => {
+    console.log('handlePay called with pagoId:', pagoId);
+    console.log('selectedMetodos:', selectedMetodos);
+    
+    if (!pagoId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'ID de pago no válido'
+      });
+      return;
+    }
+    
     const metodoSeleccionado = selectedMetodos[pagoId] || '';
+    console.log('metodoSeleccionado:', metodoSeleccionado);
+    
     if (!metodoSeleccionado || metodoSeleccionado === UNASSIGNED_PAYMENT_METHOD) {
-      alert('Seleccione un método de pago antes de completar.');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Método de pago requerido',
+        text: 'Por favor seleccione un método de pago antes de marcar como pagado.'
+      });
       return;
     }
 
     try {
-      await axios.put(`${API_BASE_URL}/api/pagos/${pagoId}`, {
+      console.log('Making PUT request to update pago');
+      
+      const response = await axios.put(`${API_BASE_URL}/api/pagos/${pagoId}`, {
         estado: 'completado',
         turno_id: turno.id,
         metodo: metodoSeleccionado,
       });
+      
+      console.log('Pago updated successfully');
       await fetchPagos();
+      Swal.fire({
+        icon: 'success',
+        title: '¡Pago procesado!',
+        text: 'Pago procesado correctamente',
+        timer: 2000,
+        showConfirmButton: false
+      });
     } catch (error) {
       console.error("Error updating pago:", error);
-      alert('Error al procesar el pago.');
+      
+      if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data?.message || 'Error desconocido';
+        
+        if (status === 403) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Sin permisos',
+            text: 'No tiene permisos para procesar pagos. Contacte al administrador.'
+          });
+        } else if (status === 404) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Pago no encontrado',
+            text: 'Pago no encontrado. Puede que haya sido eliminado.'
+          });
+        } else if (status === 400) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error en la solicitud',
+            text: `Error en la solicitud: ${message}`
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error del servidor',
+            text: `Error del servidor (${status}): ${message}`
+          });
+        }
+      } else if (error.request) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error de conexión',
+          text: 'No se pudo conectar con el servidor. Verifique su conexión a internet.'
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error inesperado',
+          text: 'Error inesperado al procesar el pago.'
+        });
+      }
     }
   };
 

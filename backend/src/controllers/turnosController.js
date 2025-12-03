@@ -4,6 +4,9 @@ const turnoModel = require('../models/turnoModel');
 const moment = require('moment');  // Agrega este require
 const path = require('path');  // Agrega esto si no está
 
+// Importar funciones auxiliares desde turnoController.js
+const { userIsAdmin, userIsRecepcion, fetchPersonaIdForUser } = require('./turnoController');
+
 /**
  * Listar turnos con filtros.
  * Query params soportados:
@@ -155,15 +158,41 @@ const cancelarTurno = async (req, res) => {
   try {
     const { id } = req.params;
     const { subject, body } = req.body;
-    if (!id || !subject || !body) return res.status(400).json({ success: false, message: 'Faltan datos' });
+    const loggedInUserId = req.user?.id;  // Obtener del token JWT en lugar del header
+    const adminHeaderOverride = String(req.headers['x-admin-override'] || '')
+      .trim()
+      .toLowerCase() === 'true';
 
-    // Primero, obtener detalles del turno
+    if (!id || !subject || !body) return res.status(400).json({ success: false, message: 'Faltan datos' });
+    if (!loggedInUserId || Number.isNaN(Number(loggedInUserId))) {
+      return res.status(401).json({ success: false, message: 'No autorizado: Falta el ID de usuario.' });
+    }
+
+    // Verificar permisos
+    const adminOverride = adminHeaderOverride || await userIsAdmin(loggedInUserId);
+    const recepcionOverride = await userIsRecepcion(loggedInUserId);
+
+    // Obtener detalles del turno para verificar asignación
     const { data: turnoCompleto, error: turnoError } = await supabaseAdmin
       .from('turnos')
-      .select('id, nino_id, inicio, fin')
+      .select(`
+        id, nino_id, inicio, fin,
+        profesionales:turno_profesionales(profesional_id)
+      `)
       .eq('id', Number(id))
       .single();
-    if (turnoError || !turnoCompleto) return res.status(400).json({ success: false, message: 'Error obteniendo detalles del turno: ' + turnoError?.message });
+
+    if (turnoError || !turnoCompleto) {
+      return res.status(400).json({ success: false, message: 'Error obteniendo detalles del turno: ' + turnoError?.message });
+    }
+
+    // Verificar si el usuario puede cancelar este turno
+    const profesionalIds = turnoCompleto.profesionales?.map(p => String(p.profesional_id)) || [];
+    const isAssignedProfesional = profesionalIds.includes(String(loggedInUserId));
+
+    if (!adminOverride && !isAssignedProfesional) {
+      return res.status(403).json({ success: false, message: 'No tiene permisos para cancelar este turno.' });
+    }
 
     // Actualizar turno a 'cancelado'
     const { data, error } = await supabaseAdmin
@@ -258,7 +287,14 @@ const cancelarTurno = async (req, res) => {
       ]
     };
 
-    await sendCancellationEmail(mailOptions);  // Pasa mailOptions completo
+    try {
+      await sendCancellationEmail(mailOptions);  // Pasa mailOptions completo
+      console.log('Email de cancelación enviado exitosamente');
+    } catch (emailError) {
+      console.error('Error enviando email de cancelación:', emailError.message);
+      // No fallar la operación si el email no se puede enviar
+    }
+    
     res.json({ success: true });
   } catch (err) {
     console.error('Error en cancelarTurno:', err);
