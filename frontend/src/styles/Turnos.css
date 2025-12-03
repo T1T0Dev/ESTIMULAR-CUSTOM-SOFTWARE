@@ -137,10 +137,14 @@
   position: relative;
 }
 
+.rbc-timeslot-group {
+  min-height: 60px; /* Ensure 30-min blocks are tall enough (timeslots=2) */
+}
+
 .rbc-day-slot .rbc-time-slot {
   min-height: 28px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Override de la toolbar para mejor control */

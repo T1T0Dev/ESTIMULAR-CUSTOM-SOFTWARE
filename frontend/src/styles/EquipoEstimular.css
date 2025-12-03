@@ -60,3 +60,27 @@
   margin: 0;
   text-align: center;
 }
+
+/* Mobile card inputs */
+.mobile-card-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-300);
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--neutral-600);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  margin-bottom: 2px;
+}
+
+.mobile-card-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-300);
+  background: #fff;
+  color: var(--neutral-700);
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}

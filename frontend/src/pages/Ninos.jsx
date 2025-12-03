@@ -540,26 +540,105 @@ export default function Ninos() {
 
                         <div className="mobile-card-content">
                           <div className="mobile-card-field">
-                            <span className="mobile-card-label">DNI:</span>
-                            <span className="mobile-card-value">{c.dni || "No especificado"}</span>
+                            <span className="mobile-card-label">Nombre:</span>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                className="mobile-edit-input"
+                                value={editData.nombre ?? c.nombre}
+                                onChange={(e) => setEditData(ed => ({...ed, nombre: e.target.value}))}
+                              />
+                            ) : (
+                              <span className="mobile-card-value">{c.nombre || "—"}</span>
+                            )}
                           </div>
                           <div className="mobile-card-field">
-                            <span className="mobile-card-label">Edad:</span>
-                            <span className="mobile-card-value">
-                              {c.fecha_nacimiento ? `${calcularEdad(c.fecha_nacimiento)} años` : "No especificada"}
-                            </span>
+                            <span className="mobile-card-label">Apellido:</span>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                className="mobile-edit-input"
+                                value={editData.apellido ?? c.apellido}
+                                onChange={(e) => setEditData(ed => ({...ed, apellido: e.target.value}))}
+                              />
+                            ) : (
+                              <span className="mobile-card-value">{c.apellido || "—"}</span>
+                            )}
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">DNI:</span>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                className="mobile-edit-input"
+                                value={editData.dni ?? c.dni ?? ""}
+                                onChange={(e) => setEditData(ed => ({...ed, dni: e.target.value}))}
+                              />
+                            ) : (
+                              <span className="mobile-card-value">{c.dni || "No especificado"}</span>
+                            )}
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Fecha Nacimiento:</span>
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                className="mobile-edit-input"
+                                value={editData.fecha_nacimiento ?? (c.fecha_nacimiento ? String(c.fecha_nacimiento).slice(0,10) : "")}
+                                onChange={(e) => setEditData(ed => ({...ed, fecha_nacimiento: e.target.value}))}
+                              />
+                            ) : (
+                              <span className="mobile-card-value">
+                                {c.fecha_nacimiento ? `${formatDateDMY(c.fecha_nacimiento)} (${calcularEdad(c.fecha_nacimiento)} años)` : "No especificada"}
+                              </span>
+                            )}
                           </div>
                           <div className="mobile-card-field">
                             <span className="mobile-card-label">Certificado:</span>
-                            <span className="mobile-card-value">
-                              {c.certificado_discapacidad ? "SI" : "NO"}
-                            </span>
+                            {isEditing ? (
+                              <select
+                                className="mobile-edit-select"
+                                value={editData.certificado_discapacidad ?? c.certificado_discapacidad ? "si" : "no"}
+                                onChange={(e) => setEditData(ed => ({...ed, certificado_discapacidad: e.target.value === "si"}))}
+                              >
+                                <option value="si">SI</option>
+                                <option value="no">NO</option>
+                              </select>
+                            ) : (
+                              <span className="mobile-card-value">{c.certificado_discapacidad ? "SI" : "NO"}</span>
+                            )}
                           </div>
                           <div className="mobile-card-field">
                             <span className="mobile-card-label">Obra Social:</span>
-                            <span className="mobile-card-value">
-                              {obraSocialName || "No especificada"}
-                            </span>
+                            {isEditing ? (
+                              <select
+                                className="mobile-edit-select"
+                                value={editData.id_obra_social ?? c.id_obra_social ?? ""}
+                                onChange={(e) => setEditData(ed => ({...ed, id_obra_social: e.target.value ? Number(e.target.value) : null}))}
+                              >
+                                <option value="">-- Seleccionar obra social --</option>
+                                {obrasSociales.map((o) => (
+                                  <option key={o.id_obra_social} value={o.id_obra_social}>{o.nombre_obra_social}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="mobile-card-value">{obraSocialName || "No especificada"}</span>
+                            )}
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Tipo:</span>
+                            {isEditing ? (
+                              <select
+                                className="mobile-edit-select"
+                                value={editData.tipo ?? c.tipo ?? "candidato"}
+                                onChange={(e) => setEditData(ed => ({...ed, tipo: e.target.value}))}
+                              >
+                                <option value="candidato">Candidato</option>
+                                <option value="paciente">Paciente</option>
+                              </select>
+                            ) : (
+                              <span className="mobile-card-value">{c.tipo === 'paciente' ? 'Paciente' : 'Candidato'}</span>
+                            )}
                           </div>
                         </div>
 

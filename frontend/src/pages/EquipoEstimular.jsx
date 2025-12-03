@@ -249,6 +249,165 @@ export default function EquipoEstimular() {
     return Math.max(1, Math.ceil(total / pageSize));
   }, [total, pageSize]);
 
+  const getMemberKey = useCallback((member) => {
+    if (!member) return null;
+    return (
+      member.id_usuario ??
+      member.id_profesional ??
+      member.id_recepcion ??
+      member.id_secretario ??
+      `${String(member.tipo || "").toLowerCase()}-${member.dni ?? ""}-${member.nombre ?? ""}`
+    );
+  }, []);
+
+  const startEdit = useCallback((member) => {
+    const p = member;
+    const memberKey = getMemberKey(p);
+    if (!memberKey) return;
+    const fechaValue = p.fecha_nacimiento
+      ? String(p.fecha_nacimiento).slice(0, 10)
+      : "";
+    setEditId(memberKey);
+    setEditData({
+      nombre: p.nombre ?? "",
+      apellido: p.apellido ?? "",
+      fecha_nacimiento: fechaValue,
+      profesionId: p.profesion_id ?? p.id_departamento ?? null,
+      email: p.email ?? "",
+      telefono: p.telefono ?? "",
+      dni: p.dni ?? "",
+      usuario: { dni: p.dni },
+      tipo: p.tipo,
+    });
+  }, [getMemberKey]);
+
+  const confirmEdit = useCallback(async (member) => {
+    const p = member;
+    const endpointId = p.id_usuario;
+    if (!endpointId) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se encontró el identificador del integrante",
+      });
+      return;
+    }
+    try {
+      Swal.fire({
+        title: "Guardando...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      const payload = {};
+      if (editData.nombre !== undefined && editData.nombre !== (p.nombre ?? "")) {
+        payload.nombre = editData.nombre;
+      }
+      if (editData.apellido !== undefined && editData.apellido !== (p.apellido ?? "")) {
+        payload.apellido = editData.apellido;
+      }
+      if (editData.email !== undefined && editData.email !== (p.email ?? "")) {
+        payload.email = editData.email;
+      }
+      if (editData.telefono !== undefined && editData.telefono !== (p.telefono ?? "")) {
+        payload.telefono = editData.telefono;
+      }
+      if (editData.fecha_nacimiento !== undefined) {
+        const newFecha = editData.fecha_nacimiento === "" ? null : editData.fecha_nacimiento;
+        const currentFecha = p.fecha_nacimiento ? String(p.fecha_nacimiento).slice(0, 10) : null;
+        if (newFecha !== currentFecha) payload.fecha_nacimiento = newFecha;
+      }
+      if (editData.profesionId !== undefined && editData.profesionId !== (p.profesion_id ?? p.id_departamento ?? null)) {
+        payload.profesionId = editData.profesionId;
+      }
+      if (editData.usuario?.dni !== undefined && editData.usuario.dni !== (p.dni ?? null)) {
+        payload.dni = editData.usuario.dni;
+      }
+      if (editData.tipo !== undefined && editData.tipo !== p.tipo) {
+        payload.tipo = editData.tipo;
+      }
+      const isRecepcion = p.tipo === 'recepcion';
+      const url = isRecepcion
+        ? `${API_BASE_URL}/api/equipo/recepcion/${endpointId}`
+        : `${API_BASE_URL}/api/equipo/${endpointId}`;
+      await axios.put(url, payload);
+      setEditId(null);
+      setEditData({});
+      await fetchEquipo(busqueda, page, profesionFiltro);
+      Swal.close();
+      Swal.fire({
+        icon: "success",
+        title: "Guardado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err?.response?.data?.message || "No se pudo guardar",
+      });
+    }
+  }, [editData, busqueda, page, profesionFiltro, fetchEquipo]);
+
+  const cancelEdit = useCallback(() => {
+    setEditId(null);
+    setEditData({});
+  }, []);
+
+  const deleteMember = useCallback(async (member) => {
+    const p = member;
+    const endpointId = p.id_usuario;
+    if (!endpointId) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se encontró el identificador del integrante",
+      });
+      return;
+    }
+    const conf = await Swal.fire({
+      title: "¿Eliminar?",
+      text: "Se realizará borrado lógico",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+    });
+    if (!conf.isConfirmed) return;
+    try {
+      Swal.fire({
+        title: "Eliminando...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      const isRecepcion = p.tipo === 'recepcion';
+      const url = isRecepcion
+        ? `${API_BASE_URL}/api/equipo/recepcion/${endpointId}`
+        : `${API_BASE_URL}/api/equipo/${endpointId}`;
+      await axios.delete(url);
+      await fetchEquipo(busqueda, page, profesionFiltro);
+      Swal.close();
+      Swal.fire({
+        icon: "success",
+        title: "Eliminado",
+        timer: 1100,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err?.response?.data?.message || "No se pudo eliminar",
+      });
+    }
+  }, [busqueda, page, profesionFiltro, fetchEquipo]);
+
+  const openResetModal = useCallback((member) => {
+    handleOpenReset(member);
+  }, [handleOpenReset]);
+
   return (
     <section className="ninos-page">
       <div className="ninos-top">
@@ -334,12 +493,7 @@ export default function EquipoEstimular() {
                       p.id_usuario ??
                       `${tipoNormalized}-${p.dni ?? ""}-${p.nombre ?? ""}`;
                     const isProfesional = tipoNormalized === "profesional";
-                    const memberKey =
-                      p.id_usuario ??
-                      p.id_profesional ??
-                      p.id_recepcion ??
-                      p.id_secretario ??
-                      rowKey;
+                    const memberKey = getMemberKey(p) ?? rowKey;
                     const canEdit = isAdmin;
                     const isEditing = canEdit && editId === memberKey;
                     const nombreCompleto = `${p.nombre || ""} ${p.apellido || ""}`.trim();
@@ -573,13 +727,15 @@ export default function EquipoEstimular() {
                             <>
                               <button
                                 className="mobile-card-btn save"
-                                onClick={() => confirmEdit(memberKey)}
+                                type="button"
+                                onClick={() => confirmEdit(p)}
                               >
                                 <MdCheck size={16} />
                                 Guardar
                               </button>
                               <button
                                 className="mobile-card-btn cancel"
+                                type="button"
                                 onClick={cancelEdit}
                               >
                                 <MdClose size={16} />
@@ -592,14 +748,16 @@ export default function EquipoEstimular() {
                                 <>
                                   <button
                                     className="mobile-card-btn edit"
-                                    onClick={() => startEdit(memberKey)}
+                                    type="button"
+                                    onClick={() => startEdit(p)}
                                   >
                                     <MdEdit size={16} />
                                     Editar
                                   </button>
                                   <button
                                     className="mobile-card-btn delete"
-                                    onClick={() => deleteMember(memberKey)}
+                                    type="button"
+                                    onClick={() => deleteMember(p)}
                                   >
                                     <MdDelete size={16} />
                                     Eliminar
@@ -608,6 +766,7 @@ export default function EquipoEstimular() {
                               )}
                               <button
                                 className="mobile-card-btn reset"
+                                type="button"
                                 onClick={() => openResetModal(p)}
                               >
                                 🔑 Reset
@@ -645,12 +804,7 @@ export default function EquipoEstimular() {
                       p.id_usuario ??
                       `${tipoNormalized}-${p.dni ?? ""}-${p.nombre ?? ""}`;
                     const isProfesional = tipoNormalized === "profesional";
-                    const memberKey =
-                      p.id_usuario ??
-                      p.id_profesional ??
-                      p.id_recepcion ??
-                      p.id_secretario ??
-                      rowKey;
+                      const memberKey = getMemberKey(p) ?? rowKey;
                     const canEdit = isAdmin;
                     const isEditing = canEdit && editId === memberKey;
                     const nombreCompleto = `${p.nombre || ""} ${
@@ -1029,19 +1183,19 @@ export default function EquipoEstimular() {
                                   className="icon-btn edit"
                                   title="Editar"
                                   onClick={() => {
-                                    setEditId(memberKey);
+                                    setEditId(c.id_usuario);
                                     setEditData({
-                                      nombre: p.nombre ?? "",
-                                      apellido: p.apellido ?? "",
+                                      nombre: c.nombre ?? "",
+                                      apellido: c.apellido ?? "",
                                       fecha_nacimiento: fechaValue,
                                       profesionId:
-                                        p.profesion_id ??
-                                        p.id_departamento ??
+                                        c.profesion_id ??
+                                        c.id_departamento ??
                                         null,
-                                      email: p.email ?? "",
-                                      telefono: p.telefono ?? "",
-                                      usuario: { dni: p.dni },
-                                      tipo: p.tipo,
+                                      email: c.email ?? "",
+                                      telefono: c.telefono ?? "",
+                                      usuario: { dni: c.dni },
+                                      tipo: c.tipo,
                                     });
                                   }}
                                 >
@@ -1074,9 +1228,11 @@ export default function EquipoEstimular() {
                                         allowOutsideClick: false,
                                         didOpen: () => Swal.showLoading(),
                                       });
-                                      await axios.delete(
-                                        `${API_BASE_URL}/api/equipo/${endpointId}`
-                                      );
+                                      const isRecepcion = p.tipo === 'recepcion';
+                                      const url = isRecepcion
+                                        ? `${API_BASE_URL}/api/equipo/recepcion/${endpointId}`
+                                        : `${API_BASE_URL}/api/equipo/${endpointId}`;
+                                      await axios.delete(url);
                                       await fetchEquipo(
                                         busqueda,
                                         page,

@@ -204,11 +204,12 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
         axios.get(`${API_BASE_URL}/api/turnos/form-data`),
       ]);
       
+      // Parse dates with moment to avoid timezone shifts (treat as local)
       const formattedEvents = turnosRes.data.data.map(turno => ({
         id: turno.id,
         title: `${turno.paciente_nombre} ${turno.paciente_apellido}`,
-        start: new Date(turno.inicio),
-        end: new Date(turno.fin),
+        start: moment(turno.inicio).toDate(),
+        end: moment(turno.fin).toDate(),
         resourceId: turno.consultorio_id,
         data: turno
       }));

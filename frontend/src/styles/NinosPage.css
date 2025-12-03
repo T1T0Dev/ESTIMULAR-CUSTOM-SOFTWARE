@@ -549,6 +549,33 @@ input[type="date"].edit-input {
   padding: 6px 8px;
 }
 
+/* Mobile edit inputs */
+.mobile-edit-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-300);
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--neutral-600);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  margin-bottom: 2px;
+}
+.mobile-edit-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-300);
+  background: #fff;
+  color: var(--neutral-700);
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.mobile-edit-select:focus {
+  outline: 2px solid rgba(255, 111, 166, 0.18);
+  border-color: var(--pink-1);
+}
+
 /* Generic small input for table inline edits */
 .table-input {
   width: 100%;
@@ -1360,6 +1387,8 @@ Hard refresh recomendado: Ctrl+F5
   font-size: 0.95rem;
   color: #495057;
   font-weight: 500;
+  display: block;
+  width: 100%;
 }
 
 .mobile-card-actions {
