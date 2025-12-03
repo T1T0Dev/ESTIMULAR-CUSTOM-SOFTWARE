@@ -1,4 +1,5 @@
 const { supabaseAdmin } = require('../config/db');
+const { formatNinoDetails } = require('../utils/ninoFormatter');
 
 const mapNinoRow = (row) => {
     if (!row || typeof row !== 'object') return row;
@@ -9,8 +10,12 @@ const mapNinoRow = (row) => {
         estado: item.estado ?? null,
         nombre: item.departamento?.nombre ?? null,
     }));
+
+    const formatted = formatNinoDetails(row);
+
     return {
         ...row,
+        ...formatted,
         nino_departamentos: departamentosOrigen,
         departamentos,
     };

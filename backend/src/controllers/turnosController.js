@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/db');
 const { sendCancellationEmail } = require('../services/emailService');
+const turnoModel = require('../models/turnoModel');
 const moment = require('moment');  // Agrega este require
 const path = require('path');  // Agrega esto si no está
 
@@ -14,7 +15,58 @@ const path = require('path');  // Agrega esto si no está
  */
 const listTurnos = async (req, res) => {
     try {
-        const { estado, nino_id, disponible, desde, hasta, limit = 50 } = req.query || {};
+        const { date, estado, nino_id, disponible, desde, hasta, limit = 50 } = req.query || {};
+
+        if (date) {
+            let enrichedTurnos = await turnoModel.getTurnosByDate(date);
+
+            if (estado) {
+                enrichedTurnos = enrichedTurnos.filter((turno) => String(turno.estado) === String(estado));
+            }
+
+            if (nino_id) {
+                enrichedTurnos = enrichedTurnos.filter((turno) => {
+                    const pacienteId = turno?.paciente_id ?? turno?.nino_id ?? null;
+                    return pacienteId !== null && String(pacienteId) === String(nino_id);
+                });
+            }
+
+            if (String(disponible) === 'true') {
+                enrichedTurnos = enrichedTurnos.filter((turno) => turno?.paciente_id === null || turno?.paciente_id === undefined);
+            }
+
+            if (desde) {
+                const fromDate = new Date(desde);
+                if (!Number.isNaN(fromDate.getTime())) {
+                    enrichedTurnos = enrichedTurnos.filter((turno) => {
+                        const inicio = turno?.inicio ? new Date(turno.inicio) : null;
+                        return inicio && inicio >= fromDate;
+                    });
+                }
+            }
+
+            if (hasta) {
+                const toDate = new Date(hasta);
+                if (!Number.isNaN(toDate.getTime())) {
+                    enrichedTurnos = enrichedTurnos.filter((turno) => {
+                        const inicio = turno?.inicio ? new Date(turno.inicio) : null;
+                        return inicio && inicio <= toDate;
+                    });
+                }
+            }
+
+            const limitNumber = Number(limit);
+            if (Number.isFinite(limitNumber) && limitNumber > 0) {
+                enrichedTurnos = enrichedTurnos.slice(0, limitNumber);
+            }
+
+            return res.json({
+                success: true,
+                data: enrichedTurnos,
+                total: enrichedTurnos.length,
+            });
+        }
+
         let q = supabaseAdmin
             .from('turnos')
             .select('id, departamento_id, inicio, fin, duracion_min, consultorio_id, estado, nino_id', { count: 'exact' })
