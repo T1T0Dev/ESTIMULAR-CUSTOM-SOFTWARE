@@ -4,7 +4,7 @@ const { authenticate, authorize } = require('../middlewares/auth');
 const router = express.Router();
 
 // GET /api/responsables?dni=44028630  -> busca por DNI
-router.get('/', authenticate, authorize(['admin', 'recepcion', 'profesional']), async (req, res) => {
+router.get('/', async (req, res) => {
     const { dni } = req.query;
     if (dni) return buscarPorDni(req, res);
     return listarResponsables(req, res);

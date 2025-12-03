@@ -5,7 +5,7 @@ const { authenticate, authorize } = require('../middlewares/auth');
 const router = express.Router();
 
 router.get('/', authenticate, authorize(['admin', 'recepcion', 'profesional']), getNinos);
-router.post('/', authenticate, authorize(['admin']), crearNino);
+router.post('/', crearNino);
 router.put('/:id_nino', authenticate, authorize(['admin']), editarNino);
 router.delete('/:id_nino', authenticate, authorize(['admin']), borrarNino);
 router.get('/:id_nino/responsables', authenticate, authorize(['admin', 'recepcion', 'profesional']), getResponsablesDeNino);

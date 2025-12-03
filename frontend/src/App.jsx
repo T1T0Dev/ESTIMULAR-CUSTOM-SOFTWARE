@@ -10,6 +10,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import MainDashboard from './pages/MainDashboard';
+import FormularioEntrevista from './components/FormularioEntrevista';
 import Ninos from './pages/Ninos';
 import Turnos from './pages/Turnos';
 import Entrevista from './pages/Entrevista';
@@ -43,6 +44,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<RegistroUsuario />} />
           <Route path="/primer-registro" element={<PrimerRegistro />} />
+          <Route path="/formulario-entrevista" element={<FormularioEntrevista />} />
 
           {/* Protected dashboard routes */}
           <Route

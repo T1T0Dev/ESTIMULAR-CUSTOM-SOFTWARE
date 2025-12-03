@@ -10,8 +10,8 @@ const { authenticate, authorize } = require('../middlewares/auth');
 
 const router = express.Router();
 
-router.get('/', authenticate, authorize(['admin', 'recepcion', 'profesional']), listarObrasSociales);
-router.get('/estados', authenticate, authorize(['admin', 'recepcion', 'profesional']), listarEstadosObraSocial);
+router.get('/', listarObrasSociales);
+router.get('/estados', listarEstadosObraSocial);
 router.post('/', authenticate, authorize(['admin']), crearObraSocial);
 router.put('/:id', authenticate, authorize(['admin']), editarObraSocial);
 router.delete('/:id', authenticate, authorize(['admin']), borrarObraSocial);
