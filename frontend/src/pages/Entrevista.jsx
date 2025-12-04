@@ -1,18 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { MdEventAvailable, MdChangeCircle, MdDelete } from "react-icons/md";
+import { MdEventAvailable, MdGroups, MdInfo, MdFilterList } from "react-icons/md";
 import { formatDateDMY } from "../utils/date";
 import { parseNinosResponse } from "../utils/ninoResponse";
 import API_BASE_URL from "../constants/api";
 import NuevoTurnoPanel from "../components/NuevoTurnoPanel";
 import ProfesionalesSelectorModal from "../components/ProfesionalesSelectorModal";
 import useAuthStore from "../store/useAuthStore";
-
-// Estilos
-import "../styles/Entrevista.css";
-
-// Utilidad local para edad
+// Utilidades necesarias
 function edad(fechaNacimiento) {
   if (!fechaNacimiento) return "";
   const hoy = new Date();
@@ -63,6 +59,7 @@ const normalizeProfesionalId = (value) => {
   return Number.isFinite(parsed) && !Number.isNaN(parsed) ? parsed : null;
 };
 
+// Arma el objeto paciente para el panel de creación de turno
 const buildPanelNino = (nino) => {
   if (!nino) return null;
   const nombre = nino.nombre || nino.paciente_nombre || "";
@@ -84,8 +81,8 @@ const buildPanelNino = (nino) => {
     paciente_responsables: Array.isArray(nino.paciente_responsables)
       ? nino.paciente_responsables
       : Array.isArray(nino.responsables)
-        ? nino.responsables
-        : [],
+      ? nino.responsables
+      : [],
     paciente_tipo: nino.tipo || nino.paciente_tipo || "candidato",
   };
 };
@@ -107,189 +104,24 @@ const parseInicioDate = (propuesta) => {
   return null;
 };
 
-const mergePropuestasEnTurnoUnico = (propuestas) => {
+function mergePropuestasEnTurnoUnico(propuestas) {
   if (!Array.isArray(propuestas) || propuestas.length === 0) return null;
-
-  const base = propuestas[0];
-  const baseInicioDate = parseInicioDate(base);
-  if (!baseInicioDate) return null;
-
-  const inicioIso = baseInicioDate.toISOString();
-  const duracionMax = Math.max(
-    ...propuestas.map((p) => {
-      const dur = Number(p.duracion_min);
-      return Number.isFinite(dur) && dur > 0 ? dur : 60;
-    })
-  );
-  const finDate = new Date(baseInicioDate);
-  finDate.setMinutes(finDate.getMinutes() + duracionMax);
-  const finIso = finDate.toISOString();
-
-  const profesionalesIds = [];
-  const profesionalesSet = new Map();
-  propuestas.forEach((propuesta) => {
-    const profs = Array.isArray(propuesta.profesional_ids)
-      ? propuesta.profesional_ids
-      : [];
-    profs.forEach((profId) => {
-      const normalized = normalizeProfesionalId(profId);
-      if (normalized !== null && !profesionalesSet.has(normalized)) {
-        profesionalesSet.set(normalized, true);
-        profesionalesIds.push(normalized);
-      }
-    });
-  });
-
-  const ordenadas = propuestas.sort((a, b) => {
-    const aInicio = parseInicioDate(a);
-    const bInicio = parseInicioDate(b);
-    if (!aInicio && !bInicio) return 0;
-    if (!aInicio) return 1;
-    if (!bInicio) return -1;
-    return aInicio.getTime() - bInicio.getTime();
-  });
-
-  const profesionalesResumen = ordenadas
-    .map((propuesta) => {
-      const info = {
-        nombre_completo: propuesta.profesional_nombre || "Profesional sin nombre",
-        departamentos: new Set(),
-      };
-      if (propuesta.departamento_nombre) {
-        info.departamentos.add(propuesta.departamento_nombre);
-      }
-      return info;
-    })
-    .reduce((acc, info) => {
-      const existing = acc.find((item) =>
-        item.nombre_completo === info.nombre_completo
-      );
-      if (existing) {
-        info.departamentos.forEach((dept) => existing.departamentos.add(dept));
-      } else {
-        acc.push({
-          nombre_completo: info.nombre_completo,
-          departamentos: new Set(info.departamentos),
-        });
-      }
-      return acc;
-    }, [])
-    .map((info) => ({
-      nombre_completo: info.nombre_completo,
-      departamentos: Array.from(info.departamentos.values()),
-    }));
-
-  const consultorioIds = ordenadas
-    .map((item) => item.consultorio_id)
-    .filter((valor) => valor !== undefined && valor !== null);
-  const consultorioId =
-    consultorioIds.length > 0 &&
-    consultorioIds.every((valor) => String(valor) === String(consultorioIds[0]))
-      ? consultorioIds[0]
-      : null;
-
-  const departamentos = [];
-  const departamentosSet = new Set();
-  ordenadas.forEach((propuesta) => {
-    const deptId = normalizeProfesionalId(propuesta.departamento_id);
-    const key =
-      deptId !== null
-        ? `id-${deptId}`
-        : `nombre-${propuesta.departamento_nombre || "?"}`;
-    if (departamentosSet.has(key)) return;
-    departamentosSet.add(key);
-    departamentos.push({
-      id_departamento: deptId,
-      nombre: propuesta.departamento_nombre || "Servicio sin nombre",
-    });
-  });
-
-  const departamentosResumen = departamentos
-    .map((dep) => dep.nombre)
-    .filter((nombre) => typeof nombre === "string" && nombre.trim().length > 0);
-
-  const serviciosResumen =
-    departamentosResumen.length > 1
-      ? departamentosResumen.join(", ")
-      : departamentosResumen[0] || base.departamento_nombre || "Entrevista";
-
-  const notasPartes = [];
-  ordenadas.forEach((propuesta) => {
-    if (propuesta.notas && String(propuesta.notas).trim().length > 0) {
-      notasPartes.push(String(propuesta.notas).trim());
-    }
-  });
-
-  if (profesionalesResumen.length > 0) {
-    const resumenProfesionales = profesionalesResumen
-      .map((prof) => {
-        const sectores =
-          Array.isArray(prof.departamentos) && prof.departamentos.length > 0
-            ? ` (${prof.departamentos.join(", ")})`
-            : "";
-        return `${prof.nombre_completo}${sectores}`;
-      })
-      .join(" · ");
-    notasPartes.push(`Profesionales asignados: ${resumenProfesionales}`);
-  }
-
-  const notasFinales =
-    notasPartes.length > 0
-      ? Array.from(new Set(notasPartes)).join(" | ")
-      : base.notas || null;
-
-  const unionDisponibles = new Map();
-  ordenadas.forEach((propuesta) => {
-    const disponibles = Array.isArray(propuesta.profesionales_disponibles)
-      ? propuesta.profesionales_disponibles
-      : [];
-    disponibles.forEach((prof) => {
-      const profId = normalizeProfesionalId(prof?.id_profesional);
-      if (profId === null) return;
-      if (!unionDisponibles.has(profId)) {
-        unionDisponibles.set(profId, {
-          ...prof,
-          id_profesional: profId,
-        });
-      }
-    });
-  });
-
-  const profesionalesDisponiblesUnificados = Array.from(unionDisponibles.values());
-
-  const departamentoPrincipalId =
-    base.departamento_id !== undefined && base.departamento_id !== null
-      ? base.departamento_id
-      : departamentos[0]?.id_departamento || "";
-
-  const departamentoPrincipalNombre =
-    departamentosResumen.length > 1
-      ? `Entrevista (${serviciosResumen})`
-      : base.departamento_nombre || departamentosResumen[0] || "Entrevista";
-
-  const resultado = {
+  const base = { ...propuestas[0] };
+  const inicioDate = parseInicioDate(base);
+  if (!inicioDate) return null;
+  const duracion = propuestas.reduce((max, p) => {
+    const d = Number(p?.duracion_min);
+    return Number.isFinite(d) && d > 0 ? Math.max(max, d) : max;
+  }, Number(base?.duracion_min) || 60);
+  const finDate = new Date(inicioDate);
+  finDate.setMinutes(finDate.getMinutes() + duracion);
+  return {
     ...base,
-    inicio: inicioIso,
-    fin: finIso,
-    date: formatDateForInput(baseInicioDate),
-    startTime: formatTimeForInput(baseInicioDate),
-    duracion_min: duracionMax,
-    consultorio_id: consultorioId,
-    profesional_ids: profesionalesIds,
-    profesionales_disponibles: profesionalesDisponiblesUnificados,
-    departamento_id: departamentoPrincipalId,
-    departamento_nombre: departamentoPrincipalNombre,
-    servicios_resumen: serviciosResumen,
-    departamentos_resumen: departamentosResumen,
-    profesionales_resumen: profesionalesResumen,
-    notas: notasFinales,
-    departamento_bloqueado: true,
+    inicio: inicioDate.toISOString(),
+    fin: finDate.toISOString(),
+    duracion_min: duracion,
   };
-
-  delete resultado.__inicioDate;
-
-  return resultado;
-};
+}
 
 export default function Entrevista() {
   const [candidatos, setCandidatos] = useState([]);
@@ -299,6 +131,13 @@ export default function Entrevista() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 10;
+
+  // Entrevistas pendientes + filtros
+  const [entrevistas, setEntrevistas] = useState([]);
+  const [loadingEntrevistas, setLoadingEntrevistas] = useState(false);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [expandedDetalleId, setExpandedDetalleId] = useState(null);
 
   // asignaciones por nino_id -> turno (o null)
   const [asignaciones, setAsignaciones] = useState({});
@@ -356,6 +195,94 @@ export default function Entrevista() {
     return debounced;
   }
 
+  // Cargar catálogo de departamentos y construir entrevistas pendientes desde candidatos/asignaciones
+  const fetchCatalogosYEntrevistas = useCallback(async (rows = [], asigns = {}) => {
+    try {
+      setLoadingEntrevistas(true);
+      // Catálogo de departamentos
+      try {
+        const formDataRes = await axios.get(`${API_BASE_URL}/api/turnos/form-data`);
+        const deps = formDataRes?.data?.data?.departamentos || formDataRes?.data?.departamentos || [];
+        setDepartamentos(deps);
+      } catch (e) {
+        console.warn('No se pudo cargar catálogo de departamentos:', e);
+      }
+
+      // Candidatos sin turno asignado
+      const pendientesCandidatos = rows.filter((c) => !asigns[c.id_nino]);
+
+      if (pendientesCandidatos.length === 0) {
+        setEntrevistas([]);
+        return;
+      }
+
+      // Para cada candidato pendiente, consultar propuestas (para conocer departamentos)
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const propuestasByNino = await Promise.all(
+        pendientesCandidatos.map(async (c) => {
+          try {
+            const r = await axios.post(
+              `${API_BASE_URL}/api/turnos/auto-schedule`,
+              { nino_id: c.id_nino, tipo_turno: 'entrevista' },
+              headers ? { headers } : undefined
+            );
+            const payload = r?.data;
+            const propuestas = Array.isArray(payload?.propuestas)
+              ? payload.propuestas
+              : Array.isArray(payload?.data?.propuestas)
+              ? payload.data.propuestas
+              : Array.isArray(payload)
+              ? payload
+              : [];
+            const deps = Array.from(
+              new Map(
+                propuestas
+                  .map((p) => ({ id: p?.departamento_id ?? null, nombre: p?.departamento_nombre || null }))
+                  .filter((d) => d.nombre)
+                  .map((d) => [d.id || d.nombre, d])
+              ).values()
+            );
+            return { id_nino: c.id_nino, deps };
+          } catch (e) {
+            console.warn('No se pudieron obtener propuestas para nino', c.id_nino, e);
+            return { id_nino: c.id_nino, deps: [] };
+          }
+        })
+      );
+
+      const depsMap = new Map(propuestasByNino.map((x) => [x.id_nino, x.deps]));
+
+      const lista = pendientesCandidatos.map((c) => {
+        const deps = depsMap.get(c.id_nino) || [];
+        const nombres = deps.map((d) => d.nombre).filter(Boolean);
+        const compartida = nombres.length >= 2;
+        const principal = deps.length === 1 ? deps[0] : null;
+        return {
+          id: c.id_nino,
+          candidatoRef: c,
+          dni: c.dni || null,
+          nombre: c.nombre || '',
+          apellido: c.apellido || '',
+          fecha_nacimiento: c.fecha_nacimiento || null,
+          obra_social: c.obra_social?.nombre_obra_social || '—',
+          motivo_consulta: c.motivo_consulta || null,
+          departamentosInvolucrados: nombres,
+          servicio_id: principal?.id ?? null,
+          servicio_nombre: principal?.nombre || null,
+          compartida,
+        };
+      });
+
+      setEntrevistas(lista);
+    } catch (e) {
+      console.error('Error cargando entrevistas pendientes:', e);
+    } finally {
+      setLoadingEntrevistas(false);
+    }
+  }, []);
+
   const fetchCandidatos = useCallback(
     async (search = "", pageNum = 1) => {
       setLoading(true);
@@ -400,6 +327,9 @@ export default function Entrevista() {
           })
         );
         setAsignaciones(asigns);
+
+        // Construir entrevistas pendientes partiendo de los candidatos y asignaciones
+        await fetchCatalogosYEntrevistas(rows, asigns);
       } catch (e) {
         console.error("Error al obtener candidatos:", e);
         setError("Error al obtener candidatos");
@@ -407,8 +337,10 @@ export default function Entrevista() {
         setLoading(false);
       }
     },
-    [pageSize]
+    [pageSize, fetchCatalogosYEntrevistas]
   );
+
+  // (definido arriba)
 
   useEffect(() => {
     skipPageEffectRef.current = true;
@@ -593,6 +525,51 @@ export default function Entrevista() {
     resetTurnoPanelState();
   }, [resetTurnoPanelState]);
 
+  // Modal: ver departamentos involucrados
+  const openDepartamentosModal = useCallback((row) => {
+    const departamentos = Array.isArray(row?.departamentosInvolucrados)
+      ? row.departamentosInvolucrados
+      : [];
+    const deps = Array.isArray(row?.departamentosInvolucrados) ? row.departamentosInvolucrados : [];
+    const title = deps.length > 1 ? 'Departamentos involucrados' : 'Departamento asignado';
+    const html = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+        <div style="font-size:0.95rem;color:#555;">${deps.length} ${deps.length === 1 ? 'servicio' : 'servicios'} ${deps.length > 1 ? 'involucrados' : 'asignado'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:640px;">
+          ${deps
+            .map(
+              (d) => `
+                <span
+                  style="
+                    display:inline-flex;align-items:center;gap:8px;
+                    padding:10px 14px;border-radius:999px;
+                    background: rgba(229,0,125,0.08);
+                    color:#e5007d;border:2px solid rgba(229,0,125,0.45);
+                    font-weight:700;letter-spacing:0.2px;box-shadow:0 1px 3px rgba(229,0,125,0.15);
+                  "
+                >
+                  <span style="font-size:14px;">🏥</span>
+                  <span>${String(d)}</span>
+                </span>
+              `
+            )
+            .join('')}
+        </div>
+      </div>
+    `;
+
+    Swal.fire({
+      title,
+      html,
+      icon: deps.length > 1 ? 'info' : undefined,
+      width: 600,
+      confirmButtonText: 'Cerrar',
+      confirmButtonColor: '#e5007d',
+      showClass: { popup: 'swal2-show' },
+      hideClass: { popup: 'swal2-hide' },
+    });
+  }, []);
+
   const programarTurnosEntrevista = useCallback(
     async (candidato, options = {}) => {
       const { replaceExisting = false } = options;
@@ -655,16 +632,34 @@ export default function Entrevista() {
         }
 
         if (propuestas.length === 1) {
-          const turnoUnico = mergePropuestasEnTurnoUnico(propuestas);
-          if (turnoUnico) {
-            launchTurnoCreationFlow([turnoUnico], omitidos);
-          } else {
-            Swal.fire({
-              icon: "error",
-              title: "Error",
-              text: "No se pudo procesar la propuesta de turno.",
-            });
+          // Mostrar el selector también cuando hay un solo departamento.
+          const unica = { ...propuestas[0] };
+          const disponibles = Array.isArray(unica?.profesionales_disponibles)
+            ? [...unica.profesionales_disponibles]
+            : [];
+          const responsables = disponibles.filter((p) => p?.es_responsable);
+          const responsablesIds = responsables
+            .map((p) => normalizeProfesionalId(p?.id_profesional))
+            .filter((id) => id !== null);
+
+          if (responsablesIds.length > 0) {
+            unica.profesional_ids = responsablesIds;
+            unica.profesionales_disponibles = disponibles.map((p) => ({
+              ...p,
+              seleccionado_por_defecto: !!p.es_responsable,
+            }));
+          } else if (disponibles.length > 0) {
+            const firstId = normalizeProfesionalId(disponibles[0]?.id_profesional);
+            unica.profesional_ids = firstId !== null ? [firstId] : [];
+            unica.profesionales_disponibles = disponibles.map((p, idx) => ({
+              ...p,
+              seleccionado_por_defecto: idx === 0,
+            }));
           }
+
+          setSelectorPropuestas([unica]);
+          setSelectorOmitidos(omitidos);
+          setSelectorOpen(true);
         } else {
           setSelectorPropuestas(propuestas);
           setSelectorOmitidos(omitidos);
@@ -753,275 +748,140 @@ export default function Entrevista() {
         </div>
 
         <div className="entrevistas-content">
-          <div className="ninos-top">
-            <div className="ninos-controls">
-              <form
-                className="busqueda-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setPage(1);
-                  fetchCandidatos(busqueda, 1);
-                }}
-              >
-                <label className="sr-only" htmlFor="buscar">
-                  Buscar
-                </label>
-                <div className="search">
-                  <input
-                    id="buscar"
-                    type="text"
-                    className="busqueda-input"
-                    placeholder="Buscar candidato por nombre, apellido o DNI"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                  />
+          {/* Bloque: Entrevistas pendientes con filtro por departamento */}
+          <div className="card ninos-card" style={{ marginBottom: 24 }}>
+            <div className="table-tools">
+              <div className="left">
+                <div className="meta">
+                  <MdGroups size={18} style={{ marginRight: 6 }} />
+                  Entrevistas pendientes: {entrevistas.length}
                 </div>
-              </form>
+              </div>
+              <div className="right tools-right">
+                <div className="tool">
+                  <MdFilterList size={18} className="tool-icon" />
+                  <label htmlFor="filtro-dep" className="tool-label">
+                    Filtro de departamento
+                  </label>
+                  <select
+                    id="filtro-dep"
+                    value={deptFilter}
+                    onChange={(e) => setDeptFilter(e.target.value)}
+                    className="tool-select"
+                  >
+                    <option value="all">Todos</option>
+                    {departamentos.map((d) => (
+                      <option key={d.id_departamento} value={String(d.id_departamento)}>
+                        {d.nombre}
+                      </option>
+                    ))}
+                    <option value="compartidas">Entrevistas compartidas</option>
+                  </select>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="card ninos-card">
-            {loading ? (
-              <div className="loader">Cargando candidatos...</div>
-            ) : error ? (
-              <div className="error">{error}</div>
-            ) : candidatos.length === 0 ? (
-              <div className="empty">No hay candidatos pendientes de entrevista.</div>
-            ) : (
-              <>
-                <div className="table-tools">
-                  <div className="left">
-                    <div className="meta">{total} candidatos pendientes</div>
-                  </div>
-                  <div className="right">
-                    <div className="meta">
-                      Página {page} de {totalPages}
-                    </div>
-                  </div>
-                </div>
-
-                {isMobile ? (
-                  /* Vista de tarjetas para móviles */
-                  <div className="mobile-cards">
-                    {candidatos.map((c) => {
-                      const asig = asignaciones[c.id_nino] || null;
-                      const obra = c.obra_social?.nombre_obra_social || "—";
-                      return (
-                        <div key={c.id_nino} className="mobile-card">
-                          <div className="mobile-card-header">
-                            <div>
-                              <div className="mobile-card-name">
-                                {c.nombre} {c.apellido}
-                              </div>
-                              <div className="mobile-card-dni">
-                                DNI: {c.dni || "No especificado"}
-                              </div>
-                            </div>
-                            <div className={`mobile-card-status ${asig ? 'assigned' : 'unassigned'}`}>
-                              {asig ? 'Asignado' : 'Pendiente'}
-                            </div>
-                          </div>
-
-                          <div className="mobile-card-info">
-                            <div className="mobile-card-field">
-                              <span className="mobile-card-label">Edad</span>
-                              <span className="mobile-card-value">
-                                {c.fecha_nacimiento
-                                  ? `${edad(c.fecha_nacimiento)} años`
-                                  : "No especificada"}
-                              </span>
-                            </div>
-                            <div className="mobile-card-field">
-                              <span className="mobile-card-label">Obra Social</span>
-                              <span className="mobile-card-value">{obra}</span>
-                            </div>
-                            <div className="mobile-card-field">
-                              <span className="mobile-card-label">Fecha Nac.</span>
-                              <span className="mobile-card-value">
-                                {c.fecha_nacimiento
-                                  ? formatDateDMY(c.fecha_nacimiento)
-                                  : "No especificada"}
-                              </span>
-                            </div>
-                            <div className="mobile-card-field">
-                              <span className="mobile-card-label">Turno</span>
-                              <span className="mobile-card-value">
-                                {asig ? (
-                                  <div className="turno-chip">
-                                    {new Date(asig.inicio).toLocaleDateString()}
-                                  </div>
-                                ) : (
-                                  <span className="muted">Sin asignar</span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-
-                          {c.motivo_consulta && (
-                            <div className="mobile-card-motivo">
-                              <div className="mobile-card-label">Motivo de consulta</div>
-                              <div className="mobile-card-value">{c.motivo_consulta}</div>
-                            </div>
-                          )}
-
-                          <div className="mobile-card-actions">
-                            {(isAdmin || isProfesional) && (
-                              <>
-                                <button
-                                  className="icon-btn success"
-                                  title={asig ? "Cambiar turno" : "Asignar turno"}
-                                  onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
-                                >
-                                  {asig ? (
-                                    <MdChangeCircle size={20} />
-                                  ) : (
-                                    <MdEventAvailable size={20} />
-                                  )}
-                                </button>
-                                {asig && (
-                                  <button
-                                    className="icon-btn danger"
-                                    title="Quitar asignación"
-                                    onClick={() =>
-                                      quitarAsignacion(asig.id, c.id_nino)
-                                    }
-                                  >
-                                    <MdDelete size={18} />
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="dashboard-table-wrapper">
-                    <table
-                      className="table candidatos-table"
-                      role="table"
-                      aria-label="Candidatos pendientes de entrevista"
-                    >
-                      <thead>
-                        <tr>
-                          <th className="col-dni">DNI</th>
-                          <th className="col-name">Nombre</th>
-                          <th className="col-last">Apellido</th>
-                          <th className="col-dniNac">Edad</th>
-                          <th className="col-os">Obra Social</th>
-                          <th className="col-motivo">Motivo consulta</th>
-                          <th className="col-turno">Turno asignado</th>
-                          <th className="col-actions">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {candidatos.map((c) => {
-                          const asig = asignaciones[c.id_nino] || null;
-                          const obra = c.obra_social?.nombre_obra_social || "—";
-                          return (
-                            <tr key={c.id_nino}>
-                              <td className="col-dni">{c.dni || "—"}</td>
-                              <td className="col-name">{c.nombre}</td>
-                              <td className="col-last">{c.apellido}</td>
-                              <td className="col-dniNac">
-                                {c.fecha_nacimiento
-                                  ? `${formatDateDMY(c.fecha_nacimiento)} (${edad(
-                                      c.fecha_nacimiento
-                                    )} años)`
-                                  : "—"}
-                              </td>
-                              <td className="col-os">{obra}</td>
+            <div className="dashboard-table-wrapper">
+              {loadingEntrevistas ? (
+                <div className="loader">Cargando entrevistas…</div>
+              ) : entrevistas.length === 0 ? (
+                <div className="empty">No hay entrevistas pendientes.</div>
+              ) : (
+                <table className="table" role="table" aria-label="Entrevistas pendientes">
+                  <thead>
+                    <tr>
+                      <th className="col-dni">DNI</th>
+                      <th className="col-name">Nombre</th>
+                      <th className="col-last">Apellido</th>
+                      <th className="col-dniNac">Edad</th>
+                      <th className="col-os">Obra Social</th>
+                      <th className="col-motivo">Motivo consulta</th>
+                      <th className="col-dep">Departamento Asignado</th>
+                      <th>Tipo</th>
+                      <th>Asignar Turno</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entrevistas
+                      .filter((row) => {
+                        if (deptFilter === 'all') return true;
+                        if (deptFilter === 'compartidas') return row.compartida;
+                        const depId = String(row?.servicio_id ?? '');
+                        if (depId && depId === String(deptFilter)) return true;
+                        // también permitir filtrar por nombre si no hay id
+                        const selected = departamentos.find((d) => String(d.id_departamento) === String(deptFilter));
+                        if (selected) {
+                          return row.departamentosInvolucrados.includes(selected.nombre);
+                        }
+                        return depId === String(deptFilter);
+                      })
+                      .map((row) => {
+                        const tipoLabel = row.compartida ? 'Entrevista compartida' : 'Entrevista';
+                        const expanded = expandedDetalleId === row.id;
+                        const birth = row.fecha_nacimiento ? formatDateDMY(row.fecha_nacimiento) : null;
+                        return (
+                          <>
+                            <tr key={row.id}>
+                              <td className="col-dni">{row.dni || '—'}</td>
+                              <td className="col-name">{row.nombre}</td>
+                              <td className="col-last">{row.apellido}</td>
+                              <td className="col-dniNac">{birth ? `${birth} (${edad(row.fecha_nacimiento)} años)` : '—'}</td>
+                              <td className="col-os">{row.obra_social}</td>
                               <td className="col-motivo">
-                                {c.motivo_consulta ? (
-                                  <span
-                                    className="motivo-text"
-                                    title={c.motivo_consulta}
-                                  >
-                                    {resumirMotivo(c.motivo_consulta)}
+                                {row.motivo_consulta ? (
+                                  <span className="motivo-text" title={row.motivo_consulta}>
+                                    {resumirMotivo(row.motivo_consulta)}
                                   </span>
                                 ) : (
                                   <span className="muted">Sin motivo</span>
                                 )}
                               </td>
-                              <td className="col-turno">
-                                {asig ? (
-                                  <div
-                                    className="turno-chip"
-                                    title={`Desde ${formatDateDMY(
-                                      asig.inicio
-                                    )} a ${formatDateDMY(asig.fin)}`}
+                              <td className="col-dep">
+                                {row.compartida ? (
+                                  <button
+                                    type="button"
+                                    className="pill pill-shared btn-link"
+                                    onClick={() => openDepartamentosModal(row)}
+                                    title="Ver departamentos involucrados"
                                   >
-                                    <span>
-                                      {new Date(asig.inicio).toLocaleString()}
-                                    </span>
-                                  </div>
+                                    <MdInfo size={16} style={{ marginRight: 6 }} /> Ver departamentos
+                                  </button>
                                 ) : (
-                                  <span className="muted">Sin asignar</span>
+                                  row.servicio_nombre || '—'
                                 )}
                               </td>
-                              <td className="col-actions">
+                              <td>
+                                <span className={row.compartida ? 'pill pill-shared' : 'pill'} title={row.compartida ? 'Intervención de múltiples departamentos' : 'Entrevista estándar'}>
+                                  {row.compartida ? (<MdGroups size={14} style={{ marginRight: 6 }} />) : null}
+                                  {tipoLabel}
+                                </span>
+                              </td>
+                              <td>
                                 <div className="row-actions">
                                   {(isAdmin || isProfesional) && (
-                                    <>
-                                      <button
-                                        className="icon-btn success"
-                                        title={asig ? "Cambiar turno" : "Asignar turno"}
-                                        onClick={() => programarTurnosEntrevista(c, { replaceExisting: !!asig })}
-                                      >
-                                        {asig ? (
-                                          <MdChangeCircle size={20} />
-                                        ) : (
-                                          <MdEventAvailable size={20} />
-                                        )}
-                                      </button>
-                                      {asig && (
-                                        <button
-                                          className="icon-btn danger"
-                                          title="Quitar asignación"
-                                          onClick={() =>
-                                            quitarAsignacion(asig.id, c.id_nino)
-                                          }
-                                        >
-                                          <MdDelete size={18} />
-                                        </button>
-                                      )}
-                                    </>
+                                    <button
+                                      className="btn primary"
+                                      title={'Asignar turno de entrevista'}
+                                      onClick={() => programarTurnosEntrevista(row.candidatoRef, { replaceExisting: false })}
+                                    >
+                                      <MdEventAvailable size={18} />
+                                      <span>Asignar turno</span>
+                                    </button>
                                   )}
                                 </div>
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {totalPages > 1 && (
-                  <div className="paginacion-sweeper">
-                    <button
-                      className="sweeper-btn"
-                      disabled={page === 1}
-                      onClick={() => setPage(page - 1)}
-                    >
-                      &lt;
-                    </button>
-                    <span className="sweeper-info">
-                      Página {page} de {totalPages}
-                    </span>
-                    <button
-                      className="sweeper-btn"
-                      disabled={page === totalPages}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      &gt;
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+                            {/* detalle expandido eliminado, ahora se muestra en modal */}
+                          </>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
+
+          {/* Se removió la tabla antigua de candidatos; se mantiene solo la tabla nueva de entrevistas pendientes */}
         </div>
       </div>
 

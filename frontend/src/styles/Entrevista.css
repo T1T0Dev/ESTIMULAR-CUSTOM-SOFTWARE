@@ -116,6 +116,45 @@
   font-size: 1.1rem;
 }
 
+/* Etiquetas y detalles para entrevistas compartidas */
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--neutral-100);
+  color: var(--neutral-700);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Variación para entrevistas compartidas */
+.pill-shared {
+  background: rgba(229, 0, 125, 0.08);
+  color: #e5007d;
+  border: 1px solid rgba(229, 0, 125, 0.25);
+}
+
+
+
+.detalle-shared {
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.detalle-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--neutral-800);
+}
+
+.detalle-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Estilos de tabla */
 .table-tools {
   display: flex;
@@ -200,6 +239,20 @@
   text-align: center;
 }
 
+/* Centrado del departamento */
+.table th.col-dep,
+.table td.col-dep {
+  text-align: center;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+
+
+.col-dep .btn-link {
+  padding: 6px 10px;
+}
+
 /* Estilos para el motivo */
 .motivo-text {
   display: block;
@@ -265,6 +318,68 @@
 
 .icon-btn.danger:hover {
   background: #ffcdd2;
+}
+
+/* Botones intuitivos */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.05s ease;
+}
+
+.btn.primary {
+  background: var(--color-rosa1);
+  color: white;
+}
+
+.btn.primary:hover {
+  filter: brightness(1.05);
+}
+
+.btn.primary:active {
+  transform: translateY(1px);
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--color-rosa2);
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Herramientas de la tabla */
+.tools-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-label {
+  font-size: 0.9rem;
+  color: var(--neutral-700);
+}
+
+.tool-select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-300);
+  background: white;
 }
 
 /* Paginación */

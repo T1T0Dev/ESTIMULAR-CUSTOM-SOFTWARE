@@ -424,6 +424,15 @@ export default function NuevoTurnoPanel({
 
   const dropdownDisabled = profesionalesFiltrados.length === 0;
 
+  const hasProfesionalSeleccionado = useMemo(() => {
+    if (!Array.isArray(formData.profesional_ids)) return false;
+    return (
+      formData.profesional_ids
+        .map((id) => Number(id))
+        .filter((id) => !Number.isNaN(id)).length > 0
+    );
+  }, [formData.profesional_ids]);
+
   const repeatSummaryText = useMemo(() => {
     if (!repeatEnabled) return '';
 
@@ -581,6 +590,12 @@ export default function NuevoTurnoPanel({
       const profesionalIdsSeleccionados = formData.profesional_ids
         .map((id) => Number(id))
         .filter((id) => !Number.isNaN(id));
+
+      if (profesionalIdsSeleccionados.length === 0) {
+        setErrorMessage('Seleccione al menos un profesional para el turno.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const basePayload = {
         departamento_id: Number(formData.departamento_id),
@@ -943,6 +958,7 @@ export default function NuevoTurnoPanel({
                       }
                       onChange={handleProfesionalChange}
                       disabled={dropdownDisabled}
+                      required
                     >
                       <option value="">Sin asignar</option>
                       {profesionalesFiltrados.map((profesional) => (
@@ -956,6 +972,9 @@ export default function NuevoTurnoPanel({
                     </select>
                     {dropdownDisabled && (
                       <p className="field-hint">No hay profesionales para este servicio.</p>
+                    )}
+                    {!dropdownDisabled && !hasProfesionalSeleccionado && (
+                      <p className="field-hint">Seleccione al menos un profesional para continuar.</p>
                     )}
                   </div>
                 )}
@@ -1097,7 +1116,11 @@ export default function NuevoTurnoPanel({
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={isSubmitting || !hasProfesionalSeleccionado}
+                >
                   {isSubmitting ? 'Creando…' : 'Crear turno'}
                 </button>
               </div>
