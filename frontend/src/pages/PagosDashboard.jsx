@@ -606,13 +606,6 @@ export default function PagosDashboard() {
             : "Sin turnos impagos registrados",
       },
       {
-        id: "bruta",
-        className: "haber",
-        label: "Ganancia bruta",
-        valor: formatCurrency(resumen.haberes, "ARS", false),
-        detalle: "Pagos completados del mes en curso",
-      },
-      {
         id: "cobertura",
         className: "cobertura",
         label: "Cubierto por obra social",
@@ -622,18 +615,9 @@ export default function PagosDashboard() {
             ? "Descuentos aplicados por obras sociales este mes"
             : "Sin bonificaciones registradas en el mes",
       },
-      {
-        id: "anteriores",
-        className: "neta",
-        label: "Cobros de meses anteriores",
-        valor: formatCurrency(resumen.cobrosMesesAnteriores, "ARS", false),
-        detalle: "Montos cobrados este mes por turnos previos",
-      },
     ];
   }, [
-    resumen.cobrosMesesAnteriores,
     resumen.coberturaObraSocial,
-    resumen.haberes,
     totals.cantidad_turnos,
     deudaConCobertura.cobertura,
     deudaConCobertura.paciente,
@@ -1154,16 +1138,7 @@ export default function PagosDashboard() {
                                           const tieneCobertura = cobertura > 0.01;
                                           return (
                                             <li key={pagoKey}>
-                                              <div>
-                                                <span className="cuota-label">
-                                                  Cuota #{pagoKey}
-                                                </span>
-                                                <small>
-                                                  Registrada el {formatDate(
-                                                    pago.registrado_en
-                                                  )}
-                                                </small>
-                                              </div>
+                                              <div aria-hidden="true" />
                                               <div className="cuota-meta">
                                                 {tieneCobertura ? (
                                                   <div className="cuota-amount-group">
