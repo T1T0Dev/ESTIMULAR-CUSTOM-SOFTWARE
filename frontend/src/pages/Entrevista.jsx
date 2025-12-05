@@ -134,7 +134,7 @@ export default function Entrevista() {
 
   // Entrevistas pendientes + filtros
   const [entrevistas, setEntrevistas] = useState([]);
-  const [loadingEntrevistas, setLoadingEntrevistas] = useState(false);
+  const [loadingEntrevistas, setLoadingEntrevistas] = useState(true);
   const [departamentos, setDepartamentos] = useState([]);
   const [deptFilter, setDeptFilter] = useState("all");
   const [expandedDetalleId, setExpandedDetalleId] = useState(null);
@@ -216,46 +216,15 @@ export default function Entrevista() {
         return;
       }
 
-      // Para cada candidato pendiente, consultar propuestas (para conocer departamentos)
-      const token = localStorage.getItem('token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
-      const propuestasByNino = await Promise.all(
-        pendientesCandidatos.map(async (c) => {
-          try {
-            const r = await axios.post(
-              `${API_BASE_URL}/api/turnos/auto-schedule`,
-              { nino_id: c.id_nino, tipo_turno: 'entrevista' },
-              headers ? { headers } : undefined
-            );
-            const payload = r?.data;
-            const propuestas = Array.isArray(payload?.propuestas)
-              ? payload.propuestas
-              : Array.isArray(payload?.data?.propuestas)
-              ? payload.data.propuestas
-              : Array.isArray(payload)
-              ? payload
-              : [];
-            const deps = Array.from(
-              new Map(
-                propuestas
-                  .map((p) => ({ id: p?.departamento_id ?? null, nombre: p?.departamento_nombre || null }))
-                  .filter((d) => d.nombre)
-                  .map((d) => [d.id || d.nombre, d])
-              ).values()
-            );
-            return { id_nino: c.id_nino, deps };
-          } catch (e) {
-            console.warn('No se pudieron obtener propuestas para nino', c.id_nino, e);
-            return { id_nino: c.id_nino, deps: [] };
-          }
-        })
-      );
-
-      const depsMap = new Map(propuestasByNino.map((x) => [x.id_nino, x.deps]));
-
       const lista = pendientesCandidatos.map((c) => {
-        const deps = depsMap.get(c.id_nino) || [];
+        const deps = Array.isArray(c?.departamentos)
+          ? c.departamentos
+              .map((dep) => ({
+                id: dep?.departamento_id ?? dep?.id ?? null,
+                nombre: dep?.nombre ?? dep?.departamento?.nombre ?? null,
+              }))
+              .filter((dep) => dep.nombre)
+          : [];
         const nombres = deps.map((d) => d.nombre).filter(Boolean);
         const compartida = nombres.length >= 2;
         const principal = deps.length === 1 ? deps[0] : null;
