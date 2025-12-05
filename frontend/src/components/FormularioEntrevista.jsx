@@ -1,6 +1,6 @@
 import "../styles/FormularioEntrevista.css";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
@@ -247,6 +247,7 @@ const GrupoCheckbox = ({
 export default function FormularioEntrevista() {
   const { listaObras, cargando } = useObrasSociales();
   const { listaProfesiones, cargandoProfesiones } = useProfesiones();
+  const navigate = useNavigate();
   const [responsableExistente, setResponsableExistente] = useState(null);
   const [responsableLookupEstado, setResponsableLookupEstado] = useState("idle");
   const lookupResponsableRef = useRef({ dni: null, status: null, data: null, timeoutId: null });
@@ -769,7 +770,7 @@ export default function FormularioEntrevista() {
       );
 
       if (respuesta.data?.success) {
-        Alerta.fire({
+        await Alerta.fire({
           icon: "success",
           title: "Enviado",
           text: "Formulario recibido. ¡Gracias!",
@@ -797,6 +798,7 @@ export default function FormularioEntrevista() {
         setResponsableExistente(null);
         lookupResponsableRef.current = { dni: null, status: null };
         setErrores({});
+        navigate("/");
       } else {
         Alerta.fire({
           icon: "error",
