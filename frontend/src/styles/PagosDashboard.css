@@ -486,8 +486,8 @@
   }
 
   .pagos-modal-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 1.1rem;
   }
 
@@ -571,6 +571,6 @@
     }
 
     .pagos-modal-grid {
-      grid-template-columns: 1fr;
+      gap: 1.1rem;
     }
   }

@@ -66,7 +66,6 @@ const adjustProfesionesPrecios = async (req, res) => {
             message: 'Se requieren actualizaciones con departamento_id y nuevo_precio.',
         });
     }
-
     const effectiveDate = aplicarDesde ? new Date(aplicarDesde) : null;
     if (!effectiveDate || Number.isNaN(effectiveDate.getTime())) {
         return res.status(400).json({
@@ -205,8 +204,8 @@ const adjustProfesionesPrecios = async (req, res) => {
                     Number((nuevoPrecio * (1 - descuentoNormalizado)).toFixed(2))
                 );
 
-                        const notasActualizadas = {
-                            ...(notasParsed || {}),
+                const notasActualizadas = {
+                    ...(notasParsed && typeof notasParsed === 'object' ? notasParsed : {}),
                     monto_original: nuevoPrecio,
                     descuento_aplicado: descuentoNormalizado,
                 };
