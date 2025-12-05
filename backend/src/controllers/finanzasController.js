@@ -300,10 +300,17 @@ const getResumenMensual = async (req, res) => {
                 })
                 .reduce((sum, p) => sum + Number(p.monto || 0), 0);
 
-            const coberturaObraSocial = pagosMes.reduce(
-                (sum, pago) => sum + toAmount(pago?.coverageInfo?.cobertura || 0),
-                0
-            );
+            const coberturaObraSocial = pagosConCobertura
+                .filter((pago) => {
+                    const turno = pago.turno || null;
+                    if (!turno) return false;
+                    const inicioTurno = turno.inicio ? new Date(turno.inicio) : null;
+                    if (!inicioTurno) return false;
+                    const iso = inicioTurno.toISOString();
+                    if (iso > now.toISOString()) return false;
+                    return iso >= inicioMesIso && iso < finMesIso;
+                })
+                .reduce((sum, pago) => sum + toAmount(pago?.coverageInfo?.cobertura || 0), 0);
 
             const id = `${anio}-${String(mesIndex + 1).padStart(2, '0')}`;
             const labelMes = `${labelsMes[mesIndex]} ${anio}`;
@@ -315,8 +322,8 @@ const getResumenMensual = async (req, res) => {
                 haberes,
                 cobrosMesesAnteriores,
                 coberturaObraSocial,
-                // Ganancia neta = (Cobros de meses anteriores + Ganancia bruta) - Deberes
-                gananciaNeta: cobrosMesesAnteriores + haberes - deberes,
+                // Ganancia neta considera ingresos del mes (obra social + cobros) menos saldos pendientes
+                gananciaNeta: cobrosMesesAnteriores + haberes + coberturaObraSocial - deberes,
             };
         });
 
