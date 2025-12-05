@@ -23,73 +23,6 @@ function parseObraSocialDescuento(raw) {
     return { tipo: 'porcentaje', valor: clampPercent(parsed) };
 }
 
-function computeCoberturaDesdeDescriptor(pago, descriptor) {
-    const estado = String(pago?.estado || '').toLowerCase();
-    const montoBase = Number(pago?.monto || 0);
-
-    if (!descriptor || descriptor.tipo === 'ninguno' || montoBase < 0) {
-        return {
-            cobertura: 0,
-            montoOriginal: Math.max(montoBase, 0),
-        };
-    }
-
-    if (estado === 'pendiente') {
-        if (descriptor.tipo === 'monto') {
-            const descuento = Number(descriptor.valor || 0);
-            if (!Number.isFinite(descuento) || Number.isNaN(descuento) || descuento <= 0) {
-                return { cobertura: 0, montoOriginal: Math.max(montoBase, 0) };
-            }
-            const cobertura = Math.min(descuento, Math.max(montoBase, 0));
-            return {
-                cobertura,
-                montoOriginal: Math.max(montoBase, 0),
-            };
-        }
-
-        if (descriptor.tipo === 'porcentaje') {
-            const ratio = clampPercent(descriptor.valor);
-            if (ratio <= 0 || ratio >= 1 || montoBase <= 0) {
-                return { cobertura: 0, montoOriginal: Math.max(montoBase, 0) };
-            }
-            const cobertura = Number((montoBase * ratio).toFixed(2));
-            return {
-                cobertura,
-                montoOriginal: Math.max(montoBase, 0),
-            };
-        }
-    }
-
-    const finalAmount = Math.max(montoBase, 0);
-
-    if (descriptor.tipo === 'monto') {
-        const descuento = Number(descriptor.valor || 0);
-        if (!Number.isFinite(descuento) || Number.isNaN(descuento) || descuento <= 0) {
-            return { cobertura: 0, montoOriginal: finalAmount };
-        }
-        const montoOriginal = Math.max(0, Number((finalAmount + descuento).toFixed(2)));
-        return {
-            cobertura: Math.min(descuento, montoOriginal),
-            montoOriginal,
-        };
-    }
-
-    if (descriptor.tipo === 'porcentaje') {
-        const ratio = clampPercent(descriptor.valor);
-        if (ratio <= 0 || ratio >= 1) {
-            return { cobertura: 0, montoOriginal: finalAmount };
-        }
-        const montoOriginal = Number((finalAmount / (1 - ratio)).toFixed(2));
-        const cobertura = Math.max(0, Number((montoOriginal - finalAmount).toFixed(2)));
-        return {
-            cobertura,
-            montoOriginal,
-        };
-    }
-
-    return { cobertura: 0, montoOriginal: finalAmount };
-}
-
 function parseNotasJson(rawNotas) {
     if (!rawNotas || typeof rawNotas !== 'string') {
         return null;
@@ -100,6 +33,131 @@ function parseNotasJson(rawNotas) {
     } catch (_error) {
         return null;
     }
+}
+
+function toAmount(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || Number.isNaN(parsed)) return 0;
+    return Number(parsed.toFixed(2));
+}
+
+function computePagoCoberturaInfo(pago, descriptorRaw) {
+    const estado = String(pago?.estado || '').toLowerCase();
+    const montoActual = toAmount(pago?.monto || 0);
+    const notasData = parseNotasJson(pago?.notas);
+
+    if (notasData && typeof notasData === 'object') {
+        const notedOriginal = toAmount(
+            notasData.monto_original ??
+                notasData.montoOriginal ??
+                notasData.precio_original ??
+                notasData.precioOriginal
+        );
+        const notedDescuento = toAmount(
+            notasData.descuento_monto ??
+                notasData.descuentoMonto ??
+                notasData.descuento_aplicado_monto
+        );
+
+        if (notedOriginal > 0) {
+            const cobertura = Math.max(0, Number((notedOriginal - montoActual).toFixed(2)));
+            if (cobertura > 0) {
+                return {
+                    cobertura,
+                    saldoPaciente: Math.max(montoActual, 0),
+                    montoOriginal: notedOriginal,
+                };
+            }
+        }
+
+        if (notedDescuento > 0) {
+            const cobertura = Math.min(notedDescuento, Math.max(montoActual, 0));
+            const saldoPaciente = Math.max(montoActual - cobertura, 0);
+            const montoOriginal = saldoPaciente > 0
+                ? Number((saldoPaciente + cobertura).toFixed(2))
+                : Math.max(montoActual, cobertura);
+            return {
+                cobertura,
+                saldoPaciente,
+                montoOriginal,
+            };
+        }
+    }
+
+    const descriptor = descriptorRaw || { tipo: 'ninguno', valor: 0 };
+
+    if (descriptor.tipo === 'monto') {
+        const descuento = toAmount(descriptor.valor);
+        const monto = Math.max(montoActual, 0);
+        if (descuento <= 0) {
+            return {
+                cobertura: 0,
+                saldoPaciente: monto,
+                montoOriginal: monto,
+            };
+        }
+
+        const cobertura = Math.min(descuento, monto);
+        if (estado === 'completado') {
+            const montoOriginal = Number((monto + cobertura).toFixed(2));
+            return {
+                cobertura,
+                saldoPaciente: monto,
+                montoOriginal,
+            };
+        }
+
+        const saldoPaciente = Math.max(monto - cobertura, 0);
+        return {
+            cobertura,
+            saldoPaciente,
+            montoOriginal: monto,
+        };
+    }
+
+    if (descriptor.tipo === 'porcentaje') {
+        const ratio = clampPercent(descriptor.valor);
+        const monto = Math.max(montoActual, 0);
+        if (ratio <= 0) {
+            return {
+                cobertura: 0,
+                saldoPaciente: monto,
+                montoOriginal: monto,
+            };
+        }
+
+        if (estado === 'completado') {
+            if (ratio >= 1) {
+                return {
+                    cobertura: 0,
+                    saldoPaciente: monto,
+                    montoOriginal: monto,
+                };
+            }
+            const montoOriginal = Number((monto / (1 - ratio)).toFixed(2));
+            const cobertura = Math.max(0, Number((montoOriginal - monto).toFixed(2)));
+            return {
+                cobertura,
+                saldoPaciente: monto,
+                montoOriginal,
+            };
+        }
+
+        const cobertura = Number((monto * ratio).toFixed(2));
+        const saldoPaciente = Math.max(monto - cobertura, 0);
+        return {
+            cobertura,
+            saldoPaciente,
+            montoOriginal: monto,
+        };
+    }
+
+    const monto = Math.max(montoActual, 0);
+    return {
+        cobertura: 0,
+        saldoPaciente: monto,
+        montoOriginal: monto,
+    };
 }
 
 // GET /api/finanzas/resumen-mensual?anio=2025
@@ -123,9 +181,11 @@ const getResumenMensual = async (req, res) => {
 
         if (pagosError) throw pagosError;
 
+        const pagosList = Array.isArray(pagos) ? pagos : [];
+
         const ninoIds = Array.from(
             new Set(
-                (pagos || [])
+                pagosList
                     .map((pago) => Number(pago.nino_id))
                     .filter((id) => Number.isInteger(id) && id > 0)
             )
@@ -157,6 +217,16 @@ const getResumenMensual = async (req, res) => {
 
         if (turnosError) throw turnosError;
 
+        const descuentosMap = descuentosPorNino;
+
+        const pagosConCobertura = pagosList.map((pago) => {
+            const descriptor = descuentosMap.get(Number(pago.nino_id)) || null;
+            return {
+                ...pago,
+                coverageInfo: computePagoCoberturaInfo(pago, descriptor),
+            };
+        });
+
         const meses = Array.from({ length: 12 }, (_, i) => i); // 0-11
         const labelsMes = [
             'Enero',
@@ -187,12 +257,12 @@ const getResumenMensual = async (req, res) => {
                 return f && f.toISOString() >= inicioMesIso && f.toISOString() < finMesIso;
             });
 
-            const pagosMes = (pagos || []).filter((p) => {
+            const pagosMes = pagosConCobertura.filter((p) => {
                 const f = p.registrado_en ? new Date(p.registrado_en) : null;
                 return f && f.toISOString() >= inicioMesIso && f.toISOString() < finMesIso;
             });
 
-            const deberes = (pagos || [])
+            const deberes = pagosConCobertura
                 .filter((p) => {
                     if (p.estado !== 'pendiente') return false;
                     const turno = p.turno || null;
@@ -208,7 +278,11 @@ const getResumenMensual = async (req, res) => {
                     if (iso > now.toISOString()) return false;
                     return iso >= inicioMesIso && iso < finMesIso;
                 })
-                .reduce((sum, p) => sum + Number(p.monto || 0), 0);
+                .reduce((sum, p) => {
+                    const saldoPaciente = p?.coverageInfo?.saldoPaciente;
+                    const base = saldoPaciente ?? p.monto ?? 0;
+                    return sum + toAmount(base);
+                }, 0);
 
             const pagosCompletadosMes = pagosMes.filter((p) => p.estado === 'completado');
 
@@ -226,44 +300,10 @@ const getResumenMensual = async (req, res) => {
                 })
                 .reduce((sum, p) => sum + Number(p.monto || 0), 0);
 
-            const coberturaObraSocial = pagosMes.reduce((sum, pago) => {
-                const notasData = parseNotasJson(pago.notas);
-                if (notasData && typeof notasData === 'object') {
-                    const montoOriginalNota = Number(
-                        notasData.monto_original ??
-                            notasData.montoOriginal ??
-                            notasData.precio_original ??
-                            notasData.precioOriginal ??
-                            0
-                    );
-                    const descuentoNota = Number(
-                        notasData.descuento_monto ??
-                            notasData.descuentoMonto ??
-                            notasData.descuento_aplicado_monto ??
-                            0
-                    );
-                    const montoActual = Number(pago.monto || 0);
-                    if (Number.isFinite(montoOriginalNota) && montoOriginalNota > 0) {
-                        const coberturaDesdeNotas = Math.max(
-                            0,
-                            Number((montoOriginalNota - montoActual).toFixed(2))
-                        );
-                        if (coberturaDesdeNotas > 0) {
-                            return sum + coberturaDesdeNotas;
-                        }
-                    }
-                    if (Number.isFinite(descuentoNota) && descuentoNota > 0) {
-                        return sum + Number(descuentoNota.toFixed(2));
-                    }
-                }
-
-                const descriptor = descuentosPorNino.get(Number(pago.nino_id)) || {
-                    tipo: 'ninguno',
-                    valor: 0,
-                };
-                const { cobertura } = computeCoberturaDesdeDescriptor(pago, descriptor);
-                return sum + cobertura;
-            }, 0);
+            const coberturaObraSocial = pagosMes.reduce(
+                (sum, pago) => sum + toAmount(pago?.coverageInfo?.cobertura || 0),
+                0
+            );
 
             const id = `${anio}-${String(mesIndex + 1).padStart(2, '0')}`;
             const labelMes = `${labelsMes[mesIndex]} ${anio}`;
@@ -311,6 +351,8 @@ const getResumenMensualDetalle = async (req, res) => {
                 id,
                 monto,
                 estado,
+                notas,
+                nino_id,
                 registrado_en,
                 turno:turnos!pagos_turno_id_fkey (
                     id,
@@ -327,10 +369,45 @@ const getResumenMensualDetalle = async (req, res) => {
 
         if (pagosError) throw pagosError;
 
+        const pagosList = Array.isArray(pagos) ? pagos : [];
+
+        const ninoIds = Array.from(
+            new Set(
+                pagosList
+                    .map((pago) => Number(pago.nino_id))
+                    .filter((id) => Number.isInteger(id) && id > 0)
+            )
+        );
+
+        let descuentosPorNino = new Map();
+        if (ninoIds.length > 0) {
+            const { data: ninosData, error: ninosError } = await supabaseAdmin
+                .from('ninos')
+                .select('id_nino, obra_social:obras_sociales!ninos_id_obra_social_fkey ( descuento )')
+                .in('id_nino', ninoIds);
+
+            if (ninosError) throw ninosError;
+
+            descuentosPorNino = new Map(
+                (ninosData || []).map((nino) => [
+                    nino.id_nino,
+                    parseObraSocialDescuento(nino?.obra_social?.descuento),
+                ])
+            );
+        }
+
+        const pagosConCobertura = pagosList.map((pago) => {
+            const descriptor = descuentosPorNino.get(Number(pago.nino_id)) || null;
+            return {
+                ...pago,
+                coverageInfo: computePagoCoberturaInfo(pago, descriptor),
+            };
+        });
+
         const now = new Date();
         const resumenPorDepartamento = new Map();
 
-        (pagos || []).forEach((pago) => {
+        pagosConCobertura.forEach((pago) => {
             const turno = pago.turno || null;
             if (!turno) return;
 
@@ -353,11 +430,18 @@ const getResumenMensualDetalle = async (req, res) => {
                     departamentoNombre: depNombre,
                     deberes: 0,
                     haberes: 0,
+                    coberturaObraSocial: 0,
                 });
             }
 
             const item = resumenPorDepartamento.get(depId);
+            const coberturaInfo = pago.coverageInfo || {
+                cobertura: 0,
+                saldoPaciente: Number(pago.monto || 0),
+            };
             const monto = Number(pago.monto || 0);
+            const saldoPaciente = toAmount(coberturaInfo.saldoPaciente ?? monto);
+            const cobertura = toAmount(coberturaInfo.cobertura || 0);
 
             const turnoInicio = turno.inicio ? new Date(turno.inicio) : null;
             const turnoInicioIso = turnoInicio ? turnoInicio.toISOString() : null;
@@ -367,7 +451,8 @@ const getResumenMensualDetalle = async (req, res) => {
                 turnoInicioIso <= now.toISOString();
 
             if (pago.estado === 'pendiente' && esDelMesActual) {
-                item.deberes += monto;
+                item.deberes += saldoPaciente;
+                item.coberturaObraSocial += cobertura;
             }
 
             if (pago.estado === 'completado') {

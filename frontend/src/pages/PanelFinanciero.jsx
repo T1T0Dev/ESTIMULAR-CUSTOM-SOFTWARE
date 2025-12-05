@@ -159,7 +159,7 @@ export default function PanelFinanciero() {
             {currencyFormatter.format(resumenActual.deberes || 0)}
           </div>
           <p className="detalle">
-            Turnos atendidos del mes que aún no fueron pagados.
+            Saldo pendiente para la familia (la cobertura de obra social ya está descontada).
           </p>
         </div>
         <div className="panel-card resumen-card haber">
