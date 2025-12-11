@@ -227,6 +227,12 @@ export default function NuevoTurnoPanel({
   const previousDepartamentoIdRef = useRef(null);
 
   const departamentoBloqueado = Boolean(prefillData?.departamento_bloqueado);
+  const lockSchedulingFields = Boolean(
+    prefillData?.lockSchedulingFields ||
+      prefillData?.bloquear_programacion ||
+      prefillData?.lock_from_entrevistas ||
+      prefillData?.origen === 'entrevista'
+  );
 
   const departamentosResumen = useMemo(() => {
     if (!prefillData) return [];
@@ -464,11 +470,11 @@ export default function NuevoTurnoPanel({
     });
 
     const repeatCount = Number(prefillData.repetir_semanas);
-    setRepeatEnabled(Number.isFinite(repeatCount) && repeatCount > 0);
+    setRepeatEnabled(!lockSchedulingFields && Number.isFinite(repeatCount) && repeatCount > 0);
 
     setErrorMessage('');
     setSuccessMessage('');
-  }, [isOpen, prefillData]);
+  }, [isOpen, prefillData, lockSchedulingFields]);
 
   useEffect(() => {
     if (!formData.departamento_id) return;
@@ -667,6 +673,10 @@ export default function NuevoTurnoPanel({
   };
 
   const handleRepeatToggle = () => {
+    if (lockSchedulingFields) {
+      resetMessages();
+      return;
+    }
     setRepeatEnabled((prevEnabled) => {
       const nextEnabled = !prevEnabled;
 
@@ -1021,7 +1031,7 @@ export default function NuevoTurnoPanel({
               </div>
 
               <div className="form-grid">
-                {!departamentoBloqueado && (
+                {!departamentoBloqueado && !lockSchedulingFields && (
                   <div className="form-section">
                     <label htmlFor="departamento_id">Servicio</label>
                     <select
@@ -1064,7 +1074,7 @@ export default function NuevoTurnoPanel({
                       handleInputChange(event);
                       resetMessages();
                     }}
-                    disabled={departamentoBloqueado}
+                      disabled={departamentoBloqueado || lockSchedulingFields}
                   >
                     <option value="">Sin asignar</option>
                     {formOptions.consultorios.map((consultorio) => (
@@ -1073,7 +1083,7 @@ export default function NuevoTurnoPanel({
                       </option>
                     ))}
                   </select>
-                  {departamentoBloqueado && formData.consultorio_id && (
+                    {(departamentoBloqueado || lockSchedulingFields) && formData.consultorio_id && (
                     <p className="field-hint">
                       Este consultorio se mantendrá para el turno combinado.
                     </p>
@@ -1092,6 +1102,7 @@ export default function NuevoTurnoPanel({
                       resetMessages();
                     }}
                     required
+                      disabled={lockSchedulingFields}
                   />
                 </div>
 
@@ -1107,6 +1118,7 @@ export default function NuevoTurnoPanel({
                       resetMessages();
                     }}
                     required
+                    disabled={lockSchedulingFields}
                   />
                 </div>
 
@@ -1124,6 +1136,7 @@ export default function NuevoTurnoPanel({
                       resetMessages();
                     }}
                     required
+                    disabled={lockSchedulingFields}
                   />
                 </div>
 
@@ -1173,6 +1186,7 @@ export default function NuevoTurnoPanel({
                       handleInputChange(event);
                       resetMessages();
                     }}
+                    disabled={lockSchedulingFields}
                   >
                     {ESTADOS_TURNO.map((estado) => (
                       <option key={estado.value} value={estado.value}>
@@ -1228,7 +1242,7 @@ export default function NuevoTurnoPanel({
                 </div>
               </div>
 
-              {!departamentoBloqueado && (
+              {!departamentoBloqueado && !lockSchedulingFields && (
                 <div className="form-section">
                   <div className="repeat-weekly-section">
                     <div className="repeat-weekly-header">

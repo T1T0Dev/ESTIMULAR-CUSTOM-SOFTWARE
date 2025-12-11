@@ -306,6 +306,7 @@ const mergePropuestasEnTurnoUnico = (propuestas = []) => {
     profesionales_resumen: profesionalesResumen,
     notas: notasFinales,
     departamento_bloqueado: true,
+    lockSchedulingFields: true,
   };
 
   delete resultado.__inicioDate;
@@ -458,21 +459,28 @@ export default function AsignarEntrevista() {
         return;
       }
 
-      setTurnoPrefill(prefillList[0]);
-      setTurnoQueue(prefillList.slice(1));
+      const prefillListWithLocks = prefillList.map((prefill) => ({
+        ...prefill,
+        departamento_bloqueado: true,
+        lockSchedulingFields: true,
+      }));
+
+      setTurnoPrefill(prefillListWithLocks[0]);
+      setTurnoQueue(prefillListWithLocks.slice(1));
       setTurnoPanelOpen(true);
 
-      const nombresServicios = prefillList
+      const nombresServicios = prefillListWithLocks
         .map((prefill) => prefill.servicios_resumen || prefill.departamento_nombre)
         .filter(Boolean);
 
+      const totalPrefills = prefillListWithLocks.length;
       const serviciosTexto = nombresServicios.length > 0
         ? ` Servicios: ${nombresServicios.join(", ")}.`
         : "";
 
-      const esUnico = prefillList.length === 1;
+      const esUnico = totalPrefills === 1;
       const mensajeToast = omitidosList.length > 0
-        ? `Se ${esUnico ? "generará" : "generarán"} ${prefillList.length} ${esUnico ? "turno" : "turnos"}. ${omitidosList.length} servicio(s) ya tenían turno activo.${serviciosTexto}`
+        ? `Se ${esUnico ? "generará" : "generarán"} ${totalPrefills} ${esUnico ? "turno" : "turnos"}. ${omitidosList.length} servicio(s) ya tenían turno activo.${serviciosTexto}`
         : esUnico
           ? `Revisá los datos y confirmá el turno.${serviciosTexto}`
           : `Revisá los datos y confirmá cada turno.${serviciosTexto}`;
@@ -480,9 +488,9 @@ export default function AsignarEntrevista() {
       Swal.fire({
         icon: "success",
         title:
-          prefillList.length === 1
+          totalPrefills === 1
             ? "Turno listo"
-            : `${prefillList.length} propuestas listas`,
+            : `${totalPrefills} propuestas listas`,
         text: mensajeToast,
         toast: true,
         timer: 2600,
