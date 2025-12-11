@@ -76,8 +76,10 @@
 .resetpwd-input {
   border: 1px solid rgba(131, 122, 167, 0.35);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 12px 50px 12px 14px;
   font-size: 0.98rem;
+  width: 100%;
+  box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -85,6 +87,32 @@
   outline: none;
   border-color: #8f6ab8;
   box-shadow: 0 0 0 3px rgba(143, 106, 184, 0.25);
+}
+
+.input-container {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #8f6ab8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.toggle-password:hover {
+  color: #5e3a94;
+  background-color: rgba(143, 106, 184, 0.08);
 }
 
 .resetpwd-error {
