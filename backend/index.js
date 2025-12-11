@@ -27,7 +27,7 @@ app.use(cors({
     'http://localhost:5174', 'http://localhost:5173', 'http://localhost:5176', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:3000',
     'http://127.0.0.1:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5176', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://127.0.0.1:3000',
     'http://172.20.10.11:5174', 'http://172.20.10.11:5173', 'http://172.20.10.11:5176', 'http://172.20.10.11:5177', 'http://172.20.10.11:5178', 'http://172.20.10.11:3000',
-    'https://pps.fdrach.pp.ua', 'https://ppsb.fdrach.pp.ua'
+    'https://pps.fdrach.pp.ua', 'https://ppsb.fdrach.pp.ua','http://localhost:5173'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -90,7 +90,7 @@ app.use('/api/profesiones', profesionesRoutes);
 app.use('/api/login', loginRoutes);
 app.use('/api', finanzasRoutes);
 
-app.listen(PORT, '::', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor backend escuchando en puerto ${PORT} en todas las interfaces`);
 });
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import API_BASE_URL from "../constants/api";
 import Swal from "sweetalert2";
+import { IoEyeOff, IoEye } from "react-icons/io5";
 import "../styles/ReestablecerContraseña.css";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -16,6 +17,8 @@ export default function ReestablecerContraseña({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -137,33 +140,53 @@ export default function ReestablecerContraseña({
           <label className="resetpwd-label" htmlFor="resetpwd-password">
             Nueva contraseña
           </label>
-          <input
-            id="resetpwd-password"
-            type="password"
-            className="resetpwd-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Ingresá la nueva contraseña"
-            minLength={MIN_PASSWORD_LENGTH}
-            required
-            disabled={submitting}
-            autoFocus
-          />
+          <div className="input-container">
+            <input
+              id="resetpwd-password"
+              type={showPassword ? "text" : "password"}
+              className="resetpwd-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Ingresá la nueva contraseña"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              disabled={submitting}
+              autoFocus
+            />
+            <button
+              type="button"
+              className="toggle-password"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? <IoEyeOff size={20} /> : <IoEye size={20} />}
+            </button>
+          </div>
 
           <label className="resetpwd-label" htmlFor="resetpwd-confirm">
             Confirmar contraseña
           </label>
-          <input
-            id="resetpwd-confirm"
-            type="password"
-            className="resetpwd-input"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Repetí la contraseña"
-            minLength={MIN_PASSWORD_LENGTH}
-            required
-            disabled={submitting}
-          />
+          <div className="input-container">
+            <input
+              id="resetpwd-confirm"
+              type={showConfirmPassword ? "text" : "password"}
+              className="resetpwd-input"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repetí la contraseña"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
+              disabled={submitting}
+            />
+            <button
+              type="button"
+              className="toggle-password"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showConfirmPassword ? <IoEyeOff size={20} /> : <IoEye size={20} />}
+            </button>
+          </div>
 
           {error ? <div className="resetpwd-error">{error}</div> : null}
 

@@ -167,7 +167,7 @@
 
 /* Column helpers */
 .col-name {
-  min-width: 160px;
+  min-width: 140px;
 }
 .col-logo {
   width: 90px;
@@ -192,7 +192,7 @@
   min-width: 140px;
 }
 .col-dni {
-  min-width: 100px;
+  min-width: 90px;
 }
 .col-dniNac {
   min-width: 110px;
@@ -224,8 +224,16 @@
   text-align: center;
 }
 .col-actions {
-  min-width: 160px;
+  min-width: 100px;
   text-align: right;
+}
+
+.col-fecha {
+  min-width: 120px;
+}
+
+.col-tipo {
+  min-width: 80px;
 }
 
 .icon-btn.info {
@@ -273,7 +281,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   padding: 2.2rem 2rem 1.5rem 2rem;
   min-width: 480px;
-  max-width: 760px;
+  max-width: 1000px;
   width: 100%;
   position: relative;
   animation: modalIn 0.2s ease;
