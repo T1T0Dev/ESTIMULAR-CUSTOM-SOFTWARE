@@ -149,13 +149,10 @@
 /* Table wrapper to ensure horizontal scrolling when necessary */
 .dashboard-table-wrapper {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .dashboard-table-wrapper .table {
   width: 100%;
-  min-width: 820px; /* allow table to scroll if too wide */
 }
 
 @media (max-width: 1000px) {

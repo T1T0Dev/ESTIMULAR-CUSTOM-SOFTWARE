@@ -1013,11 +1013,10 @@ export default function Responsables() {
                 <span>DNI:</span> {modalData.dni || "—"}
               </div>
               <div className="modal-row">
-                <span>Contacto:</span>
-                <span className="cell-stack">
-                  {modalData.telefono || "—"}
-                  <span className="muted-text">{modalData.email || "—"}</span>
-                </span>
+                <span>Celular:</span> {modalData.telefono || "—"}
+              </div>
+              <div className="modal-row">
+                <span>Email:</span> {modalData.email || "—"}
               </div>
             </div>
 
@@ -1105,93 +1104,180 @@ export default function Responsables() {
                   </div>
                 ) : (
                   <div className="dashboard-table-wrapper">
-                    <table className="table" aria-label="Niños asociados">
-                      <thead>
-                        <tr>
-                          <th>Nombre</th>
-                          <th>DNI</th>
-                          {isAdmin && <th>Parentesco</th>}
-                          {isAdmin && <th>Principal</th>}
-                          <th>Fecha nacimiento</th>
-                          <th>Tipo</th>
-                          <th className="col-actions">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    {isMobile ? (
+                      /* Vista de tarjetas para móviles */
+                      <div className="mobile-cards">
                         {ninosVinculados.map((rel) => {
                           const display = getNinoDisplay(rel.nino);
                           const nacimientoTexto = display.fecha
                             ? formatDateDMY(display.fecha)
                             : "";
                           return (
-                            <tr
-                              key={rel.id_nino_responsable}
-                              className={rel.es_principal ? "row-principal" : ""}
-                            >
-                              <td data-label="Nombre">
-                                <div className="cell-stack">
-                                  <span className="cell-strong">
-                                    {display.nombre}
-                                  </span>
+                            <div key={rel.id_nino_responsable} className="mobile-card">
+                              <div className="mobile-card-header">
+                                <h3 className="mobile-card-title">
+                                  {display.nombre}
                                   {rel.es_principal && (
-                                    <span className="tag principal">
+                                    <span className="tag principal" style={{ marginLeft: 8 }}>
                                       <FaStar size={12} /> Principal
                                     </span>
                                   )}
+                                </h3>
+                              </div>
+                              <div className="mobile-card-content">
+                                <div className="mobile-card-row">
+                                  <span className="mobile-card-label">DNI:</span>
+                                  <span className="mobile-card-value">{display.dni}</span>
                                 </div>
-                              </td>
-                              <td data-label="DNI">{display.dni}</td>
-                            {isAdmin && (
-                              <td data-label="Parentesco">
-                                <input
-                                  className="table-input"
-                                  value={rel.parentescoDraft ?? ""}
-                                  onChange={(e) =>
-                                    cambiarParentescoLocal(
-                                      rel.id_nino_responsable,
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={() => guardarParentesco(rel)}
-                                  placeholder="Ej: hijo"
-                                />
-                              </td>
-                            )}
-                            {isAdmin && (
-                              <td data-label="Principal">
-                                <label className="inline-check">
-                                  <input
-                                    type="checkbox"
-                                    checked={!!rel.es_principal}
-                                    onChange={() => togglePrincipal(rel)}
-                                    aria-label="Marcar como principal"
-                                  />
-                                  {rel.es_principal ? "Sí" : "No"}
-                                </label>
-                              </td>
-                            )}
-                              <td data-label="Fecha nacimiento">
-                                {nacimientoTexto || "—"}
-                              </td>
-                              <td data-label="Tipo">{display.tipo || "—"}</td>
-                            <td className="col-actions" data-label="Acciones">
-                              <div className="row-actions">
+                                {isAdmin && (
+                                  <div className="mobile-card-row">
+                                    <span className="mobile-card-label">Parentesco:</span>
+                                    <span className="mobile-card-value">
+                                      <input
+                                        className="mobile-card-input"
+                                        value={rel.parentescoDraft ?? ""}
+                                        onChange={(e) =>
+                                          cambiarParentescoLocal(
+                                            rel.id_nino_responsable,
+                                            e.target.value
+                                          )
+                                        }
+                                        onBlur={() => guardarParentesco(rel)}
+                                        placeholder="Ej: hijo"
+                                      />
+                                    </span>
+                                  </div>
+                                )}
+                                {isAdmin && (
+                                  <div className="mobile-card-row">
+                                    <span className="mobile-card-label">Principal:</span>
+                                    <span className="mobile-card-value">
+                                      <label className="inline-check">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!rel.es_principal}
+                                          onChange={() => togglePrincipal(rel)}
+                                          aria-label="Marcar como principal"
+                                        />
+                                        {rel.es_principal ? "Sí" : "No"}
+                                      </label>
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="mobile-card-row">
+                                  <span className="mobile-card-label">Fecha nacimiento:</span>
+                                  <span className="mobile-card-value">{nacimientoTexto || "—"}</span>
+                                </div>
+                                <div className="mobile-card-row">
+                                  <span className="mobile-card-label">Tipo:</span>
+                                  <span className="mobile-card-value">{display.tipo || "—"}</span>
+                                </div>
+                              </div>
+                              <div className="mobile-card-actions">
                                 {isAdmin && (
                                   <button
-                                    className="icon-btn danger"
-                                    title="Quitar niño"
+                                    className="mobile-card-btn delete"
                                     onClick={() => quitarNino(rel)}
                                   >
-                                    <FaUnlink size={18} />
+                                    <FaUnlink size={16} />
+                                    Quitar
                                   </button>
                                 )}
                               </div>
-                            </td>
-                            </tr>
+                            </div>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    ) : (
+                      /* Vista de tabla para desktop */
+                      <table className="table" aria-label="Niños asociados">
+                        <thead>
+                          <tr>
+                            <th>Nombre</th>
+                            <th>DNI</th>
+                            {isAdmin && <th>Parentesco</th>}
+                            {isAdmin && <th>Principal</th>}
+                            <th>Fecha nacimiento</th>
+                            <th>Tipo</th>
+                            <th className="col-actions">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ninosVinculados.map((rel) => {
+                            const display = getNinoDisplay(rel.nino);
+                            const nacimientoTexto = display.fecha
+                              ? formatDateDMY(display.fecha)
+                              : "";
+                            return (
+                              <tr
+                                key={rel.id_nino_responsable}
+                                className={rel.es_principal ? "row-principal" : ""}
+                              >
+                                <td data-label="Nombre">
+                                  <div className="cell-stack">
+                                    <span className="cell-strong">
+                                      {display.nombre}
+                                    </span>
+                                    {rel.es_principal && (
+                                      <span className="tag principal">
+                                        <FaStar size={12} /> Principal
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td data-label="DNI">{display.dni}</td>
+                              {isAdmin && (
+                                <td data-label="Parentesco">
+                                  <input
+                                    className="table-input"
+                                    value={rel.parentescoDraft ?? ""}
+                                    onChange={(e) =>
+                                      cambiarParentescoLocal(
+                                        rel.id_nino_responsable,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={() => guardarParentesco(rel)}
+                                    placeholder="Ej: hijo"
+                                  />
+                                </td>
+                              )}
+                              {isAdmin && (
+                                <td data-label="Principal">
+                                  <label className="inline-check">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!rel.es_principal}
+                                      onChange={() => togglePrincipal(rel)}
+                                      aria-label="Marcar como principal"
+                                    />
+                                    {rel.es_principal ? "Sí" : "No"}
+                                  </label>
+                                </td>
+                              )}
+                                <td data-label="Fecha nacimiento">
+                                  {nacimientoTexto || "—"}
+                                </td>
+                                <td data-label="Tipo">{display.tipo || "—"}</td>
+                              <td className="col-actions" data-label="Acciones">
+                                <div className="row-actions">
+                                  {isAdmin && (
+                                    <button
+                                      className="icon-btn danger"
+                                      title="Quitar niño"
+                                      onClick={() => quitarNino(rel)}
+                                    >
+                                      <FaUnlink size={18} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 )}
               </div>
