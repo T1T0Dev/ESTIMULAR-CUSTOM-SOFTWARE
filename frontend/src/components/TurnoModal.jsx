@@ -27,6 +27,9 @@ export default function TurnoModal({
   const [endTime, setEndTime] = useState("");
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelTexto, setCancelTexto] = useState("");
+  const [showChangeDayModal, setShowChangeDayModal] = useState(false);
+  const [changeDayDate, setChangeDayDate] = useState("");
+  const [isSubmittingChangeDay, setIsSubmittingChangeDay] = useState(false);
 
   const { token } = useAuthStore();
 
@@ -81,12 +84,61 @@ export default function TurnoModal({
   };
 
   const handleChangeDay = () => {
-    Swal.fire({
-      icon: "info",
-      title: "Funcionalidad no disponible",
-      text: "La funcionalidad para cambiar el día aún no está implementada.",
-      confirmButtonText: "Entendido",
+    setChangeDayDate(moment(event.start).format("YYYY-MM-DD"));
+    setShowChangeDayModal(true);
+  };
+
+  const handleCloseChangeDayModal = () => {
+    if (isSubmittingChangeDay) return;
+    setShowChangeDayModal(false);
+  };
+
+  const handleChangeDaySubmit = async () => {
+    if (!changeDayDate) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Seleccioná una fecha",
+        text: "Por favor, elegí la nueva fecha del turno.",
+        confirmButtonText: "Entendido",
+      });
+      return;
+    }
+
+    const currentStart = moment(event.start);
+    const currentEnd = moment(event.end);
+    const newStart = moment(changeDayDate, "YYYY-MM-DD").set({
+      hour: currentStart.hour(),
+      minute: currentStart.minute(),
+      second: 0,
+      millisecond: 0,
     });
+    const durationMinutes = Math.max(currentEnd.diff(currentStart, "minutes"), 15);
+    const newEnd = newStart.clone().add(durationMinutes, "minutes");
+
+    setIsSubmittingChangeDay(true);
+    try {
+      await onUpdate(event, {
+        inicio: newStart.toISOString(),
+        fin: newEnd.toISOString(),
+      });
+      await Swal.fire({
+        icon: "success",
+        title: "Fecha actualizada",
+        text: "La fecha del turno se cambió correctamente.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      setShowChangeDayModal(false);
+    } catch (error) {
+      console.error("Error al cambiar el día del turno:", error);
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo cambiar el día",
+        text: error?.response?.data?.message || "Intente nuevamente en unos minutos.",
+      });
+    } finally {
+      setIsSubmittingChangeDay(false);
+    }
   };
 
   const createStatusHandler =
@@ -342,6 +394,43 @@ export default function TurnoModal({
               </button>
               <button className="btn-send" onClick={handleCancelSubmit}>
                 Enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showChangeDayModal && (
+        <div className="modal-backdrop" onClick={handleCloseChangeDayModal}>
+          <div
+            className="modal-content change-day-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Cambiar día del turno</h3>
+            <p>Seleccioná la nueva fecha para este turno. El horario se mantendrá igual.</p>
+            <label htmlFor="change-day-date">Nueva fecha</label>
+            <input
+              id="change-day-date"
+              type="date"
+              value={changeDayDate}
+              onChange={(e) => setChangeDayDate(e.target.value)}
+              disabled={isSubmittingChangeDay}
+            />
+            <div className="change-day-actions">
+              <button
+                type="button"
+                className="btn-cancel2"
+                onClick={handleCloseChangeDayModal}
+                disabled={isSubmittingChangeDay}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-send"
+                onClick={handleChangeDaySubmit}
+                disabled={isSubmittingChangeDay}
+              >
+                {isSubmittingChangeDay ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

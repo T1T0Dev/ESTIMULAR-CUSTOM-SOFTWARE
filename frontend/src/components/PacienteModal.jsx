@@ -1,6 +1,5 @@
 import React from 'react';
 import moment from 'moment';
-import Swal from 'sweetalert2';
 import './../styles/PacienteModal.css';
 import API_BASE_URL from "../constants/api";
 
@@ -11,14 +10,6 @@ const calculateAge = (birthDate) => {
 
 export default function PacienteModal({ paciente, onClose }) {
   if (!paciente) return null;
-
-  const handleVerDocumentos = () => {
-    Swal.fire({
-      icon: 'info',
-      title: 'Función no implementada',
-      text: 'Esta funcionalidad estará disponible próximamente.'
-    });
-  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -66,11 +57,6 @@ export default function PacienteModal({ paciente, onClose }) {
           </div>
         </div>
 
-        <div className="paciente-modal-actions">
-          <button className="btn-view-docs" onClick={handleVerDocumentos}>
-            📄 Ver Documentos
-          </button>
-        </div>
       </div>
     </div>
   );

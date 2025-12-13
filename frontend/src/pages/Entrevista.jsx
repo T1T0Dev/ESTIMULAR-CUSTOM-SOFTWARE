@@ -8,6 +8,7 @@ import API_BASE_URL from "../constants/api";
 import NuevoTurnoPanel from "../components/NuevoTurnoPanel";
 import ProfesionalesSelectorModal from "../components/ProfesionalesSelectorModal";
 import useAuthStore from "../store/useAuthStore";
+import "../styles/Entrevista.css";
 // Utilidades necesarias
 function edad(fechaNacimiento) {
   if (!fechaNacimiento) return "";

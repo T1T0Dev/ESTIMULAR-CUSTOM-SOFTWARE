@@ -282,6 +282,60 @@
   border-color: var(--color-rosa1);
 }
 
+.change-day-modal {
+  max-width: 420px;
+  background: white;
+  border: 2px solid var(--color-rosa1);
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  padding: 2rem;
+}
+
+.change-day-modal h3 {
+  text-align: center;
+  margin-bottom: 0.75rem;
+  color: var(--color-rosa2);
+  font-size: 1.3rem;
+}
+
+.change-day-modal p {
+  margin: 0 0 1rem 0;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.change-day-modal label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.change-day-modal input[type="date"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fafafa;
+  transition: border-color 0.2s;
+}
+
+.change-day-modal input[type="date"]:focus {
+  outline: none;
+  border-color: var(--color-rosa1);
+}
+
+.change-day-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.change-day-actions button {
+  flex: 1;
+}
+
 .modal-buttons {
   display: flex;
   justify-content: space-between;
@@ -319,6 +373,12 @@
 
 .btn-send:hover {
   background-color: var(--color-rosa2);
+}
+
+.btn-cancel2:disabled,
+.btn-send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Media Queries para Responsividad */
