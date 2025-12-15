@@ -74,7 +74,8 @@ const getNinos = async (req, res) => {
 
         const selectColumns = `id_nino, nombre, apellido, fecha_nacimiento, dni, certificado_discapacidad, tipo, id_obra_social, motivo_consulta,
             obra_social:obras_sociales (id_obra_social, nombre_obra_social, descuento),
-            nino_departamentos:nino_departamentos ( id, departamento_id, estado, departamento:profesiones ( id_departamento, nombre ) )`;
+            nino_departamentos:nino_departamentos ( id, departamento_id, estado, departamento:profesiones ( id_departamento, nombre ) ),
+            responsables:nino_responsables ( id_nino_responsable, parentesco, es_principal, responsable:responsables ( id_responsable, nombre, apellido, telefono, email, dni ) )`;
 
         let q = supabaseAdmin
             .from('ninos')

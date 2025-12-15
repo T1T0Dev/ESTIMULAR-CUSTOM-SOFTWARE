@@ -888,6 +888,7 @@ export default function NuevoTurnoPanel({
                         Servicios incluidos: <strong>{serviciosResumen}</strong>
                       </p>
                     )}
+                    <p className="multi-turno-title">Profesionales confirmados</p>
                     <ul className="multi-turno-profesionales">
                       {(() => {
                         const multipleServicios =
@@ -895,6 +896,9 @@ export default function NuevoTurnoPanel({
                           prefillData.departamentos_resumen.length > 1;
 
                         return prefillData.profesionales_resumen.map((prof) => {
+                          const nombreProfesional = capitalizeWords(
+                            prof.nombre_completo || `Profesional ${prof.id_profesional}`
+                          );
                           const departamentos = Array.isArray(prof.departamentos)
                             ? prof.departamentos.filter(
                                 (nombre) => typeof nombre === 'string' && nombre.trim() !== ''
@@ -906,7 +910,7 @@ export default function NuevoTurnoPanel({
 
                           return (
                             <li key={prof.id_profesional}>
-                              <strong>{prof.nombre_completo}</strong>
+                              <strong>{nombreProfesional}</strong>
                               {shouldMostrarDepartamentos && (
                                 <span className="multi-turno-departamentos">
                                   {' '}
@@ -1209,6 +1213,7 @@ export default function NuevoTurnoPanel({
                       resetMessages();
                     }}
                     placeholder="Ej: 4500"
+                    disabled={true}
                   />
                   {selectedNino &&
                     obraSocialDescuentoInfo.hasDiscount &&

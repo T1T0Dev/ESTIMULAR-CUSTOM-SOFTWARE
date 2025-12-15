@@ -105,24 +105,196 @@ const parseInicioDate = (propuesta) => {
   return null;
 };
 
-function mergePropuestasEnTurnoUnico(propuestas) {
-  if (!Array.isArray(propuestas) || propuestas.length === 0) return null;
-  const base = { ...propuestas[0] };
-  const inicioDate = parseInicioDate(base);
-  if (!inicioDate) return null;
-  const duracion = propuestas.reduce((max, p) => {
-    const d = Number(p?.duracion_min);
-    return Number.isFinite(d) && d > 0 ? Math.max(max, d) : max;
-  }, Number(base?.duracion_min) || 60);
-  const finDate = new Date(inicioDate);
-  finDate.setMinutes(finDate.getMinutes() + duracion);
+const mergePropuestasEnTurnoUnico = (propuestas = []) => {
+  if (!Array.isArray(propuestas) || propuestas.length === 0) {
+    return null;
+  }
+
+  const enriquecidas = propuestas
+    .map((propuesta) => {
+      const inicioDate = parseInicioDate(propuesta);
+      if (!inicioDate) return null;
+      return { ...propuesta, __inicioDate: inicioDate };
+    })
+    .filter(Boolean);
+
+  if (enriquecidas.length === 0) {
+    return null;
+  }
+
+  const ordenadas = [...enriquecidas].sort(
+    (a, b) => a.__inicioDate.getTime() - b.__inicioDate.getTime()
+  );
+
+  const base = { ...ordenadas[0] };
+  const baseInicioDate = base.__inicioDate;
+  const inicioIso = baseInicioDate.toISOString();
+
+  const duraciones = ordenadas
+    .map((item) => Number(item.duracion_min))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const duracionMax = duraciones.length > 0 ? Math.max(...duraciones) : 30;
+
+  const finDate = new Date(baseInicioDate.getTime() + duracionMax * 60000);
+  const finIso = finDate.toISOString();
+
+  const profesionalInfoMap = new Map();
+  const profesionalesSet = new Set();
+
+  ordenadas.forEach((propuesta) => {
+    const disponibles = Array.isArray(propuesta.profesionales_disponibles)
+      ? propuesta.profesionales_disponibles
+      : [];
+
+    (propuesta.profesional_ids || []).forEach((rawId) => {
+      const profId = normalizeProfesionalId(rawId);
+      if (profId === null) return;
+
+      profesionalesSet.add(profId);
+
+      const existente = profesionalInfoMap.get(profId) || {
+        id_profesional: profId,
+        nombre_completo: null,
+        departamentos: new Set(),
+      };
+
+      const encontrado = disponibles.find(
+        (prof) => normalizeProfesionalId(prof?.id_profesional) === profId
+      );
+
+      if (encontrado) {
+        const nombreCompleto =
+          encontrado.nombre_completo ||
+          [encontrado.nombre, encontrado.apellido]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+        if (nombreCompleto) {
+          existente.nombre_completo = nombreCompleto;
+        }
+        if (encontrado.departamento_nombre) {
+          existente.departamentos.add(encontrado.departamento_nombre);
+        }
+      }
+
+      if (propuesta.departamento_nombre) {
+        existente.departamentos.add(propuesta.departamento_nombre);
+      }
+
+      if (!existente.nombre_completo) {
+        existente.nombre_completo = `Profesional ${profId}`;
+      }
+
+      profesionalInfoMap.set(profId, existente);
+    });
+  });
+
+  const profesionalesIds = Array.from(profesionalesSet.values());
+
+  const profesionalesResumen = Array.from(profesionalInfoMap.values()).map((info) => ({
+    id_profesional: info.id_profesional,
+    nombre_completo: info.nombre_completo,
+    departamentos: Array.from(info.departamentos.values()),
+  }));
+
+  const consultorioIds = ordenadas
+    .map((item) => item.consultorio_id)
+    .filter((valor) => valor !== undefined && valor !== null);
+  const consultorioId =
+    consultorioIds.length > 0 &&
+    consultorioIds.every((valor) => String(valor) === String(consultorioIds[0]))
+      ? consultorioIds[0]
+      : null;
+
+  const departamentos = [];
+  const departamentosSet = new Set();
+  ordenadas.forEach((propuesta) => {
+    const deptId = normalizeProfesionalId(propuesta.departamento_id);
+    const key =
+      deptId !== null
+        ? `id-${deptId}`
+        : `nombre-${propuesta.departamento_nombre || "?"}`;
+    if (departamentosSet.has(key)) return;
+    departamentosSet.add(key);
+    departamentos.push({
+      id_departamento: deptId,
+      nombre: propuesta.departamento_nombre || "Servicio sin nombre",
+    });
+  });
+
+  const departamentosResumen = departamentos
+    .map((dep) => dep.nombre)
+    .filter((nombre) => typeof nombre === "string" && nombre.trim().length > 0);
+
+  const serviciosResumen =
+    departamentosResumen.length > 1
+      ? departamentosResumen.join(", ")
+      : departamentosResumen[0] || base.departamento_nombre || "Entrevista";
+
+  const notasPartes = [];
+  ordenadas.forEach((propuesta) => {
+    if (propuesta.notas && String(propuesta.notas).trim().length > 0) {
+      notasPartes.push(String(propuesta.notas).trim());
+    }
+  });
+
+  if (profesionalesResumen.length > 0) {
+    const resumenProfesionales = profesionalesResumen
+      .map((prof) => {
+        const sectores =
+          Array.isArray(prof.departamentos) && prof.departamentos.length > 0
+            ? ` (${prof.departamentos.join(", ")})`
+            : "";
+        return `${prof.nombre_completo}${sectores}`;
+      })
+      .join(" · ");
+    notasPartes.push(`Profesionales asignados: ${resumenProfesionales}`);
+  }
+
+  const notasFinales =
+    notasPartes.length > 0
+      ? Array.from(new Set(notasPartes)).join(" | ")
+      : base.notas || null;
+
+  const unionDisponibles = new Map();
+  ordenadas.forEach((propuesta) => {
+    const disponibles = Array.isArray(propuesta.profesionales_disponibles)
+      ? propuesta.profesionales_disponibles
+      : [];
+    disponibles.forEach((prof) => {
+      const profId = normalizeProfesionalId(prof?.id_profesional);
+      if (profId === null) return;
+      if (!unionDisponibles.has(profId)) {
+        unionDisponibles.set(profId, {
+          ...prof,
+          id_profesional: profId,
+        });
+      }
+    });
+  });
+
+  const profesionalesDisponiblesUnificados = Array.from(unionDisponibles.values());
+
   return {
     ...base,
-    inicio: inicioDate.toISOString(),
-    fin: finDate.toISOString(),
-    duracion_min: duracion,
+    inicio: inicioIso,
+    fin: finIso,
+    date: formatDateForInput(baseInicioDate),
+    startTime: formatTimeForInput(baseInicioDate),
+    duracion_min: duracionMax,
+    consultorio_id: consultorioId,
+    profesional_ids: profesionalesIds,
+    profesionales_disponibles: profesionalesDisponiblesUnificados,
+    departamento_id: base.departamento_id ?? departamentos[0]?.id_departamento ?? null,
+    departamento_nombre: base.departamento_nombre ?? departamentos[0]?.nombre ?? null,
+    servicios_resumen: serviciosResumen,
+    departamentos_resumen: departamentosResumen,
+    profesionales_resumen: profesionalesResumen,
+    notas: notasFinales,
+    departamento_bloqueado: true,
+    lockSchedulingFields: true,
   };
-}
+};
 
 export default function Entrevista() {
   const [candidatos, setCandidatos] = useState([]);
