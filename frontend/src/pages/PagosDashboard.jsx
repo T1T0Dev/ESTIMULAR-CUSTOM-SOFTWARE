@@ -9,6 +9,7 @@ import {
   getPaymentMethodLabel,
 } from "../constants/paymentMethods";
 import "../styles/PagosDashboard.css";
+import useAuthStore from "../store/useAuthStore";
 
 const MESES = [
   "Enero",
@@ -328,6 +329,28 @@ function prepareDeudaRow(row) {
 }
 
 export default function PagosDashboard() {
+  const user = useAuthStore((state) => state.user);
+  const roleNames = [];
+  if (user?.rol_nombre) roleNames.push(user.rol_nombre);
+  if (Array.isArray(user?.roles)) {
+    roleNames.push(
+      ...user.roles
+        .map((r) => r?.nombre)
+        .filter((value) => typeof value === "string")
+    );
+  }
+  const isAdmin = Boolean(
+    user?.es_admin ||
+    roleNames
+      .map((value) =>
+        String(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+      )
+      .some((value) => value.includes("admin"))
+  );
+
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
@@ -447,6 +470,7 @@ export default function PagosDashboard() {
   }, [fetchData]);
 
   const handleOpenPriceModal = useCallback(async () => {
+    if (!isAdmin) return;
     setPriceModalOpen(true);
     setPriceModalError("");
     setPriceModalLoading(true);
@@ -474,7 +498,7 @@ export default function PagosDashboard() {
     } finally {
       setPriceModalLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   const handleClosePriceModal = useCallback(() => {
     if (priceSaving) return;
@@ -887,14 +911,16 @@ export default function PagosDashboard() {
                 Actualizado: {formatDateTime(lastUpdated)}
               </span>
             )}
-            <button
-              type="button"
-              className="pagos-btn primary"
-              onClick={handleOpenPriceModal}
-              disabled={loading}
-            >
-              Ajustar precios
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className="pagos-btn primary"
+                onClick={handleOpenPriceModal}
+                disabled={loading}
+              >
+                Ajustar precios
+              </button>
+            )}
             <button
               type="button"
               className="pagos-btn refresh"

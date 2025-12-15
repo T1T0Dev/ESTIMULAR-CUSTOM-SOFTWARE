@@ -58,6 +58,25 @@ function useDebounce(value, delay) {
 export default function ObrasSociales() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+  const roleNames = [];
+  if (user?.rol_nombre) roleNames.push(user.rol_nombre);
+  if (Array.isArray(user?.roles)) {
+    roleNames.push(
+      ...user.roles
+        .map((r) => r?.nombre)
+        .filter((value) => typeof value === "string")
+    );
+  }
+  const normalizeRole = (value) =>
+    String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const hasRole = (needle) => roleNames.map(normalizeRole).some((value) => value.includes(needle));
+  const isProfesional = hasRole("profesional");
+  const isRecepcion = hasRole("recepcion") || hasRole("recepción") || hasRole("secretar");
+  const canEditLogo = isAdmin && !isProfesional && !isRecepcion;
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -741,6 +760,7 @@ export default function ObrasSociales() {
             setModalData(null);
           }}
           onUpdated={handleModalUpdated}
+          canEditLogo={canEditLogo}
         />
       )}
 
@@ -762,7 +782,7 @@ export default function ObrasSociales() {
   );
 }
 
-function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
+function ObraSocialDetalleModal({ obra, onClose, onUpdated, canEditLogo = false }) {
   const [initialLogo, setInitialLogo] = useState(() => resolveObraLogoUrl(obra));
   const [logoPreview, setLogoPreview] = useState(() => resolveObraLogoUrl(obra) || fallbackObraLogo);
   const [logoDataUrl, setLogoDataUrl] = useState(null);
@@ -792,7 +812,7 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
 
   const handleFileChange = useCallback(
     (event) => {
-      if (processing) return;
+      if (processing || !canEditLogo) return;
       const file = event.target.files?.[0];
       if (!file) {
         resetSelection();
@@ -834,10 +854,11 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
       };
       reader.readAsDataURL(file);
     },
-    [processing, resetSelection]
+    [canEditLogo, processing, resetSelection]
   );
 
   const handleSaveLogo = useCallback(async () => {
+    if (!canEditLogo) return;
     if (!logoDataUrl) {
       Swal.fire({
         icon: "info",
@@ -887,9 +908,10 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
     } finally {
       setProcessing(false);
     }
-  }, [logoDataUrl, obra?.id_obra_social, onUpdated]);
+  }, [canEditLogo, logoDataUrl, obra?.id_obra_social, onUpdated]);
 
   const handleRemoveLogo = useCallback(async () => {
+    if (!canEditLogo) return;
     if (!hasExistingLogo && !logoDataUrl) {
       resetSelection();
       return;
@@ -943,7 +965,7 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
     } finally {
       setProcessing(false);
     }
-  }, [hasExistingLogo, logoDataUrl, obra?.id_obra_social, onUpdated, resetSelection]);
+  }, [canEditLogo, hasExistingLogo, logoDataUrl, obra?.id_obra_social, onUpdated, resetSelection]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -984,7 +1006,8 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
                 accept="image/png,image/jpeg,image/jpg,image/webp"
                 className="obra-logo-file"
                 onChange={handleFileChange}
-                disabled={processing}
+                disabled={processing || !canEditLogo}
+                aria-disabled={!canEditLogo}
               />
             </label>
             <div className="obra-logo-buttons">
@@ -992,7 +1015,9 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
                 type="button"
                 className="obra-logo-btn obra-logo-btn--save"
                 onClick={handleSaveLogo}
-                disabled={processing || !logoDataUrl}
+                disabled={processing || !logoDataUrl || !canEditLogo}
+                aria-disabled={!canEditLogo}
+                title={!canEditLogo ? "Solo administración puede modificar el logo" : undefined}
               >
                 Guardar logo
               </button>
@@ -1000,7 +1025,8 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
                 type="button"
                 className="obra-logo-btn obra-logo-btn--cancel"
                 onClick={resetSelection}
-                disabled={processing || !logoDataUrl}
+                disabled={processing || !logoDataUrl || !canEditLogo}
+                aria-disabled={!canEditLogo}
               >
                 Cancelar cambio
               </button>
@@ -1008,7 +1034,9 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated }) {
                 type="button"
                 className="obra-logo-btn obra-logo-btn--remove"
                 onClick={handleRemoveLogo}
-                disabled={processing || (!hasExistingLogo && !logoDataUrl)}
+                disabled={processing || (!hasExistingLogo && !logoDataUrl) || !canEditLogo}
+                aria-disabled={!canEditLogo}
+                title={!canEditLogo ? "Solo administración puede quitar el logo" : undefined}
               >
                 Quitar logo
               </button>

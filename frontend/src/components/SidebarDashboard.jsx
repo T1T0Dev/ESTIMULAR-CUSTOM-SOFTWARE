@@ -41,6 +41,7 @@ export default function SidebarDashboard() {
   const isProfesional = React.useMemo(() => {
     const names = [];
     if (user?.rol_nombre) names.push(user.rol_nombre);
+    if (profile?.tipo) names.push(profile.tipo);
     if (Array.isArray(user?.roles)) {
       names.push(
         ...user.roles
@@ -49,9 +50,15 @@ export default function SidebarDashboard() {
       );
     }
     return names
-      .map((value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())
-      .some((value) => value === 'profesional');
-  }, [user?.rol_nombre, user?.roles]);
+      .map((value) =>
+        value
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim()
+      )
+      .some((value) => value.includes('profesional'));
+  }, [profile?.tipo, user?.rol_nombre, user?.roles]);
 
   const isRecepcion = React.useMemo(() => {
     const names = [];
@@ -213,7 +220,7 @@ export default function SidebarDashboard() {
           <MdPerson size={18} /> <span>Niños</span>
         </NavLink>
 
-        {(esAdmin || isRecepcion) && (
+        {(esAdmin || isRecepcion || isProfesional) && (
           <NavLink
             to="/dashboard/responsables"
             className={({ isActive }) =>

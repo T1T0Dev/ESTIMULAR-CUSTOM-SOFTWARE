@@ -32,6 +32,25 @@ function calcularEdad(fechaNacimiento) {
 export default function Ninos() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
+  const roleNames = [];
+  if (user?.rol_nombre) roleNames.push(user.rol_nombre);
+  if (Array.isArray(user?.roles)) {
+    roleNames.push(
+      ...user.roles
+        .map((r) => r?.nombre)
+        .filter((value) => typeof value === "string")
+    );
+  }
+  const normalizeRole = (value) =>
+    String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const hasRole = (needle) => roleNames.map(normalizeRole).some((value) => value.includes(needle));
+  const isProfesional = hasRole("profesional");
+  const isRecepcion = hasRole("recepcion") || hasRole("recepción") || hasRole("secretar");
+  const linkingDisabled = isProfesional || isRecepcion;
 
   // Detectar si estamos en móvil
   const [isMobile, setIsMobile] = useState(false);
@@ -369,6 +388,7 @@ export default function Ninos() {
   };
 
   const mostrarBuscadorResponsable = () => {
+    if (linkingDisabled) return;
     setShowResponsableSearch(true);
     setTimeout(() => {
       const input = document.getElementById("buscar-responsable");
@@ -377,7 +397,7 @@ export default function Ninos() {
   };
 
   const vincularResponsable = async (responsable) => {
-    if (!modalData) return;
+    if (!modalData || linkingDisabled) return;
     const { value: formValues } = await Swal.fire({
       title: `Vincular a ${responsable.nombre ?? "Responsable"}`,
       html: `
@@ -1283,6 +1303,9 @@ export default function Ninos() {
                   type="button"
                   className="btn outline"
                   onClick={mostrarBuscadorResponsable}
+                  disabled={linkingDisabled}
+                  aria-disabled={linkingDisabled}
+                  title={linkingDisabled ? "Solo administración puede vincular" : undefined}
                 >
                   <FaUserPlus size={16} /> Vincular responsable
                 </button>
@@ -1317,7 +1340,10 @@ export default function Ninos() {
                           </div>
                           <button
                             className="btn small"
-                            onClick={() => vincularResponsable(resp)}
+                            onClick={() => !linkingDisabled && vincularResponsable(resp)}
+                            disabled={linkingDisabled}
+                            aria-disabled={linkingDisabled}
+                            title={linkingDisabled ? "Solo administración puede vincular" : undefined}
                           >
                             <FaUserPlus size={14} /> Vincular
                           </button>
