@@ -9,6 +9,20 @@ import API_BASE_URL from "../constants/api";
 import useAuthStore from "../store/useAuthStore";
 import fallbackObraLogo from "../assets/logo_estimular.png";
 
+const currencyFormatterARS = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const formatCurrencyARS = (value) => {
+  if (value === null || value === undefined) return "—";
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return "—";
+  return currencyFormatterARS.format(numeric);
+};
+
 const sanitizeNombreObra = (value) => {
   if (!value) return "";
   return String(value)
@@ -58,25 +72,7 @@ function useDebounce(value, delay) {
 export default function ObrasSociales() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.es_admin || (user?.roles?.some(role => role.nombre?.toLowerCase() === 'admin'));
-  const roleNames = [];
-  if (user?.rol_nombre) roleNames.push(user.rol_nombre);
-  if (Array.isArray(user?.roles)) {
-    roleNames.push(
-      ...user.roles
-        .map((r) => r?.nombre)
-        .filter((value) => typeof value === "string")
-    );
-  }
-  const normalizeRole = (value) =>
-    String(value)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim();
-  const hasRole = (needle) => roleNames.map(normalizeRole).some((value) => value.includes(needle));
-  const isProfesional = hasRole("profesional");
-  const isRecepcion = hasRole("recepcion") || hasRole("recepción") || hasRole("secretar");
-  const canEditLogo = isAdmin && !isProfesional && !isRecepcion;
+  const canEditLogo = Boolean(isAdmin);
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -980,8 +976,12 @@ function ObraSocialDetalleModal({ obra, onClose, onUpdated, canEditLogo = false 
             <span className="value">{obra?.nombre_obra_social || "—"}</span>
             <span className="label">Estado:</span>
             <span className="value">{obra?.estado || "—"}</span>
-            <span className="label">ID:</span>
-            <span className="value">{obra?.id_obra_social || "—"}</span>
+            <span className="label">Cobertura:</span>
+            <span className="value">
+              {obra?.descuento === null || obra?.descuento === undefined
+                ? "—"
+                : formatCurrencyARS(obra.descuento)}
+            </span>
           </div>
         </div>
         <div className="modal-section">
