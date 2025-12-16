@@ -1,6 +1,8 @@
 const { supabaseAdmin } = require('../config/db');
 const { formatNinoDetails } = require('../utils/ninoFormatter');
 
+const isAdmin = (req) => Array.isArray(req?.user?.roles) && req.user.roles.includes('admin');
+
 const mapNinoRow = (row) => {
     if (!row || typeof row !== 'object') return row;
     const departamentosOrigen = Array.isArray(row.nino_departamentos) ? row.nino_departamentos : [];
@@ -145,6 +147,8 @@ const crearNino = async (req, res) => {
         motivo_consulta,
     } = body;
 
+    const adminUser = isAdmin(req);
+
     if (!nombre || !apellido) {
         return res.status(400).json({ success: false, message: 'Nombre y apellido son obligatorios' });
     }
@@ -199,9 +203,9 @@ const crearNino = async (req, res) => {
             createdObraId = idObra;
         }
 
-        // 2) Si viene responsable (o al menos dni), crear/buscar
+        // 2) Si viene responsable (o al menos dni) y el usuario es admin, crear/buscar
         let respId = null;
-        if (respBody && (respBody.dni || respBody.nombre || respBody.apellido)) {
+        if (adminUser && respBody && (respBody.dni || respBody.nombre || respBody.apellido)) {
             if (respBody.dni) {
                 const dniResp = Number.parseInt(String(respBody.dni).trim(), 10);
                 if (!Number.isNaN(dniResp)) {
@@ -251,8 +255,8 @@ const crearNino = async (req, res) => {
         if (ninoErr) throw ninoErr;
         insertedNino = nino;
 
-        // 4) Opcional: crear relación en nino_responsables con es_principal
-        if (respId) {
+        // 4) Opcional: crear relación en nino_responsables con es_principal (solo admin)
+        if (adminUser && respId) {
             await supabaseAdmin
                 .from('nino_responsables')
                 .insert([{ id_nino: nino.id_nino, id_responsable: respId, parentesco: respBody?.parentesco || 'responsable', es_principal: true }]);

@@ -51,6 +51,7 @@ export default function Ninos() {
   const isProfesional = hasRole("profesional");
   const isRecepcion = hasRole("recepcion") || hasRole("recepción") || hasRole("secretar");
   const linkingDisabled = isProfesional || isRecepcion;
+  const canLinkResponsables = isAdmin && !isProfesional && !isRecepcion;
 
   // Detectar si estamos en móvil
   const [isMobile, setIsMobile] = useState(false);
@@ -1298,20 +1299,22 @@ export default function Ninos() {
                 niño. El responsable principal se destaca con un ícono.
               </p>
 
-              <div className="relationship-cta">
-                <button
-                  type="button"
-                  className="btn outline"
-                  onClick={mostrarBuscadorResponsable}
-                  disabled={linkingDisabled}
-                  aria-disabled={linkingDisabled}
-                  title={linkingDisabled ? "Solo administración puede vincular" : undefined}
-                >
-                  <FaUserPlus size={16} /> Vincular responsable
-                </button>
-              </div>
+              {canLinkResponsables && (
+                <div className="relationship-cta">
+                  <button
+                    type="button"
+                    className="btn outline"
+                    onClick={mostrarBuscadorResponsable}
+                    disabled={linkingDisabled}
+                    aria-disabled={linkingDisabled}
+                    title={linkingDisabled ? "Solo administración puede vincular" : undefined}
+                  >
+                    <FaUserPlus size={16} /> Vincular responsable
+                  </button>
+                </div>
+              )}
 
-              {showResponsableSearch && (
+              {canLinkResponsables && showResponsableSearch && (
                 <div className="relationship-search">
                   <label htmlFor="buscar-responsable" className="sr-only">
                     Buscar responsable
@@ -1368,8 +1371,9 @@ export default function Ninos() {
                   <div className="error">{responsablesError}</div>
                 ) : responsablesVinculados.length === 0 ? (
                   <div className="empty">
-                    No hay responsables asociados todavía. Usa la búsqueda para
-                    vincular uno existente.
+                    {canLinkResponsables
+                      ? "No hay responsables asociados todavía. Usa la búsqueda para vincular uno existente."
+                      : "No hay responsables asociados todavía. Solo administración puede vincular responsables."}
                   </div>
                 ) : (
                   <div className="dashboard-table-wrapper">
@@ -1384,7 +1388,7 @@ export default function Ninos() {
                           <th>Contacto</th>
                           <th>Parentesco</th>
                           {isAdmin && <th>Principal</th>}
-                          <th className="col-actions">Acciones</th>
+                          {isAdmin && <th className="col-actions">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1445,9 +1449,9 @@ export default function Ninos() {
                                 </label>
                               </td>
                             )}
-                            <td className="col-actions" data-label="Acciones">
-                              <div className="row-actions">
-                                {isAdmin && (
+                            {isAdmin && (
+                              <td className="col-actions" data-label="Acciones">
+                                <div className="row-actions">
                                   <button
                                     className="icon-btn danger"
                                     title="Quitar responsable"
@@ -1455,9 +1459,9 @@ export default function Ninos() {
                                   >
                                     <FaUnlink size={18} />
                                   </button>
-                                )}
-                              </div>
-                            </td>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

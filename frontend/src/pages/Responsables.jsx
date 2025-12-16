@@ -40,6 +40,7 @@ export default function Responsables() {
   const isProfesional = hasRole("profesional");
   const isRecepcion = hasRole("recepcion") || hasRole("recepción") || hasRole("secretar");
   const linkingDisabled = isProfesional || isRecepcion;
+  const canLinkNinos = isAdmin && !isProfesional && !isRecepcion;
 
   // Detectar si estamos en móvil
   const [isMobile, setIsMobile] = useState(false);
@@ -1047,20 +1048,22 @@ export default function Responsables() {
                 asignar nuevos niños con la búsqueda en tiempo real.
               </p>
 
-              <div className="relationship-cta">
-                <button
-                  type="button"
-                  className="btn outline"
-                  onClick={mostrarBuscadorNino}
-                  disabled={linkingDisabled}
-                  aria-disabled={linkingDisabled}
-                  title={linkingDisabled ? "Solo administración puede vincular" : undefined}
-                >
-                  <FaChild size={16} /> Vincular niño
-                </button>
-              </div>
+              {canLinkNinos && (
+                <div className="relationship-cta">
+                  <button
+                    type="button"
+                    className="btn outline"
+                    onClick={mostrarBuscadorNino}
+                    disabled={linkingDisabled}
+                    aria-disabled={linkingDisabled}
+                    title={linkingDisabled ? "Solo administración puede vincular" : undefined}
+                  >
+                    <FaChild size={16} /> Vincular niño
+                  </button>
+                </div>
+              )}
 
-              {showNinoSearch && (
+              {canLinkNinos && showNinoSearch && (
                 <div className="relationship-search">
                   <label htmlFor="buscar-nino" className="sr-only">
                     Buscar niño
@@ -1125,8 +1128,9 @@ export default function Responsables() {
                   <div className="error">{ninosError}</div>
                 ) : ninosVinculados.length === 0 ? (
                   <div className="empty">
-                    No tiene niños asociados. Utiliza la búsqueda para vincular
-                    uno existente.
+                    {canLinkNinos
+                      ? "No tiene niños asociados. Utiliza la búsqueda para vincular uno existente."
+                      : "No tiene niños asociados. Solo administración puede vincular niños."}
                   </div>
                 ) : (
                   <div className="dashboard-table-wrapper">
@@ -1199,8 +1203,8 @@ export default function Responsables() {
                                   <span className="mobile-card-value">{display.tipo || "—"}</span>
                                 </div>
                               </div>
-                              <div className="mobile-card-actions">
-                                {isAdmin && (
+                              {isAdmin && (
+                                <div className="mobile-card-actions">
                                   <button
                                     className="mobile-card-btn delete"
                                     onClick={() => quitarNino(rel)}
@@ -1208,8 +1212,8 @@ export default function Responsables() {
                                     <FaUnlink size={16} />
                                     Quitar
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1225,7 +1229,7 @@ export default function Responsables() {
                             {isAdmin && <th>Principal</th>}
                             <th>Fecha nacimiento</th>
                             <th>Tipo</th>
-                            <th className="col-actions">Acciones</th>
+                            {isAdmin && <th className="col-actions">Acciones</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -1285,9 +1289,9 @@ export default function Responsables() {
                                   {nacimientoTexto || "—"}
                                 </td>
                                 <td data-label="Tipo">{display.tipo || "—"}</td>
-                              <td className="col-actions" data-label="Acciones">
-                                <div className="row-actions">
-                                  {isAdmin && (
+                              {isAdmin && (
+                                <td className="col-actions" data-label="Acciones">
+                                  <div className="row-actions">
                                     <button
                                       className="icon-btn danger"
                                       title="Quitar niño"
@@ -1295,9 +1299,9 @@ export default function Responsables() {
                                     >
                                       <FaUnlink size={18} />
                                     </button>
-                                  )}
-                                </div>
-                              </td>
+                                  </div>
+                                </td>
+                              )}
                               </tr>
                             );
                           })}
