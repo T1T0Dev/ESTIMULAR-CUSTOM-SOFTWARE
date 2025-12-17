@@ -27,6 +27,19 @@ const resumirMotivo = (texto, max = 120) => {
   return `${limpio.slice(0, max - 1)}…`;
 };
 
+const useMostrarMotivoCompleto = () =>
+  useCallback((motivo) => {
+    if (!motivo) return;
+    const texto = String(motivo).trim();
+    if (!texto) return;
+    Swal.fire({
+      title: "Motivo de consulta",
+      text: texto,
+      confirmButtonText: "Cerrar",
+      width: "48rem",
+    });
+  }, []);
+
 const extraerTurnos = (payload) => {
   if (!payload) return [];
   if (Array.isArray(payload.data)) return payload.data;
@@ -311,6 +324,7 @@ export default function Entrevista() {
   const [departamentos, setDepartamentos] = useState([]);
   const [deptFilter, setDeptFilter] = useState("all");
   const [expandedDetalleId, setExpandedDetalleId] = useState(null);
+  const mostrarMotivoCompleto = useMostrarMotivoCompleto();
 
   // asignaciones por nino_id -> turno (o null)
   const [asignaciones, setAsignaciones] = useState({});
@@ -983,7 +997,19 @@ export default function Entrevista() {
                               <td className="col-os">{row.obra_social}</td>
                               <td className="col-motivo">
                                 {row.motivo_consulta ? (
-                                  <span className="motivo-text" title={row.motivo_consulta}>
+                                  <span
+                                    className="motivo-text"
+                                    title={row.motivo_consulta}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => mostrarMotivoCompleto(row.motivo_consulta)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        mostrarMotivoCompleto(row.motivo_consulta);
+                                      }
+                                    }}
+                                  >
                                     {resumirMotivo(row.motivo_consulta)}
                                   </span>
                                 ) : (

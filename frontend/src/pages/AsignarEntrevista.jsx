@@ -29,6 +29,19 @@ const resumirMotivo = (texto, max = 120) => {
   return `${limpio.slice(0, max - 1)}…`;
 };
 
+const useMostrarMotivoCompleto = () =>
+  useCallback((motivo) => {
+    if (!motivo) return;
+    const texto = String(motivo).trim();
+    if (!texto) return;
+    Swal.fire({
+      title: "Motivo de consulta",
+      text: texto,
+      confirmButtonText: "Cerrar",
+      width: "48rem",
+    });
+  }, []);
+
 const extraerTurnos = (payload) => {
   if (!payload) return [];
   if (Array.isArray(payload.data)) return payload.data;
@@ -332,6 +345,7 @@ export default function AsignarEntrevista() {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorPropuestas, setSelectorPropuestas] = useState([]);
   const [selectorOmitidos, setSelectorOmitidos] = useState([]);
+  const mostrarMotivoCompleto = useMostrarMotivoCompleto();
 
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
@@ -912,6 +926,15 @@ export default function AsignarEntrevista() {
                               <span
                                 className="motivo-text"
                                 title={c.motivo_consulta}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => mostrarMotivoCompleto(c.motivo_consulta)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    mostrarMotivoCompleto(c.motivo_consulta);
+                                  }
+                                }}
                               >
                                 {resumirMotivo(c.motivo_consulta)}
                               </span>
