@@ -174,6 +174,7 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
   const [consultoriosTurnos, setConsultoriosTurnos] = useState([]);
   const [todosConsultorios, setTodosConsultorios] = useState([]);
   const [mostrarTodosConsultorios, setMostrarTodosConsultorios] = useState(false);
+  const [userConsultorioToggle, setUserConsultorioToggle] = useState(false);
 
   // Detectar si es móvil y mostrar todos los consultorios por defecto
   useEffect(() => {
@@ -239,6 +240,13 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
       });
 
       setConsultoriosTurnos(resources);
+
+      // Si no hay turnos en el día, mostrar todos los consultorios por defecto (salvo que el usuario lo haya configurado manualmente)
+      setMostrarTodosConsultorios((prev) => {
+        if (userConsultorioToggle) return prev;
+        if (formattedEvents.length === 0) return true;
+        return prev;
+      });
 
     } catch (error) {
       console.error("Error fetching turnos:", error);
@@ -379,8 +387,14 @@ export default function TurnosGrid({ loggedInProfesionalId, isAdmin = false, isR
   }, [currentDate, fetchTurnos]);
 
   const handleMostrarTodosConsultorios = () => {
+    setUserConsultorioToggle(true);
     setMostrarTodosConsultorios((prev) => !prev);
   };
+
+  // Al cambiar de fecha, restablecer el comportamiento por defecto para esa jornada (a menos que ya esté activado manualmente)
+  useEffect(() => {
+    setUserConsultorioToggle(false);
+  }, [currentDate]);
 
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'calendar' ? 'list' : 'calendar');
