@@ -263,6 +263,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  color: var(--pink-1);
+  text-decoration: underline dashed;
+  text-underline-offset: 2px;
+}
+
+.motivo-text:hover,
+.motivo-text:focus {
+  color: var(--pink-2);
+  text-decoration-thickness: 2px;
 }
 
 .muted {
