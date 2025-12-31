@@ -54,3 +54,8 @@ Thumbs.db
 
 # --- Supabase local ---
 .supabase/
+
+# --- Dumps / data (no subir a repos públicos) ---
+scripts/supabaseDump.sql
+scripts/Dump*.sql
+scripts/*Dump*.sql

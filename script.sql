@@ -187,7 +187,7 @@ CREATE TABLE public.usuario_roles (
 CREATE TABLE public.usuarios (
   id_usuario bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   dni bigint UNIQUE,
-  password_hash character varying DEFAULT '$2b$12$05HVDAICCjoJgLElA1JfSer6zSiRMNEdennz7NIVbqsgCqtaLIGey'::character varying,
+  password_hash character varying,
   activo boolean NOT NULL DEFAULT true,
   creado_en timestamp with time zone NOT NULL DEFAULT now(),
   actualizado_en timestamp with time zone NOT NULL DEFAULT now(),
