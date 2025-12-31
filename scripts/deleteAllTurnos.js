@@ -10,15 +10,32 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 
 let createClient;
+let dotenv;
 try {
   ({ createClient } = require('@supabase/supabase-js'));
+  dotenv = require('dotenv');
 } catch (error) {
   const backendRequire = createRequire(path.resolve(__dirname, '..', 'backend', 'package.json'));
   ({ createClient } = backendRequire('@supabase/supabase-js'));
+  dotenv = backendRequire('dotenv');
 }
 
-const SUPABASE_URL = 'https://yhlixgtpmfreujzmescf.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlobGl4Z3RwbWZyZXVqem1lc2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTg0MzEsImV4cCI6MjA3NjEzNDQzMX0.rvvj-QMTSVacTCAX8Oz7kT-pkkwsqOULbOrQGU07IwY';
+// Carga variables de entorno (local) desde backend/.env si existe.
+dotenv.config({ path: path.resolve(__dirname, '..', 'backend', '.env') });
+
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_KEY ||
+  ''
+).trim();
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ Faltan variables de entorno para Supabase.');
+  console.error('   Configura SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Estimular-Tesis/backend/.env');
+  process.exit(1);
+}
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
